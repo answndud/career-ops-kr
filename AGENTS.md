@@ -5,6 +5,7 @@
 - 이 저장소는 한국 개발자용 구직 운영 도구를 Python CLI로 제공한다.
 - 핵심 흐름은 `공고 저장 -> 공고 평가 -> tracker 반영 -> 이력서 HTML/PDF 생성`이다.
 - 파일 기반 워크플로우를 유지한다. DB, 웹서버, 프론트엔드 앱을 기본 전제로 두지 않는다.
+- 다만 초보자용 product surface로 `serve-web` 기반 로컬 FastAPI 앱은 허용한다. 이 web layer는 선택 기능이며 core CLI/file 흐름을 대체하지 않는다.
 
 ## 실행 명령
 
@@ -22,6 +23,7 @@ python -m playwright install chromium
 ```bash
 source .venv/bin/activate
 career-ops-kr --help
+career-ops-kr serve-web
 career-ops-kr discover-jobs wanted --limit 10
 SARAMIN_ACCESS_KEY=... career-ops-kr discover-jobs saramin --limit 10
 career-ops-kr discover-jobs remember --limit 10
@@ -101,6 +103,23 @@ CLI 변경 시:
 ```bash
 source .venv/bin/activate
 career-ops-kr --help
+career-ops-kr serve-web --help
+```
+
+web 변경 시:
+
+```bash
+source .venv/bin/activate
+python -m unittest tests.test_web
+python -m unittest discover -s tests
+career-ops-kr serve-web --help
+```
+
+브라우저 E2E는 선택 검증:
+
+```bash
+source .venv/bin/activate
+CAREER_OPS_RUN_BROWSER_E2E=1 python -m unittest tests.test_web_e2e
 ```
 
 resume 렌더링 변경 시:
@@ -179,6 +198,9 @@ rm -f research/test-toss.md research/test-toss-summary.md
 - 포털 discovery 로직은 [src/career_ops_kr/portals.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/portals.py)에 둔다.
 - 회사 조사 brief와 follow-up scaffold 생성 로직은 [src/career_ops_kr/research.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/research.py)에 둔다.
 - 새 CLI 기능은 가능하면 [src/career_ops_kr/commands](/Users/alex/project/career-ops-kr/src/career_ops_kr/commands) 아래 해당 command group 모듈에 둔다. `cli.py`는 얇은 엔트리포인트로 유지한다.
+- optional web product surface는 [src/career_ops_kr/web](/Users/alex/project/career-ops-kr/src/career_ops_kr/web) 아래에 둔다. 엔트리포인트는 [src/career_ops_kr/commands/web.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/commands/web.py)와 `career-ops-kr serve-web`만 사용한다.
+- web layer는 local-only SQLite sidecar를 써도 되지만, deterministic JD/report/resume 산출은 기존 core helper를 재사용해야 한다.
+- web 검색/설정/이력서/트래커 표면은 [src/career_ops_kr/web/app.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/web/app.py)와 [src/career_ops_kr/web/templates](/Users/alex/project/career-ops-kr/src/career_ops_kr/web/templates)에서 관리한다. AI 표면은 기본 비활성화이고 필요할 때만 `serve-web --enable-ai`로 노출한다.
 - 모든 채용 플랫폼을 crawler 대상으로 취급하지 않는다. source role이 `company_research`인 항목은 리서치 입력원으로만 다룬다.
 - `Indeed`는 현재 manual detail-only source다. `viewjob?jk=<job_key>`만 canonical detail로 보고, search/listing URL은 intake로 취급하지 않는다.
 - `RocketPunch`는 현재 manual detail-only reference source다. `jobs/<job_id>`를 canonical detail URL로 보고, localized/slug 변형은 여기에 맞춰 canonicalize한다. listing/company recruit URL은 intake로 취급하지 않는다.
@@ -244,6 +266,7 @@ rm -f research/test-toss.md research/test-toss-summary.md
 - 핵심 런타임은 Python이다. 명시적 요청 없이 Node/Go 기반 새 실행 경로를 추가하지 않는다.
 - 명시적 요청 없이 `.claude/` 설정을 이 저장소에 추가하지 않는다.
 - tracker 병합 규칙을 바꾸면서 [data/applications.md](/Users/alex/project/career-ops-kr/data/applications.md) 포맷을 임의 변경하지 않는다.
+- web layer를 수정하면서 core CLI/file workflow가 web DB에 종속되도록 바꾸지 않는다.
 
 ## 작업 순서
 
@@ -291,5 +314,6 @@ rm -f research/test-toss.md research/test-toss-summary.md
 - 점수화 변경: [src/career_ops_kr/scoring.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/scoring.py), [config/scorecard.kr.yml](/Users/alex/project/career-ops-kr/config/scorecard.kr.yml), [docs/scoring-kr.md](/Users/alex/project/career-ops-kr/docs/scoring-kr.md)
 - 회사 리서치 source 변경: [docs/portal-integration-strategy.md](/Users/alex/project/career-ops-kr/docs/portal-integration-strategy.md), [config/portals.kr.example.yml](/Users/alex/project/career-ops-kr/config/portals.kr.example.yml)
 - 템플릿 변경: [templates/resume-ko.html](/Users/alex/project/career-ops-kr/templates/resume-ko.html), [templates/resume-en.html](/Users/alex/project/career-ops-kr/templates/resume-en.html)
+- web 변경: [src/career_ops_kr/commands/web.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/commands/web.py), [src/career_ops_kr/web/app.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/web/app.py), [src/career_ops_kr/web/db.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/web/db.py), [src/career_ops_kr/web/search.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/web/search.py), [src/career_ops_kr/web/resume_tools.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/web/resume_tools.py), [src/career_ops_kr/web/ai.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/web/ai.py), [src/career_ops_kr/web/templates](/Users/alex/project/career-ops-kr/src/career_ops_kr/web/templates), [tests/test_web.py](/Users/alex/project/career-ops-kr/tests/test_web.py)
 - 평가 프롬프트 변경: [prompts/evaluate-job.md](/Users/alex/project/career-ops-kr/prompts/evaluate-job.md)
 - Codex 자동화 변경: [.codex/config.toml](/Users/alex/project/career-ops-kr/.codex/config.toml), [.codex/agents/career-ops-planner.toml](/Users/alex/project/career-ops-kr/.codex/agents/career-ops-planner.toml), [.codex/agents/career-ops-docs-researcher.toml](/Users/alex/project/career-ops-kr/.codex/agents/career-ops-docs-researcher.toml), [.codex/agents/career-ops-builder.toml](/Users/alex/project/career-ops-kr/.codex/agents/career-ops-builder.toml), [.codex/agents/career-ops-reviewer.toml](/Users/alex/project/career-ops-kr/.codex/agents/career-ops-reviewer.toml), [.codex/agents/career-ops-tester.toml](/Users/alex/project/career-ops-kr/.codex/agents/career-ops-tester.toml), [.agents/skills/career-ops-session-bootstrap/SKILL.md](/Users/alex/project/career-ops-kr/.agents/skills/career-ops-session-bootstrap/SKILL.md), [.agents/skills/career-ops-company-research/SKILL.md](/Users/alex/project/career-ops-kr/.agents/skills/career-ops-company-research/SKILL.md)

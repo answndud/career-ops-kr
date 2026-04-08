@@ -98,3 +98,29 @@ Codex에게는 아래 순서로 요청하는 것이 좋습니다.
 - 반복 호출이 필요한 절차는 skill로 넣는다.
 - 역할이 분명한 작업만 custom agent로 둔다.
 - `planner`는 계획만, `builder`는 구현만, `reviewer`는 검토만, `tester`는 실행/재현만, `docs_researcher`는 조사만 맡긴다.
+
+## 8. 선택적 웹 사용 흐름
+
+터미널 대신 브라우저로 먼저 시작하고 싶으면 아래 흐름을 사용합니다.
+
+1. `career-ops-kr serve-web`를 실행합니다.
+2. 브라우저에서 `http://127.0.0.1:3001`을 열면 `홈` 대시보드가 먼저 보입니다.
+3. 홈에서 `설정 -> 이력서 -> 검색 -> 트래커` 순서로 들어가고, 최근 생성한 HTML/PDF와 preset 경로를 함께 확인합니다.
+4. `설정` 페이지에서 웹 DB 경로를 확인하고 필요하면 `DB 백업 생성`, `JSON 내보내기`, `JSON 가져오기`를 사용합니다.
+5. `이력서` 페이지에서 PDF/TXT/MD 이력서를 업로드합니다.
+6. `검색` 페이지에서 공고를 검색합니다.
+7. 검색 결과에서 아래를 바로 실행할 수 있습니다.
+   - local tracker DB 저장
+   - 맞춤 이력서 HTML/PDF 생성
+8. `트래커` 페이지에서 상태와 메모를 정리합니다.
+9. 저장한 공고를 다시 볼 때는 `트래커` 목록에서 상세 화면으로 들어가 tracker 상태와 연결된 JD/report/context/HTML/PDF를 확인하고, 공고 URL이 있으면 그 자리에서 맞춤 이력서를 다시 생성합니다.
+10. `홈`으로 돌아오면 최근 생성한 웹 HTML/PDF 이력서와 preset 경로를 다시 바로 확인할 수 있습니다.
+11. AI 기능은 기본 비활성화 상태입니다. 나중에 필요하면 `career-ops-kr serve-web --enable-ai`로 다시 켤 수 있습니다.
+
+규칙:
+
+- web layer는 편한 product surface일 뿐, core pipeline을 대체하지 않습니다.
+- web layer는 local SQLite sidecar를 사용합니다.
+- deterministic 이력서 산출은 `build-tailored-resume-from-url`를 내부에서 호출해 `jds/`, `reports/`, `output/` 경로를 그대로 사용합니다.
+- tracker source of truth는 여전히 CLI/file workflow 쪽 `data/applications.md`입니다. web jobs table은 product-side local state로 취급합니다.
+- 브라우저 E2E는 선택 검증입니다. 기본 회귀 기준은 `tests.test_web`, `python -m unittest discover -s tests`, `career-ops-kr verify`입니다. 실제 브라우저까지 확인하려면 `CAREER_OPS_RUN_BROWSER_E2E=1 python -m unittest tests.test_web_e2e`를 따로 실행합니다.

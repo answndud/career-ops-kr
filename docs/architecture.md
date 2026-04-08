@@ -2,7 +2,7 @@
 
 ## Overview
 
-`career-ops-kr`는 크게 5개 층으로 나뉩니다.
+`career-ops-kr`는 크게 6개 층으로 나뉩니다.
 
 1. `config/`
    개인 프로필, 상태값, 포털, 점수화 규칙, live smoke target registry의 소스 오브 트루스입니다.
@@ -14,6 +14,8 @@
    Codex용 project-local 운영 계층입니다. `.codex/config.toml`은 런타임 기본값과 custom agent를 정의하고, `.agents/skills/`는 반복 작업 절차를 정의합니다.
 5. `prompts/`
    Codex가 일관된 방식으로 평가와 작성 작업을 수행하도록 돕는 운영 프롬프트입니다.
+6. `src/career_ops_kr/web/`
+   선택적으로 띄울 수 있는 FastAPI 기반 product surface입니다. 홈 대시보드, 검색, 설정, 이력서 업로드, tracker UI, 저장 공고 detail view를 제공합니다. 홈 대시보드는 최근 공고, 최근 업로드 이력서, 최근 생성 웹 HTML/PDF를 한 번에 보여주고, 저장 공고 detail view는 tracker row와 연결된 artifact를 다시 열거나 같은 공고 URL로 resume build를 재실행하는 entry point로 동작합니다. 이 계층은 local-only SQLite sidecar를 쓰지만, HTML/PDF resume 산출은 기존 CLI resume pipeline을 그대로 호출합니다. AI surface는 기본 비활성화이고, 필요할 때만 `serve-web --enable-ai`로 켭니다.
 
 ## Core Flow
 
@@ -67,6 +69,24 @@ company name + optional URLs
 ```
 
 `prepare-company-research`와 `prepare-company-followup`는 네트워크 fetch를 하지 않고, 이미 알고 있는 URL과 로컬 산출물 경로만 묶어 조사 브리프와 후속 scaffold를 만듭니다. 공고 intake와 tracker 병합 흐름에 직접 쓰지 않습니다.
+
+선택적 web product surface는 아래처럼 작동합니다.
+
+```text
+browser
+  -> career-ops-kr serve-web
+  -> src/career_ops_kr/web/app.py
+  -> local SQLite sidecar (settings, jobs, resumes, ai_outputs)
+  -> search / tracker / web DB operations
+  -> build-tailored-resume-from-url
+  -> jds/*.md + reports/*.md + output/*.html/pdf
+```
+
+여기서 중요한 점은 두 가지입니다.
+
+- CLI/file workflow는 여전히 canonical core입니다.
+- web layer는 초보자용 product surface이므로 local DB를 써도 되지만, deterministic JD/report/resume 산출은 core helper를 재사용해야 합니다.
+- web DB는 settings/jobs/resumes와 운영용 backup/export/import를 위한 sidecar입니다. tracker canonical source는 여전히 `data/applications.md`입니다.
 
 ## Why Codex-First
 

@@ -133,6 +133,111 @@ def normalize_tracker_statuses(
     return changed
 
 
+def save_tracker_row(
+    tracker_path: str | Path,
+    row_input: dict[str, str],
+    *,
+    states_path: str | Path = "config/states.yml",
+) -> dict[str, str]:
+    states = load_yaml(states_path)
+    tracker = Path(tracker_path)
+    ensure_dir(tracker.parent)
+    if not tracker.exists():
+        tracker.write_text(render_tracker([]), encoding="utf-8")
+
+    rows = parse_tracker_rows(tracker.read_text(encoding="utf-8"))
+    row_id = row_input.get("id", "").strip()
+    target_row: dict[str, str] | None = None
+    if row_id:
+        target_row = next((row for row in rows if row["id"] == row_id), None)
+
+    if target_row is None:
+        next_id = max((int(row["id"]) for row in rows), default=0) + 1
+        target_row = {
+            "id": str(next_id),
+            "date": "",
+            "company": "",
+            "role": "",
+            "score": "",
+            "status": "검토중",
+            "source": "",
+            "resume": "",
+            "report": "",
+            "notes": "",
+        }
+        rows.append(target_row)
+
+    for key in ["date", "company", "role", "score", "source", "resume", "report", "notes"]:
+        if key in row_input:
+            target_row[key] = row_input[key].strip()
+    if "status" in row_input:
+        target_row["status"] = normalize_status(row_input["status"], states)
+
+    rows.sort(key=lambda row: int(row["id"]))
+    tracker.write_text(render_tracker(rows), encoding="utf-8")
+    return target_row.copy()
+
+
+def upsert_tracker_row(
+    tracker_path: str | Path,
+    row_input: dict[str, str],
+    *,
+    states_path: str | Path = "config/states.yml",
+) -> dict[str, str]:
+    states = load_yaml(states_path)
+    tracker = Path(tracker_path)
+    ensure_dir(tracker.parent)
+    if not tracker.exists():
+        tracker.write_text(render_tracker([]), encoding="utf-8")
+
+    rows = parse_tracker_rows(tracker.read_text(encoding="utf-8"))
+    row_id = row_input.get("id", "").strip()
+    target_row: dict[str, str] | None = None
+    if row_id:
+        target_row = next((row for row in rows if row["id"] == row_id), None)
+
+    if target_row is None:
+        company = row_input.get("company", "").strip()
+        role = row_input.get("role", "").strip()
+        if company and role:
+            target_row = next(
+                (row for row in rows if row["company"] == company and row["role"] == role),
+                None,
+            )
+
+    if target_row is None:
+        return save_tracker_row(tracker, row_input, states_path=states_path)
+
+    for key in ["date", "company", "role", "score", "source", "resume", "report", "notes"]:
+        if key in row_input:
+            target_row[key] = row_input[key].strip()
+    if "status" in row_input:
+        target_row["status"] = normalize_status(row_input["status"], states)
+
+    rows.sort(key=lambda row: int(row["id"]))
+    tracker.write_text(render_tracker(rows), encoding="utf-8")
+    return target_row.copy()
+
+
+def delete_tracker_row(
+    tracker_path: str | Path,
+    row_id: str | int,
+) -> bool:
+    tracker = Path(tracker_path)
+    ensure_dir(tracker.parent)
+    if not tracker.exists():
+        tracker.write_text(render_tracker([]), encoding="utf-8")
+        return False
+
+    target_id = str(row_id).strip()
+    rows = parse_tracker_rows(tracker.read_text(encoding="utf-8"))
+    next_rows = [row for row in rows if row["id"] != target_id]
+    if len(next_rows) == len(rows):
+        return False
+    tracker.write_text(render_tracker(next_rows), encoding="utf-8")
+    return True
+
+
 def _iter_addition_paths(additions_dir: Path, *, recursive: bool) -> list[Path]:
     if not additions_dir.exists():
         return []

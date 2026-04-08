@@ -43,12 +43,27 @@ from career_ops_kr.commands.resume import (
     write_live_smoke_batch_report,
 )
 from career_ops_kr.commands.tracker import run_merge_tracker, run_normalize_statuses, run_verify
+from career_ops_kr.commands.web import run_web_server
 from career_ops_kr.jobs import fetch_job_to_markdown
 from career_ops_kr.pipeline import PipelineLockError
 from career_ops_kr.scoring import ScoreJobError
 
 
 app = typer.Typer(help="Codex-first job search operations toolkit for Korean developers.")
+
+
+@app.command("serve-web")
+def serve_web(
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind host for the optional web app."),
+    port: int = typer.Option(3001, "--port", min=1, max=65535, help="Bind port for the optional web app."),
+    reload: bool = typer.Option(False, "--reload", help="Enable auto-reload for local development."),
+    enable_ai: bool = typer.Option(
+        False,
+        "--enable-ai",
+        help="Enable optional AI-assisted web features. Default is disabled.",
+    ),
+) -> None:
+    run_web_server(host=host, port=port, reload=reload, enable_ai=enable_ai)
 
 
 @app.command("fetch-job")

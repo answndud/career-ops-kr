@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}공고 상세 | Career Ops KR Web{% endblock %}
+{% block content %}
+<div class="grid two">
+  <section class="card">
+    <span class="pill">Saved Job</span>
+    <h1>{{ job.company }} · {{ job.position }}</h1>
+    <p class="muted">저장된 공고, tracker 상태, 생성 산출물을 한 화면에서 다시 확인합니다.</p>
+    <div class="grid two">
+      <div class="notice">
+        <div class="muted">상태</div>
+        <div><strong>{{ job.status }}</strong></div>
+      </div>
+      <div class="notice">
+        <div class="muted">출처</div>
+        <div><strong>{{ job.source or "-" }}</strong></div>
+      </div>
+      <div class="notice">
+        <div class="muted">위치</div>
+        <div><strong>{{ job.location or "-" }}</strong></div>
+      </div>
+      <div class="notice">
+        <div class="muted">Tracker ID</div>
+        <div><strong>{{ job.tracker_id or "-" }}</strong></div>
+      </div>
+      <div class="notice">
+        <div class="muted">지원일</div>
+        <div><strong>{{ job.date_applied or "-" }}</strong></div>
+      </div>
+      <div class="notice">
+        <div class="muted">팔로업</div>
+        <div><strong>{{ job.follow_up or "-" }}</strong></div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    {% if job.url %}
+      <div class="actions">
+        <a class="link" href="{{ job.url }}" target="_blank" rel="noreferrer">원문 공고 열기</a>
+        <a class="link" href="/tracker">목록으로 돌아가기</a>
+      </div>
+    {% else %}
+      <div class="actions">
+        <a class="link" href="/tracker">목록으로 돌아가기</a>
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <span class="pill">Notes</span>
+    <h2>메모와 로컬 상태</h2>
+    <div class="notice">
+      {% if job.notes %}
+        <pre>{{ job.notes }}</pre>
+      {% else %}
+        <div class="muted">아직 메모가 없습니다.</div>
+      {% endif %}
+    </div>
+    <div class="spacer"></div>
+    <div class="muted">created: {{ job.created_at }}</div>
+    <div class="muted">updated: {{ job.updated_at }}</div>
+  </section>
+</div>
+
+<section class="card" style="margin-top: 16px;">
+  <span class="pill">Artifacts</span>
+  <h2>저장된 산출물</h2>
+  <ul class="list-compact">
+    {% for artifact in artifacts %}
+      <li>
+        <div class="title">{{ artifact.label }}</div>
+        <div class="meta"><code>{{ artifact.path }}</code></div>
+        <div class="actions" style="margin-top: 8px;">
+          {% if artifact.output_url %}
+            <a class="link" href="{{ artifact.output_url }}" target="_blank" rel="noreferrer">열기</a>
+          {% endif %}
+          {% if artifact.view_url %}
+            <a class="link" href="{{ artifact.view_url }}" target="_blank" rel="noreferrer">내용 보기</a>
+          {% endif %}
+        </div>
+      </li>
+    {% else %}
+      <li class="muted">아직 연결된 산출물이 없습니다. 검색 또는 이력서 화면에서 이 공고 URL로 맞춤 이력서를 먼저 생성하세요.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="card" style="margin-top: 16px;">
+  <span class="pill">Build</span>
+  <h2>이 공고에서 바로 맞춤 이력서 생성</h2>
+  {% if job.url %}
+    <p class="muted">현재 저장된 회사명, 포지션, 공고 URL을 재사용해서 HTML/PDF를 다시 생성합니다. 생성이 끝나면 아래에 링크가 바로 나타납니다.</p>
+    <div class="grid two">
+      <div>
+        <label for="detail-build-preset">Preset</label>
+        <select id="detail-build-preset">
+          {% for preset in resume_presets %}
+            <option value="{{ preset.key }}">{{ preset.role_label }} · {{ preset.language_label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label><input id="detail-build-pdf" type="checkbox" checked style="width:auto;"> PDF도 같이 생성</label>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <div class="actions">
+      <button type="button" onclick="CareerOpsJobDetail.buildResume()">HTML/PDF 생성</button>
+      <a class="link" href="{{ job.url }}" target="_blank" rel="noreferrer">원문 공고 다시 열기</a>
+    </div>
+    <div class="spacer"></div>
+    <div id="detail-build-output" class="notice">아직 생성한 결과가 없습니다.</div>
+  {% else %}
+    <div class="notice warn">저장된 공고 URL이 없어서 이 화면에서 바로 이력서를 생성할 수 없습니다.</div>
+  {% endif %}
+</section>
+
+<section class="card" style="margin-top: 16px;">
+  <span class="pill">Tracker</span>
+  <h2>Markdown Tracker Snapshot</h2>
+  {% if tracker_row %}
+    <table>
+      <tbody>
+        <tr><th>ID</th><td>{{ tracker_row.id }}</td></tr>
+        <tr><th>Date</th><td>{{ tracker_row.date or "-" }}</td></tr>
+        <tr><th>Company</th><td>{{ tracker_row.company }}</td></tr>
+        <tr><th>Role</th><td>{{ tracker_row.role }}</td></tr>
+        <tr><th>Score</th><td>{{ tracker_row.score or "-" }}</td></tr>
+        <tr><th>Status</th><td>{{ tracker_row.status }}</td></tr>
+        <tr><th>Source</th><td>{{ tracker_row.source or "-" }}</td></tr>
+        <tr><th>Notes</th><td>{{ tracker_row.notes or "-" }}</td></tr>
+      </tbody>
+    </table>
+  {% else %}
+    <div class="muted">연결된 tracker row를 찾지 못했습니다.</div>
+  {% endif %}
+</section>
+
+<div class="grid two" style="margin-top: 16px;">
+  <section class="card">
+    <span class="pill">Activity</span>
+    <h2>연결된 매칭 결과</h2>
+    <ul class="list-compact">
+      {% for result in match_results %}
+        <li>
+          <div class="title">Resume #{{ result.resume_id }} · {{ result.match_score or 0 }}</div>
+          <div class="meta">{{ result.created_at }}</div>
+        </li>
+      {% else %}
+        <li class="muted">아직 이 공고에 연결된 resume match 결과가 없습니다.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  {% if ai_enabled %}
+    <section class="card">
+      <span class="pill">AI</span>
+      <h2>연결된 AI 출력</h2>
+      <ul class="list-compact">
+        {% for item in ai_outputs %}
+          <li>
+            <div class="title">{{ item.type }}</div>
+            <div class="meta">{{ item.created_at }}</div>
+            <div class="muted">{{ item.preview }}</div>
+          </li>
+        {% else %}
+          <li class="muted">아직 이 공고에 연결된 AI 출력이 없습니다.</li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+</div>
+
+{% if job.url %}
+  <script>
+    const CareerOpsJobDetail = {
+      async buildResume() {
+        const output = document.getElementById("detail-build-output");
+        output.className = "notice warn";
+        output.textContent = "이력서 생성 중...";
+        try {
+          const [role, language] = document.getElementById("detail-build-preset").value.split(":");
+          const response = await fetch("/api/resume/build-from-url", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+              url: {{ job.url | tojson }},
+              company: {{ job.company | tojson }},
+              position: {{ job.position | tojson }},
+              source: {{ (job.source or "") | tojson }},
+              role,
+              language,
+              pdf: document.getElementById("detail-build-pdf").checked,
+              job_id: {{ job.id }},
+            }),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            output.className = "notice error";
+            output.textContent = data.detail || "생성 실패";
+            return;
+          }
+          CareerOpsWeb.renderBuildResult("detail-build-output", data);
+        } catch (error) {
+          output.className = "notice error";
+          output.textContent = error.message;
+        }
+      },
+    };
+  </script>
+{% endif %}
+{% endblock %}

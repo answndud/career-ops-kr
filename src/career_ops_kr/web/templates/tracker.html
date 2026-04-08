@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+{% block title %}트래커 | Career Ops KR Web{% endblock %}
+{% block content %}
+<div class="grid two">
+  <section class="card">
+    <span class="pill">대시보드</span>
+    <h1>지원 현황</h1>
+    <div class="grid three">
+      <div class="notice">
+        <div class="muted">총 항목</div>
+        <div class="metric">{{ dashboard.totalJobs }}</div>
+      </div>
+      {% for row in dashboard.statusCounts[:2] %}
+        <div class="notice">
+          <div class="muted">{{ row.status }}</div>
+          <div class="metric">{{ row.count }}</div>
+        </div>
+      {% endfor %}
+    </div>
+    <div class="spacer"></div>
+    <ul>
+      {% for row in dashboard.statusCounts %}
+        <li>{{ row.status }}: {{ row.count }}</li>
+      {% else %}
+        <li class="muted">저장된 상태 집계가 없습니다.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="card">
+    <span class="pill">동기화</span>
+    <h2>CLI tracker와 맞추기</h2>
+    <p class="muted">웹 DB는 product surface용 sidecar이고, <code>data/applications.md</code>와 연결해 같이 운영합니다.</p>
+    <div class="actions">
+      <button type="button" onclick="CareerOpsTracker.syncTracker()">tracker 가져오기</button>
+      <button type="button" class="secondary" onclick="CareerOpsTracker.refreshJobs()">목록 새로고침</button>
+    </div>
+    <div class="spacer"></div>
+    <pre id="tracker-sync-output" style="white-space: pre-wrap;">아직 동기화하지 않았습니다.</pre>
+  </section>
+</div>
+
+<section class="card" style="margin-top: 16px;">
+  <span class="pill">빠른 추가</span>
+  <h2>수동 항목 추가</h2>
+  <form id="tracker-create-form" class="grid two" onsubmit="CareerOpsTracker.createJob(event)">
+    <div>
+      <label>회사</label>
+      <input name="company" required>
+    </div>
+    <div>
+      <label>포지션</label>
+      <input name="position" required>
+    </div>
+    <div>
+      <label>상태</label>
+      <select name="status">
+        {% for status in statuses %}
+          <option value="{{ status }}">{{ status }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>출처</label>
+      <input name="source" value="web">
+    </div>
+    <div>
+      <label>위치</label>
+      <input name="location">
+    </div>
+    <div>
+      <label>공고 URL</label>
+      <input name="url">
+    </div>
+    <div>
+      <label>지원일</label>
+      <input name="date_applied" placeholder="YYYY-MM-DD">
+    </div>
+    <div>
+      <label>팔로업</label>
+      <input name="follow_up" placeholder="YYYY-MM-DD">
+    </div>
+    <div style="grid-column: 1 / -1;">
+      <label>메모</label>
+      <textarea name="notes" rows="3"></textarea>
+    </div>
+    <div style="grid-column: 1 / -1;">
+      <button type="submit">추가</button>
+    </div>
+  </form>
+</section>
+
+<section class="card" style="margin-top: 16px;">
+  <span class="pill">필터</span>
+  <h2>검색 / 상태 / 정렬</h2>
+  <div class="grid three">
+    <div>
+      <label for="filter-q">검색어</label>
+      <input id="filter-q" placeholder="회사, 포지션, 메모">
+    </div>
+    <div>
+      <label for="filter-status">상태</label>
+      <select id="filter-status">
+        <option value="">전체</option>
+        {% for status in statuses %}
+          <option value="{{ status }}">{{ status }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="filter-sort">정렬</label>
+      <select id="filter-sort">
+        <option value="updated_at:DESC">최근 업데이트</option>
+        <option value="company:ASC">회사명</option>
+        <option value="position:ASC">포지션</option>
+        <option value="status:ASC">상태</option>
+        <option value="date_applied:DESC">지원일</option>
+      </select>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <div class="actions">
+    <button type="button" onclick="CareerOpsTracker.refreshJobs()">필터 적용</button>
+    <button type="button" class="secondary" onclick="CareerOpsTracker.resetFilters()">초기화</button>
+  </div>
+</section>
+
+<section class="card" style="margin-top: 16px;">
+  <h2>Jobs</h2>
+  <div id="jobs-table">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>회사 / 포지션</th>
+          <th>상태</th>
+          <th>출처 / 위치</th>
+          <th>메모</th>
+          <th>액션</th>
+        </tr>
+      </thead>
+      <tbody id="jobs-table-body">
+        {% for row in jobs %}
+          <tr>
+            <td>#{{ row.id }}</td>
+            <td>
+              <strong>{{ row.company }}</strong><br>
+              <span class="muted">{{ row.position }}</span>
+            </td>
+            <td>
+              <select id="status-{{ row.id }}">
+                {% for status in statuses %}
+                  <option value="{{ status }}" {% if row.status == status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+              </select>
+              <div class="spacer"></div>
+              <input id="follow-up-{{ row.id }}" value="{{ row.follow_up or '' }}" placeholder="Follow-up">
+            </td>
+            <td>
+              <input id="source-{{ row.id }}" value="{{ row.source or '' }}" placeholder="source">
+              <div class="spacer"></div>
+              <input id="location-{{ row.id }}" value="{{ row.location or '' }}" placeholder="location">
+            </td>
+            <td>
+              <textarea id="notes-{{ row.id }}" rows="2">{{ row.notes or '' }}</textarea>
+            </td>
+            <td>
+              <div class="table-actions">
+                <a class="link" href="/tracker/{{ row.id }}">상세</a>
+                <button type="button" onclick="CareerOpsTracker.saveJob({{ row.id }})">저장</button>
+                <button type="button" class="danger" onclick="CareerOpsTracker.deleteJob({{ row.id }})">삭제</button>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6" class="muted">저장된 공고가 없습니다.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+  const CareerOpsTracker = {
+    statuses: {{ statuses | tojson }},
+
+    escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    },
+
+    filters() {
+      const [sort, order] = document.getElementById("filter-sort").value.split(":");
+      return {
+        q: document.getElementById("filter-q").value.trim(),
+        status: document.getElementById("filter-status").value,
+        sort,
+        order,
+      };
+    },
+
+    renderRows(jobs) {
+      const body = document.getElementById("jobs-table-body");
+      if (!jobs.length) {
+        body.innerHTML = '<tr><td colspan="6" class="muted">조건에 맞는 공고가 없습니다.</td></tr>';
+        return;
+      }
+      body.innerHTML = jobs.map((row) => {
+        const statusOptions = CareerOpsTracker.statuses
+          .map((status) => `<option value="${CareerOpsTracker.escapeHtml(status)}" ${row.status === status ? "selected" : ""}>${CareerOpsTracker.escapeHtml(status)}</option>`)
+          .join("");
+        return `
+          <tr>
+            <td>#${row.id}</td>
+            <td><strong>${CareerOpsTracker.escapeHtml(row.company)}</strong><br><span class="muted">${CareerOpsTracker.escapeHtml(row.position)}</span></td>
+            <td>
+              <select id="status-${row.id}">${statusOptions}</select>
+              <div class="spacer"></div>
+              <input id="follow-up-${row.id}" value="${CareerOpsTracker.escapeHtml(row.follow_up || "")}" placeholder="Follow-up">
+            </td>
+            <td>
+              <input id="source-${row.id}" value="${CareerOpsTracker.escapeHtml(row.source || "")}" placeholder="source">
+              <div class="spacer"></div>
+              <input id="location-${row.id}" value="${CareerOpsTracker.escapeHtml(row.location || "")}" placeholder="location">
+            </td>
+            <td><textarea id="notes-${row.id}" rows="2">${CareerOpsTracker.escapeHtml(row.notes || "")}</textarea></td>
+            <td>
+              <div class="table-actions">
+                <a class="link" href="/tracker/${row.id}">상세</a>
+                <button type="button" onclick="CareerOpsTracker.saveJob(${row.id})">저장</button>
+                <button type="button" class="danger" onclick="CareerOpsTracker.deleteJob(${row.id})">삭제</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    },
+
+    async refreshJobs() {
+      const filters = CareerOpsTracker.filters();
+      const params = new URLSearchParams();
+      if (filters.q) params.set("q", filters.q);
+      if (filters.status) params.set("status", filters.status);
+      params.set("sort", filters.sort);
+      params.set("order", filters.order);
+      const response = await fetch(`/api/jobs?${params.toString()}`);
+      const jobs = await response.json();
+      CareerOpsTracker.renderRows(jobs);
+    },
+
+    resetFilters() {
+      document.getElementById("filter-q").value = "";
+      document.getElementById("filter-status").value = "";
+      document.getElementById("filter-sort").value = "updated_at:DESC";
+      CareerOpsTracker.refreshJobs();
+    },
+
+    async createJob(event) {
+      event.preventDefault();
+      const form = new FormData(event.target);
+      const payload = Object.fromEntries(form.entries());
+      const response = await fetch("/api/jobs", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      alert(response.ok ? `추가 완료: #${data.id}` : (data.detail || "추가 실패"));
+      if (response.ok) {
+        event.target.reset();
+        event.target.querySelector('select[name="status"]').value = CareerOpsTracker.statuses[0] || "";
+        await CareerOpsTracker.refreshJobs();
+      }
+    },
+
+    async saveJob(jobId) {
+      const payload = {
+        status: document.getElementById(`status-${jobId}`).value,
+        source: document.getElementById(`source-${jobId}`).value,
+        location: document.getElementById(`location-${jobId}`).value,
+        follow_up: document.getElementById(`follow-up-${jobId}`).value,
+        notes: document.getElementById(`notes-${jobId}`).value,
+      };
+      const response = await fetch(`/api/jobs/${jobId}`, {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      alert(response.ok ? `저장 완료: #${data.id}` : (data.detail || "저장 실패"));
+      if (response.ok) await CareerOpsTracker.refreshJobs();
+    },
+
+    async deleteJob(jobId) {
+      if (!confirm(`정말 #${jobId} 항목을 삭제할까요?`)) return;
+      const response = await fetch(`/api/jobs/${jobId}`, {method: "DELETE"});
+      const data = await response.json();
+      alert(response.ok ? "삭제 완료" : (data.detail || "삭제 실패"));
+      if (response.ok) await CareerOpsTracker.refreshJobs();
+    },
+
+    async syncTracker() {
+      const output = document.getElementById("tracker-sync-output");
+      output.textContent = "동기화 중...";
+      const response = await fetch("/api/tracker/sync", {method: "POST"});
+      const data = await response.json();
+      output.textContent = JSON.stringify(data, null, 2);
+      if (response.ok) await CareerOpsTracker.refreshJobs();
+    },
+  };
+</script>
+{% endblock %}

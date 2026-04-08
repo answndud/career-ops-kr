@@ -10,8 +10,8 @@
 - 회사 조사 메모 작성
 - 한국어/영문 이력서 HTML/PDF 생성
 
-웹서비스가 아니라 터미널에서 쓰는 도구입니다.  
-개발자가 아니어도, 명령어를 복사해서 순서대로 실행할 수 있으면 사용할 수 있게 설계했습니다.
+기본은 터미널 도구입니다.  
+다만 지금은 초보자도 쉽게 쓸 수 있도록, 선택적으로 브라우저에서 쓰는 로컬 웹 화면도 함께 제공합니다.
 
 ## 이 도구로 할 수 있는 것
 
@@ -67,13 +67,89 @@
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
-python -m playwright install chromium
 career-ops-kr --help
 ```
 
 마지막 `career-ops-kr --help`가 실행되면 설치가 된 것입니다.
 
-## 2. 가장 먼저 해야 할 일
+브라우저 E2E 테스트까지 직접 돌릴 때만 아래를 추가로 설치하면 됩니다.
+
+```bash
+python -m playwright install chromium
+```
+
+## 2. 터미널이 어렵다면: 웹 화면으로 시작하기
+
+브라우저에서 바로 쓰고 싶다면 아래 명령만 실행하면 됩니다.
+
+```bash
+source .venv/bin/activate
+career-ops-kr serve-web
+```
+
+그 다음 브라우저에서 아래 주소를 엽니다.
+
+- `http://127.0.0.1:3001`
+
+가장 쉬운 웹 시작 순서는 아래 3단계입니다.
+
+1. `설정`에서 DB 경로와 검색 연동 키를 확인합니다.
+2. `이력서`에서 내 PDF/TXT/MD 이력서를 업로드합니다.
+3. `검색` 또는 `트래커 상세`에서 맞춤 이력서 HTML/PDF를 생성합니다.
+
+처음 열리는 화면은 `홈`입니다. 여기서 아래를 바로 볼 수 있습니다.
+
+- 무엇부터 해야 하는지 순서
+- 업로드된 이력서 수
+- 저장된 공고 수
+- 최근 생성한 HTML/PDF 이력서 다시 열기
+- resume preset 시작점
+
+웹 화면에서 할 수 있는 일:
+
+- **설정**
+  - 웹 DB 경로 확인
+  - DB 백업 / JSON 내보내기 / JSON 가져오기
+  - 검색 연동 키 저장
+- **이력서**
+  - PDF/TXT/MD 업로드
+  - URL에서 맞춤 이력서 HTML/PDF 생성
+- **검색**
+  - 사람인 / 원티드 / eFinancial / Adzuna 통합 검색
+  - 검색 결과 저장
+  - 검색 결과에서 바로 맞춤 이력서 HTML/PDF 생성
+- **트래커**
+  - 저장된 공고 목록 확인
+  - 저장된 공고 상세 화면에서 tracker 상태와 생성 산출물 확인
+  - 저장된 공고 상세 화면에서 같은 URL로 맞춤 이력서 HTML/PDF 다시 생성
+  - 수동 추가 / 상태 수정 / 삭제
+  - `data/applications.md` 기준 tracker sync
+
+주의:
+
+- 이 웹 화면은 **선택 기능**입니다.
+- 기본 CLI/file workflow는 그대로 유지됩니다.
+- 웹 화면은 편한 사용을 위해 로컬 SQLite 파일 `data/career-ops-web.db`를 같이 씁니다.
+- AI 기능은 지금 기본으로 꺼져 있습니다.
+- 나중에 필요하면 `career-ops-kr serve-web --enable-ai`로 다시 켤 수 있습니다.
+- 웹에서 공고를 추가/수정/삭제하면 tracker markdown도 같이 맞추고, 필요하면 `트래커` 화면에서 다시 sync할 수 있습니다.
+- `트래커`에서 저장된 공고 상세 화면으로 들어가면 JD/report/context/HTML/PDF 연결 상태를 다시 확인할 수 있고, 저장된 공고 URL이 있으면 그 자리에서 다시 맞춤 이력서를 생성할 수 있습니다.
+- 최종 HTML/PDF 이력서 산출은 기존 Python resume pipeline을 그대로 호출합니다.
+- 웹에서 방금 만든 HTML/PDF는 `홈` 화면의 최근 생성 결과에서 다시 열 수 있습니다.
+- `홈` 화면의 최근 생성 결과는 웹에서 만든 산출물만 보여줍니다.
+
+### 웹에서 AI 없이 쓰는 기본 루트
+
+지금 이 프로젝트의 웹 화면은 아래 4가지만 써도 충분합니다.
+
+1. `이력서`에서 이력서 업로드
+2. `검색`에서 공고 저장
+3. `트래커`에서 상태와 메모 정리
+4. `검색` 또는 `트래커 상세`에서 맞춤 이력서 HTML/PDF 생성
+
+즉, 처음에는 AI 기능을 신경 쓰지 않아도 됩니다.
+
+## 3. 가장 먼저 해야 할 일
 
 이 프로젝트를 처음 쓸 때는 아래 2가지만 먼저 하면 됩니다.
 
@@ -100,7 +176,7 @@ career-ops-kr --help
 
 영문 이력서가 필요하면 `.ko.`가 없는 파일을 사용하면 됩니다.
 
-## 3. 가장 쉬운 시작 방법: 공고 URL 하나로 이력서 만들기
+## 4. 가장 쉬운 시작 방법: 공고 URL 하나로 이력서 만들기
 
 초보자에게 가장 쉬운 방법은 `공고 1개`로 시작하는 것입니다.
 
@@ -146,7 +222,7 @@ source .venv/bin/activate
 career-ops-kr generate-pdf output/my-first-resume.html output/my-first-resume.pdf
 ```
 
-## 4. 공고를 여러 개 관리하는 기본 루트
+## 5. 공고를 여러 개 관리하는 기본 루트
 
 공고를 하나씩 넣는 대신, 여러 개를 pipeline에 쌓아두고 처리할 수도 있습니다.
 
@@ -182,7 +258,7 @@ career-ops-kr process-pipeline --limit 3 --score --profile-path config/profile.e
 - `reports/`에 평가 결과를 만들고
 - tracker addition 파일도 같이 생성할 수 있습니다
 
-## 5. tracker 반영하기
+## 6. tracker 반영하기
 
 지원 현황을 한 파일로 정리하고 싶으면 tracker를 씁니다.
 
@@ -201,7 +277,7 @@ career-ops-kr finalize-tracker
 
 지원 현황 원본 파일은 `data/applications.md`입니다.
 
-## 6. 이력서를 단계별로 만들고 싶을 때
+## 7. 이력서를 단계별로 만들고 싶을 때
 
 위의 one-shot 명령 대신, 단계별로 나눠서 작업할 수도 있습니다.
 
@@ -242,7 +318,7 @@ source .venv/bin/activate
 career-ops-kr generate-pdf output/my-resume.html output/my-resume.pdf
 ```
 
-## 7. 회사 조사 메모 만들기
+## 8. 회사 조사 메모 만들기
 
 지원 전에 회사 조사 메모를 만들고 싶다면:
 
@@ -338,6 +414,26 @@ career-ops-kr --help
 source .venv/bin/activate
 career-ops-kr verify
 ```
+
+### 웹 DB를 백업하거나 옮기고 싶을 때
+
+웹의 `설정` 화면에서 아래 3가지를 구분해서 쓰면 됩니다.
+
+- `DB 백업 생성`
+  현재 SQLite 파일을 그대로 복사해 둡니다.
+  가장 안전한 기본 백업입니다.
+- `JSON 내보내기`
+  현재 웹 DB 내용을 JSON snapshot으로 저장합니다.
+  다른 로컬 환경으로 옮기거나 내용을 확인할 때 편합니다.
+- `JSON 가져오기`
+  이전에 내보낸 JSON snapshot을 다시 불러옵니다.
+  가져오기 전에 자동 백업도 함께 만듭니다.
+
+처음에는 아래처럼 이해하면 됩니다.
+
+- 그냥 안전하게 보관하고 싶다: `DB 백업 생성`
+- 다른 곳으로 옮기고 싶다: `JSON 내보내기`
+- 예전에 저장한 상태로 되돌리고 싶다: `JSON 가져오기`
 
 ### TLS 인증서 문제로 fetch가 실패할 때
 

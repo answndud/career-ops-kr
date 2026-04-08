@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}홈 | Career Ops KR Web{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="stack" style="margin-bottom: 12px;">
+    <span class="pill">Start Here</span>
+    <span class="pill">Optional Web Surface</span>
+  </div>
+  <h1>처음 쓰는 사람도 바로 시작할 수 있는 구직 대시보드</h1>
+  <p class="muted" style="margin-top: 0; font-weight: 700;">무엇부터 할지 바로 보이는 시작 화면</p>
+  <p class="lede">
+    이 웹 화면은 편하게 시작하기 위한 선택 기능입니다. 핵심 기록은 여전히 CLI와 파일 기반 workflow가 기준이고,
+    여기서는 검색, 이력서, tracker, 설정을 한 화면에서 빠르게 이어갈 수 있습니다.
+  </p>
+  <div class="actions" style="margin-top: 18px;">
+    <a class="link" href="/search">공고 검색</a>
+    <a class="link" href="/resume">이력서 업로드</a>
+    <a class="link" href="/tracker">트래커 확인</a>
+    <a class="link" href="/settings">설정 저장</a>
+  </div>
+</section>
+
+<section class="grid four" style="margin-top: 16px;">
+  <article class="stat">
+    <div class="label">Jobs</div>
+    <div class="value">{{ dashboard.totalJobs }}</div>
+    <div class="hint">저장된 공고 수</div>
+  </article>
+  <article class="stat">
+    <div class="label">Resumes</div>
+    <div class="value">{{ dashboard.totalResumes }}</div>
+    <div class="hint">업로드된 이력서 수</div>
+  </article>
+  <article class="stat">
+    <div class="label">Generated</div>
+    <div class="value">{{ dashboard.generatedResumeCount }}</div>
+    <div class="hint">웹에서 생성한 HTML 이력서 수</div>
+  </article>
+  {% if ai_enabled %}
+    <article class="stat">
+      <div class="label">AI outputs</div>
+      <div class="value">{{ dashboard.totalAiOutputs }}</div>
+      <div class="hint">어시스턴트 출력 수</div>
+    </article>
+  {% endif %}
+</section>
+
+<section class="card" style="margin-top: 16px;">
+  <span class="pill">Quick Start</span>
+  <h2>처음 할 일 4개</h2>
+  <div class="grid two">
+    <article class="card" style="padding: 16px;">
+      <h3>1. 기본 설정 확인</h3>
+      <p class="muted">웹 DB 경로와 백업/내보내기 기능을 먼저 확인합니다.</p>
+      <div class="actions"><a class="link" href="/settings">설정 열기</a></div>
+    </article>
+    <article class="card" style="padding: 16px;">
+      <h3>2. 이력서 업로드</h3>
+      <p class="muted">PDF/TXT/MD 이력서를 넣으면 매칭과 재작성이 가능합니다.</p>
+      <div class="actions"><a class="link" href="/resume">이력서 열기</a></div>
+    </article>
+    <article class="card" style="padding: 16px;">
+      <h3>3. 공고 검색</h3>
+      <p class="muted">원티드, 사람인, Adzuna, eFinancialCareers를 한 번에 조회합니다.</p>
+      <div class="actions"><a class="link" href="/search">검색 열기</a></div>
+    </article>
+    <article class="card" style="padding: 16px;">
+      <h3>4. tracker 정리</h3>
+      <p class="muted">저장한 공고를 상태별로 정리하고 follow-up을 관리합니다.</p>
+      <div class="actions"><a class="link" href="/tracker">트래커 열기</a></div>
+    </article>
+  </div>
+</section>
+
+<section class="callout" style="margin-top: 16px;">
+  <strong>주의:</strong> 이 화면은 편한 진입점입니다.
+  실제 source of truth는 여전히 CLI/file workflow와 <code>data/applications.md</code>입니다.
+  웹에서는 로컬 SQLite sidecar가 함께 쓰이며, 최종 이력서 산출은 core pipeline을 그대로 호출합니다.
+  최근 생성 결과에는 <strong>웹에서 만든 HTML/PDF 산출물만</strong> 표시합니다.
+</section>
+
+<div class="grid two" style="margin-top: 16px;">
+  <section class="card">
+    <span class="pill">Recent Jobs</span>
+    <h2>최근 저장된 공고</h2>
+    <ul class="list-compact">
+      {% for row in dashboard.recentJobs %}
+        <li>
+          <div class="title"><a class="link" href="/tracker/{{ row.id }}">#{{ row.id }} · {{ row.company }} · {{ row.position }}</a></div>
+          <div class="meta">상태: {{ row.status }} · 업데이트: {{ row.updated_at }}</div>
+        </li>
+      {% else %}
+        <li class="muted">아직 저장된 공고가 없습니다. 검색에서 공고를 저장해 보세요.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="card">
+    <span class="pill">Follow-up</span>
+    <h2>다가오는 팔로업</h2>
+    <ul class="list-compact">
+      {% for row in dashboard.upcomingFollowUps %}
+        <li>
+          <div class="title"><a class="link" href="/tracker/{{ row.id }}">{{ row.follow_up }} · {{ row.company }} · {{ row.position }}</a></div>
+          <div class="meta">항목 #{{ row.id }}</div>
+        </li>
+      {% else %}
+        <li class="muted">다가오는 팔로업이 없습니다.</li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+
+<div class="grid two" style="margin-top: 16px;">
+  <section class="card">
+    <span class="pill">Recent Resumes</span>
+    <h2>최근 업로드된 이력서</h2>
+    <ul class="list-compact">
+      {% for resume in dashboard.recentResumes %}
+        <li>
+          <div class="title">#{{ resume.id }} · {{ resume.filename }}</div>
+          <div class="meta">{{ resume.created_at }}</div>
+        </li>
+      {% else %}
+        <li class="muted">아직 업로드된 이력서가 없습니다.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="card">
+    <span class="pill">Generated Output</span>
+    <h2>최근 생성한 웹 HTML/PDF</h2>
+    <ul class="list-compact">
+      {% for item in dashboard.recentGeneratedResumes %}
+        <li>
+          <div class="title">{{ item.label }}</div>
+          <div class="meta">{{ item.modified_at }}</div>
+          <div class="actions" style="margin-top: 8px;">
+            {% if item.html_url %}
+              <a class="link" href="{{ item.html_url }}" target="_blank" rel="noreferrer">HTML</a>
+            {% endif %}
+            {% if item.pdf_url %}
+              <a class="link" href="{{ item.pdf_url }}" target="_blank" rel="noreferrer">PDF</a>
+            {% endif %}
+          </div>
+          {% if item.job_path or item.report_path or item.context_path %}
+            <div class="meta" style="margin-top: 8px;">
+              {% if item.job_path %}<div>job: <code>{{ item.job_path }}</code></div>{% endif %}
+              {% if item.report_path %}<div>report: <code>{{ item.report_path }}</code></div>{% endif %}
+              {% if item.context_path %}<div>context: <code>{{ item.context_path }}</code></div>{% endif %}
+            </div>
+          {% endif %}
+        </li>
+      {% else %}
+        <li class="muted">아직 생성된 HTML/PDF 이력서가 없습니다.</li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+
+<div class="grid two" style="margin-top: 16px;">
+  <section class="card">
+    <span class="pill">Preset</span>
+    <h2>바로 시작할 수 있는 이력서 preset</h2>
+    <ul class="list-compact">
+      {% for preset in resume_presets %}
+        <li>
+          <div class="title">{{ preset.role_label }} · {{ preset.language_label }}</div>
+          <div class="meta"><code>{{ preset.context_path }}</code></div>
+          <div class="meta"><code>{{ preset.template_path }}</code></div>
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="card">
+    <span class="pill">Status</span>
+    <h2>tracker 상태 분포</h2>
+    <div class="stack">
+      {% for row in dashboard.statusCounts %}
+        <span class="pill">{{ row.status }} · {{ row.count }}</span>
+      {% else %}
+        <span class="muted">상태 집계가 없습니다.</span>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+
+{% if ai_enabled %}
+  <section class="card" style="margin-top: 16px;">
+    <span class="pill">AI</span>
+    <h2>최근 AI 출력</h2>
+    <ul class="list-compact">
+      {% for item in dashboard.recentAiOutputs %}
+        <li>
+          <div class="title">#{{ item.id }} · {{ item.type }}</div>
+          <div class="meta">{{ item.created_at }}</div>
+          <div class="meta">{{ item.preview }}</div>
+        </li>
+      {% else %}
+        <li class="muted">아직 AI 출력이 없습니다.</li>
+      {% endfor %}
+    </ul>
+  </section>
+{% else %}
+  <section class="notice warn" style="margin-top: 16px;">
+    AI 기능은 현재 기본 비활성화 상태입니다. 지금은 검색, 저장, tracker, deterministic resume build만 사용하면 됩니다.
+  </section>
+{% endif %}
+{% endblock %}

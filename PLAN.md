@@ -4,6 +4,7 @@
 
 - 한국 개발자용 구직 운영 도구를 Python CLI 중심으로 확장 가능한 형태로 완성한다.
 - 기본 흐름인 `공고 저장 -> 공고 평가 -> tracker 반영 -> 이력서 HTML/PDF 생성`을 안정적으로 유지한다.
+- 기본 흐름 위에 초보자용 optional web product surface를 유지한다.
 - 이후 국내 채용 포털 스캐너와 직군별 점수화 규칙을 추가할 수 있는 구조를 만든다.
 
 ## 작업 단위
@@ -19,16 +20,31 @@
   - `render-resume`
   - `generate-pdf`
 - shared scoring helper와 최소 `unittest` smoke suite 유지
+- optional web surface에 대한 browser E2E smoke는 선택 검증으로만 유지
+  - `tests.test_web_e2e`
+  - 기본 discover에서는 skip되고 `CAREER_OPS_RUN_BROWSER_E2E=1`일 때만 실행
+  - 기본 회귀 기준은 `tests.test_web`, `unittest discover`, `verify`
 - tracker, report, output 디렉터리 워크플로우 유지
 - README, docs, AGENTS 문서 동기화
   - 초보자용 전체 README 가이드 작성 완료
+  - README에 웹 3단계 시작 루트, AI 없이 쓰는 기본 루트, DB backup/export/import 설명 보강 완료
   - 이후 CLI 표면이 바뀌면 README 예시 명령도 함께 갱신
 - git hygiene 유지
   - 생성 산출물은 `.gitignore`와 `.gitkeep` 기준으로 버전 관리에서 제외
   - commit 전 smoke/demo 산출물이 남아 있지 않게 유지
+- optional web surface 유지
+  - `career-ops-kr serve-web`
+  - home dashboard / search / settings / resume upload / tracker / saved job detail / deterministic resume build-from-url
+  - home dashboard는 최근 공고 / 최근 이력서 / 최근 생성 웹 HTML/PDF / preset 경로를 함께 보여주는 입구로 유지
+  - saved job detail은 tracker 상태와 연결된 JD / report / context / HTML / PDF, related match activity를 다시 확인하고, 저장된 공고 URL이 있으면 같은 화면에서 resume build를 다시 시작하는 entry point로 유지
+  - AI surface는 기본 비활성화로 유지하고 필요할 때만 `serve-web --enable-ai`로 노출
+  - settings 화면에서 web DB backup/export/import를 지원
 - AI harness 로컬 설정 추가 설계
   - Codex: `AGENTS.md`, `.codex/config.toml`, `.codex/agents/`, `.agents/skills/`
   - command surface는 skill 우선으로 통일하고, 별도 command 계층은 만들지 않음
+- optional web surface browser E2E는 선택 검증으로 유지
+  - Python Playwright 기반 `tests/test_web_e2e.py`
+  - 홈 -> resume upload -> tracker 생성 -> saved job detail -> resume build 기본 흐름을 필요할 때만 실제 브라우저에서 점검
 
 ### P0.5
 
@@ -138,6 +154,7 @@
   - `list-live-smoke-reports --latest-per-target`으로 target별 최신 상태 inventory 지원
   - `validate-live-smoke-reports`로 saved report freshness/success coverage gate 지원
   - 2026-04-07 live smoke batch + freshness gate 실검증 완료
+  - 2026-04-08 live smoke batch report `output/live-smoke/20260408-batch-report.json` 저장 및 `6 ok, 0 failing` 재검증 완료
 - source role 분류 정리 완료
   - Remember: primary intake
   - Indeed: manual intake with `jk`-based canonicalization

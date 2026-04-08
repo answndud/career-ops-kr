@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}어시스턴트 | Career Ops KR Web{% endblock %}
+{% block content %}
+<section class="card">
+  <span class="pill">AI</span>
+  <h1>AI 어시스턴트</h1>
+  {% if ai_enabled %}
+    <p class="muted">자기소개서, 면접 준비, 공고 분석, 스킬 갭 분석을 한 화면에서 실행합니다.</p>
+    <div class="grid two">
+      <div>
+        <label>모드</label>
+        <select id="assistant-mode">
+          {% for mode in modes %}
+            <option value="{{ mode.replace('_', '-') }}">{{ mode }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>이력서</label>
+        <select id="assistant-resume-id">
+          <option value="">사용 안 함</option>
+          {% for resume in resumes %}
+            <option value="{{ resume.id }}">#{{ resume.id }} · {{ resume.filename }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>회사</label>
+        <input id="assistant-company" placeholder="예: Toss">
+      </div>
+      <div>
+        <label>포지션</label>
+        <input id="assistant-position" placeholder="예: Backend Engineer">
+      </div>
+      <div style="grid-column: 1 / -1;">
+        <label>공고 설명</label>
+        <textarea id="assistant-job-description" rows="10"></textarea>
+      </div>
+      <div style="grid-column: 1 / -1;">
+        <button type="button" onclick="CareerOpsAssistant.run()">실행</button>
+      </div>
+    </div>
+  {% else %}
+    <div class="notice warn">
+      AI 기능은 현재 비활성화되어 있습니다. 나중에 필요하면 <code>career-ops-kr serve-web --enable-ai</code>로 다시 켤 수 있습니다.
+    </div>
+  {% endif %}
+</section>
+
+{% if ai_enabled %}
+  <section class="card" style="margin-top: 16px;">
+    <span class="pill">출력</span>
+    <pre id="assistant-output" style="white-space: pre-wrap;">아직 실행한 결과가 없습니다.</pre>
+  </section>
+{% endif %}
+
+{% if ai_enabled %}
+<script>
+  const CareerOpsAssistant = {
+    async run() {
+      const output = document.getElementById("assistant-output");
+      output.textContent = "생성 중...";
+      const payload = {
+        resume_id: document.getElementById("assistant-resume-id").value || null,
+        company: document.getElementById("assistant-company").value,
+        position: document.getElementById("assistant-position").value,
+        job_description: document.getElementById("assistant-job-description").value,
+      };
+      const mode = document.getElementById("assistant-mode").value;
+      const response = await fetch(`/api/ai/${mode}`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      output.textContent = data.output || JSON.stringify(data, null, 2);
+    },
+  };
+</script>
+{% endif %}
+{% endblock %}

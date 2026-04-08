@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}설정 | Career Ops KR Web{% endblock %}
+{% block content %}
+<section class="card">
+  <span class="pill">설정</span>
+  <h1>웹 설정과 데이터 관리</h1>
+  <p class="muted">현재 DB 경로: <code>{{ db_path }}</code></p>
+  <p class="muted">설정 페이지에 저장하면 로컬 SQLite sidecar에 보관됩니다.</p>
+  {% if ai_enabled %}
+    <p class="muted">현재 active provider: <strong>{{ active_provider }}</strong></p>
+  {% else %}
+    <div class="notice warn">AI 기능은 현재 비활성화되어 있습니다. 지금은 검색, tracker, deterministic resume build만 사용하면 됩니다.</div>
+  {% endif %}
+  <div class="grid two" style="margin-top: 16px;">
+    <section class="card" style="padding: 16px;">
+      <h2>검색 연동 키</h2>
+      <table>
+        <thead>
+          <tr><th>키</th><th>값</th><th>액션</th></tr>
+        </thead>
+        <tbody>
+          {% for key in allowed_search_keys %}
+            <tr>
+              <td>{{ key }}</td>
+              <td><input id="setting-{{ key }}" value="{{ settings.get(key, '') }}"></td>
+              <td><button type="button" onclick="CareerOpsSettings.save('{{ key }}')">저장</button></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card" style="padding: 16px;">
+      <h2>DB 백업 / 내보내기 / 가져오기</h2>
+      <div class="grid">
+        <button type="button" onclick="CareerOpsSettings.backupDb()">DB 백업 생성</button>
+        <button type="button" class="secondary" onclick="CareerOpsSettings.exportDb()">JSON 내보내기</button>
+        <label>JSON snapshot 가져오기</label>
+        <input id="db-import-file" type="file" accept=".json">
+        <button type="button" class="ghost" onclick="CareerOpsSettings.importDb()">JSON 가져오기</button>
+      </div>
+    </section>
+  </div>
+  {% if ai_enabled %}
+    <section class="card" style="margin-top: 16px; padding: 16px;">
+      <h2>AI 키</h2>
+      <table>
+        <thead>
+          <tr><th>키</th><th>값</th><th>액션</th></tr>
+        </thead>
+        <tbody>
+          {% for key in allowed_ai_keys %}
+            <tr>
+              <td>{{ key }}</td>
+              <td><input id="setting-{{ key }}" value="{{ settings.get(key, '') }}"></td>
+              <td><button type="button" onclick="CareerOpsSettings.save('{{ key }}')">저장</button></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  {% endif %}
+  <div class="spacer"></div>
+  <pre id="settings-output" style="white-space: pre-wrap;">아직 저장한 결과가 없습니다.</pre>
+</section>
+
+<script>
+  const CareerOpsSettings = {
+    async save(key) {
+      const output = document.getElementById("settings-output");
+      const value = document.getElementById(`setting-${key}`).value;
+      const response = await fetch("/api/settings", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({key, value}),
+      });
+      const data = await response.json();
+      output.textContent = JSON.stringify({key, response: data}, null, 2);
+    },
+    async backupDb() {
+      const output = document.getElementById("settings-output");
+      const response = await fetch("/api/system/db/backup", {method: "POST"});
+      const data = await response.json();
+      output.textContent = JSON.stringify(data, null, 2);
+    },
+    async exportDb() {
+      const output = document.getElementById("settings-output");
+      const response = await fetch("/api/system/db/export", {method: "POST"});
+      const data = await response.json();
+      output.textContent = JSON.stringify(data, null, 2);
+    },
+    async importDb() {
+      const output = document.getElementById("settings-output");
+      const fileInput = document.getElementById("db-import-file");
+      if (!fileInput.files[0]) {
+        output.textContent = "가져올 JSON snapshot 파일을 먼저 선택하세요.";
+        return;
+      }
+      const form = new FormData();
+      form.append("file", fileInput.files[0]);
+      const response = await fetch("/api/system/db/import", {method: "POST", body: form});
+      const data = await response.json();
+      output.textContent = JSON.stringify(data, null, 2);
+    },
+  };
+</script>
+{% endblock %}

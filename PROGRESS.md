@@ -19,6 +19,45 @@
   - 설치, 첫 설정, one-shot 이력서 생성, pipeline 처리, tracker 반영, 회사 조사, 문제 해결 순서로 재구성
   - 자주 쓰는 명령과 폴더 역할을 쉬운 한국어로 설명
   - live smoke/report tooling은 일반 사용자 흐름과 분리해 고급 기능으로 안내
+  - Playwright 설치를 선택 항목으로 내리고, 웹 3단계 시작 루트와 AI 없이 쓰는 기본 웹 루트를 추가
+  - settings 화면의 DB backup / JSON export / JSON import를 언제 쓰는지 쉬운 문장으로 보강
+- optional web product surface 정비
+  - `career-ops-kr serve-web` command 연결
+  - `src/career_ops_kr/web/app.py` 기준 FastAPI app을 공식 web entry로 정리
+  - 검색 / 설정 / 이력서 업로드 / tracker / import / resume build-from-url UI/API를 usable 상태로 보강
+  - deterministic resume pipeline을 web endpoint에서 재사용
+  - `tests/test_web.py`로 page render, job CRUD/import, resume build bridge 회귀 추가
+  - `tests/test_web_e2e.py`로 home -> resume upload -> tracker -> saved job detail -> detail-based resume build 흐름을 선택 검증으로 유지
+  - beginner onboarding을 위해 `/` 홈 대시보드 추가
+  - 홈에서 빠른 시작 순서, 최근 저장 공고, upcoming follow-up, 최근 업로드 이력서, 최근 생성 HTML/PDF 이력서를 바로 확인 가능하게 정리
+  - dashboard snapshot에 generated artifact `context_path`를 추가
+  - `tests/test_web.py`에 home/dashboard recent artifact 회귀 추가
+  - search/resume build 결과를 raw JSON 대신 직접 열 수 있는 HTML/PDF 링크 요약으로 표시하도록 개선
+  - saved job detail page 추가
+    - `/tracker/<job_id>`에서 tracker 상태, 메모, 외부 공고 URL, 연결된 JD/report/context/HTML/PDF를 다시 확인 가능하게 정리
+    - 해당 job_id에 연결된 recent match result를 다시 확인 가능하게 정리
+    - `/tracker/<job_id>/artifacts/{job,report,context}` read-only artifact route 추가
+    - tracker/home recent jobs에서 detail 화면으로 바로 들어갈 수 있게 링크 추가
+  - resume build artifact를 기존 saved job row에 다시 연결
+    - web DB `jobs` table에 `job_path`, `report_path`, `tailoring_path`, `context_path`, `html_path`, `pdf_path` 저장
+    - `build-from-url` 성공 시 `job_id` 또는 URL / company / position 기준 matching row를 찾아 artifact path를 갱신
+    - `tests/test_web.py`에 import + build artifact persistence 회귀 추가
+  - browser E2E smoke 추가
+    - `tests/test_web_e2e.py`
+    - 실제 browser에서 홈 -> resume upload -> tracker 생성 -> saved job detail -> detail-based resume build -> 홈 recent generated output 흐름 검증
+    - 기본 discover에서는 skip되고 `CAREER_OPS_RUN_BROWSER_E2E=1`일 때만 실행하는 선택 smoke로 유지
+    - web test용 temp DB/output/tracker/JD/report 경로를 env 기반으로 분리 가능하게 정리
+  - AI 기능 비활성 기본값 정리
+    - `CAREER_OPS_WEB_ENABLE_AI`가 없으면 nav, 홈, 검색, 이력서 화면에서 AI surface를 숨김
+    - `serve-web --enable-ai`로 나중에 다시 켤 수 있게 정리
+    - AI API route는 비활성 상태에서 404로 막고, 검색/저장/build 중심 웹 흐름을 기본값으로 유지
+  - settings 화면에 web DB backup/export/import 추가
+    - SQLite backup 생성
+    - JSON snapshot export/import
+    - `tests/test_web.py`에 backup/export/import roundtrip 회귀 추가
+  - 2026-04-08 live smoke batch 재실행 완료
+    - `output/live-smoke/20260408-batch-report.json` 저장
+    - `show-live-smoke-report`, `validate-live-smoke-reports --max-age-hours 1`, `list-live-smoke-reports --latest-per-target`로 `6 passed, 0 failed`, `6 ok, 0 failing` 확인
 - git commit 준비를 위해 생성 산출물 정리와 ignore 규칙 보강
   - `jds/`, `reports/`, `research/`, `output/`, `data/tracker-additions/`는 `.gitkeep`만 추적하고 실제 생성물은 `.gitignore`로 제외
   - demo smoke 산출물 삭제 후 clean starter 상태 유지
@@ -128,6 +167,7 @@
   - `list-live-smoke-reports --latest-per-target`을 추가해 batch/single report를 target별 최신 상태 inventory로 바로 볼 수 있게 보강
   - `validate-live-smoke-reports`를 추가해 saved report 기준으로 각 registry target의 최신 상태가 fresh success인지 gate할 수 있게 보강
   - `career-ops-kr smoke-live-resume-batch --report-out <tmp>` + `career-ops-kr validate-live-smoke-reports <tmp> --max-age-hours 1` 실제 실행으로 2026-04-07 기준 `6 ok, 0 failing` 확인
+  - 2026-04-08에도 batch live smoke와 freshness gate를 다시 실행해 `6 passed, 0 failed`, `6 ok, 0 failing` 재확인
 - 세션 운영 규칙 문서 추가
   - `AGENTS.md`
 - Codex 공식 문서와 `everything-claude-code` 조사 완료

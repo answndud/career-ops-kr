@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Career Ops KR Web{% endblock %}</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5efe4;
+        --panel: #fffdf8;
+        --ink: #1e293b;
+        --muted: #64748b;
+        --accent: #0f766e;
+        --accent-strong: #115e59;
+        --accent-soft: #dff3ef;
+        --line: #d9d2c7;
+        --danger: #b91c1c;
+        --warn: #92400e;
+        --ok: #166534;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top right, rgba(15, 118, 110, 0.08), transparent 24rem),
+          linear-gradient(180deg, #f8f2e8 0%, #efe6d8 100%);
+      }
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 253, 248, 0.82);
+        backdrop-filter: blur(10px);
+      }
+      .shell { max-width: 1200px; margin: 0 auto; }
+      .brand { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+      .brand h1 { margin: 0; font-size: 20px; }
+      .metric { font-size: 28px; font-weight: 800; margin-top: 6px; }
+      .muted { color: var(--muted); }
+      nav { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+      nav a {
+        text-decoration: none;
+        color: var(--accent-strong);
+        font-weight: 700;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(15, 118, 110, 0.08);
+      }
+      main { max-width: 1200px; margin: 0 auto; padding: 24px; }
+      .grid { display: grid; gap: 16px; }
+      .grid.two { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+      .grid.three { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+      .grid.four { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 20px;
+        box-shadow: 0 18px 40px rgba(30, 41, 59, 0.08);
+      }
+      .pill {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent-strong);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      h1, h2, h3 { margin-top: 0; }
+      p, li { line-height: 1.55; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td {
+        text-align: left;
+        vertical-align: top;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+      }
+      .stack { display: flex; flex-wrap: wrap; gap: 8px; }
+      .hero {
+        padding: 28px;
+        border-radius: 26px;
+        border: 1px solid rgba(17, 94, 89, 0.14);
+        background:
+          linear-gradient(135deg, rgba(223, 243, 239, 0.98), rgba(255, 253, 248, 0.94)),
+          linear-gradient(180deg, #fffdf8 0%, #f8f2e8 100%);
+        box-shadow: 0 22px 48px rgba(30, 41, 59, 0.12);
+      }
+      .hero h1 { font-size: 34px; margin-bottom: 8px; }
+      .hero .lede { max-width: 72ch; font-size: 16px; }
+      .stat {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.72);
+        padding: 16px;
+      }
+      .stat .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+      .stat .value { font-size: 30px; font-weight: 800; margin-top: 6px; }
+      .stat .hint { font-size: 13px; color: var(--muted); margin-top: 6px; }
+      input, textarea, select, button { width: 100%; font: inherit; }
+      input, textarea, select {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: white;
+        color: var(--ink);
+      }
+      textarea { min-height: 120px; resize: vertical; }
+      button {
+        border: 0;
+        border-radius: 12px;
+        padding: 10px 14px;
+        background: var(--accent);
+        color: white;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button.secondary { background: #334155; }
+      button.ghost { background: rgba(15, 118, 110, 0.08); color: var(--accent-strong); }
+      button.danger { background: var(--danger); }
+      button:disabled { opacity: 0.55; cursor: wait; }
+      pre, code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: #f3eee4;
+        border-radius: 12px;
+      }
+      pre {
+        white-space: pre-wrap;
+        padding: 14px;
+        overflow-x: auto;
+      }
+      code { padding: 2px 6px; }
+      .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+      .actions > * { width: auto; }
+      .notice {
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: #fcfaf4;
+      }
+      .notice.ok { border-color: rgba(22, 101, 52, 0.24); color: var(--ok); background: #ecfdf3; }
+      .notice.warn { border-color: rgba(146, 64, 14, 0.24); color: var(--warn); background: #fff7ed; }
+      .notice.error { border-color: rgba(185, 28, 28, 0.24); color: var(--danger); background: #fef2f2; }
+      .spacer { height: 8px; }
+      .hidden { display: none; }
+      .inline-form { display: grid; gap: 10px; }
+      .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+      .toolbar > * { width: auto; }
+      a.link { color: var(--accent-strong); font-weight: 700; }
+      .list-compact {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 10px;
+      }
+      .list-compact li {
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: #fffdf9;
+      }
+      .list-compact .title { font-weight: 700; }
+      .list-compact .meta { color: var(--muted); font-size: 13px; margin-top: 4px; }
+      .callout {
+        border-radius: 16px;
+        border: 1px solid rgba(185, 28, 28, 0.16);
+        background: linear-gradient(180deg, #fff4f4, #fffaf8);
+        padding: 14px 16px;
+      }
+      .callout strong { color: var(--danger); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="shell">
+        <div class="brand">
+          <div>
+            <h1>Career Ops KR Web</h1>
+            <div class="muted">Python 기반 optional product surface for search, resume, tracker, and local operations.</div>
+          </div>
+          <div class="notice">
+            CLI와 파일 기반 core는 그대로 유지됩니다. 이 웹 표면은 로컬 SQLite sidecar를 쓰는 선택 기능입니다.
+          </div>
+        </div>
+        <nav>
+          <a href="/">홈</a>
+          <a href="/search">검색</a>
+          <a href="/resume">이력서</a>
+          {% if ai_enabled %}
+            <a href="/assistant">어시스턴트</a>
+          {% endif %}
+          <a href="/tracker">트래커</a>
+          <a href="/settings">설정</a>
+        </nav>
+      </div>
+    </header>
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+    <script>
+      window.CareerOpsWeb = {
+        escapeHtml(value) {
+          return String(value || "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;");
+        },
+        renderBuildResult(targetId, payload) {
+          const target = document.getElementById(targetId);
+          const htmlUrl = payload.html_url ? `<a class="link" href="${this.escapeHtml(payload.html_url)}" target="_blank" rel="noreferrer">HTML 열기</a>` : "";
+          const pdfUrl = payload.pdf_url ? `<a class="link" href="${this.escapeHtml(payload.pdf_url)}" target="_blank" rel="noreferrer">PDF 열기</a>` : "";
+          const detailUrl = payload.job_id ? `<a class="link" href="/tracker/${payload.job_id}">저장된 공고 보기</a>` : "";
+          target.innerHTML = `
+            <div><strong>생성 완료</strong></div>
+            <div class="muted">job: ${this.escapeHtml(payload.job_path || "-")}</div>
+            <div class="muted">report: ${this.escapeHtml(payload.report_path || "-")}</div>
+            <div class="muted">context: ${this.escapeHtml(payload.context_path || "-")}</div>
+            <div class="actions" style="margin-top: 8px;">${htmlUrl}${pdfUrl}${detailUrl}</div>
+          `;
+        },
+      };
+    </script>
+  </body>
+</html>

@@ -14,5 +14,7 @@ output/*
 !output/.gitkeep
 data/tracker-additions/*
 !data/tracker-additions/.gitkeep
+data/*.db
+data/*.db-*
 
 .DS_Store

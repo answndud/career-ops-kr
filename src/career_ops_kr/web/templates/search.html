@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% block title %}검색 | Career Ops KR Web{% endblock %}
+{% block content %}
+<div class="grid two">
+  <section class="card">
+    <span class="pill">검색</span>
+    <h1>통합 채용 검색</h1>
+    <p class="muted">사람인, 원티드, eFinancialCareers, Adzuna를 한 번에 조회합니다. 지금 기본 흐름은 저장과 deterministic resume build 중심입니다.</p>
+    <form method="get" action="/search" class="grid">
+      <label>검색어</label>
+      <input type="text" name="q" value="{{ query }}" placeholder="예: 백엔드, data engineer, quant">
+      <input type="hidden" name="source" value="전체">
+      <button type="submit">검색</button>
+    </form>
+    {% if ai_enabled %}
+      <p class="muted">현재 AI provider: <strong>{{ provider }}</strong></p>
+    {% else %}
+      <p class="muted">AI 기능은 현재 꺼져 있습니다. 검색, 저장, 이력서 생성은 그대로 사용할 수 있습니다.</p>
+    {% endif %}
+  </section>
+  <section class="card">
+    <span class="pill">빠른 액션</span>
+    <h2>검색 결과에서 바로 할 수 있는 일</h2>
+    <ul>
+      {% if ai_enabled %}
+        <li>공고 분석: <code>POST /api/search/analyze</code></li>
+      {% endif %}
+      <li>트래커 저장: <code>POST /api/import</code></li>
+      <li>맞춤 이력서 HTML/PDF 생성: <code>POST /api/resume/build-from-url</code></li>
+    </ul>
+    <label for="resume-preset">맞춤 이력서 preset</label>
+    <select id="resume-preset">
+      {% for preset in resume_presets %}
+        <option value="{{ preset.key }}">{{ preset.role_label }} · {{ preset.language_label }}</option>
+      {% endfor %}
+    </select>
+  </section>
+</div>
+
+{% if results %}
+  <section class="card" style="margin-top: 16px;">
+    <h2>검색 결과</h2>
+    {% if results.error %}
+      <p>{{ results.error }}</p>
+    {% else %}
+      <p class="muted">총 {{ results.count }}건{% if results.translated_query %} · {{ results.translated_query }}{% endif %}</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
+        {% for source_name, count in results.sources.items() %}
+          <a
+            href="/search?q={{ query | urlencode }}&source={{ source_name | urlencode }}"
+            style="text-decoration:none;"
+          >
+            <span class="pill" {% if source_name == active_source %}style="background:#125b50;color:white;"{% endif %}>
+              {{ source_name }} ({{ count }})
+            </span>
+          </a>
+        {% endfor %}
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>회사</th>
+            <th>포지션</th>
+            <th>소스</th>
+            <th>위치</th>
+            <th>액션</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in visible_results %}
+            <tr>
+              <td>{{ item.company }}</td>
+              <td>{{ item.title }}</td>
+              <td>{{ item.source }}</td>
+              <td>{{ item.location }}</td>
+              <td>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                  <a href="{{ item.url }}" target="_blank" rel="noreferrer">열기</a>
+                  {% if ai_enabled %}
+                    <button
+                      type="button"
+                      data-title="{{ item.title }}"
+                      data-company="{{ item.company }}"
+                      data-location="{{ item.location }}"
+                      data-source="{{ item.source }}"
+                      data-url="{{ item.url }}"
+                      onclick="CareerOpsSearch.analyze(this)"
+                    >
+                      분석
+                    </button>
+                  {% endif %}
+                  <button
+                    type="button"
+                    data-title="{{ item.title }}"
+                    data-company="{{ item.company }}"
+                    data-location="{{ item.location }}"
+                    data-source="{{ item.source }}"
+                    data-url="{{ item.url }}"
+                    data-description="{{ item.description }}"
+                    onclick="CareerOpsSearch.save(this)"
+                  >
+                    저장
+                  </button>
+                  <button
+                    type="button"
+                    data-title="{{ item.title }}"
+                    data-company="{{ item.company }}"
+                    data-source="{{ item.source }}"
+                    data-url="{{ item.url }}"
+                    onclick="CareerOpsSearch.buildResume(this)"
+                  >
+                    이력서 생성
+                  </button>
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="muted">조건에 맞는 결과가 없습니다.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </section>
+{% endif %}
+
+<section class="grid two" style="margin-top: 16px;">
+  {% if ai_enabled %}
+    <section class="card">
+      <span class="pill">공고 분석</span>
+      <pre id="search-analysis-output" style="white-space: pre-wrap;">아직 분석한 결과가 없습니다.</pre>
+    </section>
+  {% else %}
+    <section class="card">
+      <span class="pill">안내</span>
+      <div class="notice warn">AI 분석은 현재 사용하지 않습니다. 저장 또는 이력서 생성만 사용하세요.</div>
+    </section>
+  {% endif %}
+  <section class="card">
+    <span class="pill">이력서 생성</span>
+    <div id="search-build-output" class="notice">아직 생성한 이력서가 없습니다.</div>
+  </section>
+</section>
+
+<script>
+  function renderResumeBuildResult(targetId, payload) {
+    const target = document.getElementById(targetId);
+    const htmlLink = payload.html_url
+      ? `<a class="link" href="${CareerOpsWeb.escapeHtml(payload.html_url)}" target="_blank" rel="noreferrer">HTML 열기</a>`
+      : '<span class="muted">HTML 없음</span>';
+    const pdfLink = payload.pdf_url
+      ? `<a class="link" href="${CareerOpsWeb.escapeHtml(payload.pdf_url)}" target="_blank" rel="noreferrer">PDF 열기</a>`
+      : '<span class="muted">PDF 없음</span>';
+    const detailLink = payload.job_id
+      ? `<a class="link" href="/tracker/${payload.job_id}">저장된 공고 보기</a>`
+      : "";
+    const rawPayload = CareerOpsWeb.escapeHtml(JSON.stringify(payload, null, 2));
+    target.className = "notice ok";
+    target.innerHTML = `
+      <div><strong>생성 완료</strong></div>
+      <div class="muted">검색 결과에서 맞춤 이력서 산출물이 만들어졌습니다.</div>
+      <div class="spacer"></div>
+      <div><strong>출력 링크</strong></div>
+      <div class="stack" style="margin-top: 8px;">${htmlLink}${pdfLink}${detailLink}</div>
+      <div class="spacer"></div>
+      <div><strong>저장 경로</strong></div>
+      <div class="muted">HTML: ${CareerOpsWeb.escapeHtml(payload.html_path || "-")}</div>
+      <div class="muted">PDF: ${CareerOpsWeb.escapeHtml(payload.pdf_path || "-")}</div>
+      <details style="margin-top: 12px;">
+        <summary>원본 응답 보기</summary>
+        <pre>${rawPayload}</pre>
+      </details>
+    `;
+  }
+
+  const CareerOpsSearch = {
+    async analyze(button) {
+      const payload = {
+        title: button.dataset.title,
+        company: button.dataset.company,
+        location: button.dataset.location,
+        source: button.dataset.source,
+        url: button.dataset.url,
+      };
+      const output = document.getElementById("search-analysis-output");
+      output.textContent = "분석 중...";
+      const response = await fetch("/api/search/analyze", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      output.textContent = JSON.stringify(data, null, 2);
+    },
+    async save(button) {
+      const payload = {
+        title: button.dataset.title,
+        company: button.dataset.company,
+        location: button.dataset.location,
+        source: button.dataset.source,
+        url: button.dataset.url,
+        description: button.dataset.description,
+      };
+      const response = await fetch("/api/import", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      alert(response.ok ? `저장 완료: #${data.id} ${data.company}` : (data.detail || "저장 실패"));
+    },
+    async buildResume(button) {
+      const output = document.getElementById("search-build-output");
+      output.textContent = "이력서 생성 중...";
+      const preset = document.getElementById("resume-preset").value.split(":");
+      const payload = {
+        url: button.dataset.url,
+        company: button.dataset.company,
+        position: button.dataset.title,
+        source: button.dataset.source,
+        role: preset[0],
+        language: preset[1],
+        pdf: true,
+      };
+      const response = await fetch("/api/resume/build-from-url", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        output.textContent = data.detail || "이력서 생성 실패";
+        return;
+      }
+      renderResumeBuildResult("search-build-output", data);
+    },
+  };
+</script>
+{% endblock %}
