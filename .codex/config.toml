@@ -1,0 +1,42 @@
+#:schema https://developers.openai.com/codex/config-schema.json
+
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+web_search = "live"
+
+persistent_instructions = """
+Follow project AGENTS.md.
+Read PLAN.md and PROGRESS.md at session start.
+Use project-local skills as the primary command surface for repeatable workflows.
+Do not add .claude/ configuration to this repository unless explicitly requested.
+Use planner for scoping, builder for implementation, reviewer for risk review, tester for reproduction/validation, and docs researcher for external docs or portal research.
+Treat finalize-tracker as the default tracker-apply helper after process-pipeline --score.
+Treat prepare-company-research as a separate brief-generation workflow; do not mix it with intake or tracker mutation.
+"""
+
+[features]
+multi_agent = true
+
+[agents]
+max_threads = 6
+max_depth = 1
+
+[agents.career_ops_planner]
+description = "Planning specialist for multi-file changes, architecture decisions, and workflow design in career-ops-kr."
+config_file = "agents/career-ops-planner.toml"
+
+[agents.career_ops_docs_researcher]
+description = "Read-only documentation and web research specialist for Codex/OpenAI docs, Python dependencies, and Korean job portals."
+config_file = "agents/career-ops-docs-researcher.toml"
+
+[agents.career_ops_builder]
+description = "Workspace-write implementation agent for bounded code changes, tests, and small refactors in career-ops-kr."
+config_file = "agents/career-ops-builder.toml"
+
+[agents.career_ops_reviewer]
+description = "Read-only reviewer focused on code quality, rule violations, security issues, regressions, and missing validation."
+config_file = "agents/career-ops-reviewer.toml"
+
+[agents.career_ops_tester]
+description = "Workspace-write tester for reproducing failures, running commands, inspecting logs, and narrowing root causes without making product changes."
+config_file = "agents/career-ops-tester.toml"

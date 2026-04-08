@@ -1,0 +1,297 @@
+# PLAN.md
+
+## 목표
+
+- 한국 개발자용 구직 운영 도구를 Python CLI 중심으로 확장 가능한 형태로 완성한다.
+- 기본 흐름인 `공고 저장 -> 공고 평가 -> tracker 반영 -> 이력서 HTML/PDF 생성`을 안정적으로 유지한다.
+- 이후 국내 채용 포털 스캐너와 직군별 점수화 규칙을 추가할 수 있는 구조를 만든다.
+
+## 작업 단위
+
+### P0
+
+- Python CLI 기본 명령 유지
+  - `fetch-job`
+  - `score-job`
+  - `merge-tracker`
+  - `normalize-statuses`
+  - `verify`
+  - `render-resume`
+  - `generate-pdf`
+- shared scoring helper와 최소 `unittest` smoke suite 유지
+- tracker, report, output 디렉터리 워크플로우 유지
+- README, docs, AGENTS 문서 동기화
+  - 초보자용 전체 README 가이드 작성 완료
+  - 이후 CLI 표면이 바뀌면 README 예시 명령도 함께 갱신
+- git hygiene 유지
+  - 생성 산출물은 `.gitignore`와 `.gitkeep` 기준으로 버전 관리에서 제외
+  - commit 전 smoke/demo 산출물이 남아 있지 않게 유지
+- AI harness 로컬 설정 추가 설계
+  - Codex: `AGENTS.md`, `.codex/config.toml`, `.codex/agents/`, `.agents/skills/`
+  - command surface는 skill 우선으로 통일하고, 별도 command 계층은 만들지 않음
+
+### P0.5
+
+- Codex 공식 문서 기준의 project-local 설정 반영 완료
+  - `.codex/config.toml`
+  - `.codex/agents/`
+  - `.agents/skills/`
+- 첫 번째 project-local skill 세트 정의 완료
+  - `career-ops-session-bootstrap`
+  - `career-ops-portal-research`
+  - `career-ops-company-research`
+  - `career-ops-scorecard-design`
+  - `career-ops-tracker-audit`
+  - `career-ops-resume-pipeline`
+- 첫 번째 project-local agent 세트 정의 완료
+  - `career_ops_planner`
+  - `career_ops_docs_researcher`
+  - `career_ops_builder`
+  - `career_ops_reviewer`
+  - `career_ops_tester`
+- 남은 일
+  - 실제 구현 작업에서 각 skill/agent의 trigger 품질 추가 관찰
+  - builder / reviewer / tester handoff 규칙 1차 명시 완료, 이후 실사용 기준 미세 조정
+  - 필요시 skill 수를 늘리되 역할 중복 없이 유지
+
+### P1
+
+- 국내 포털 구현 전략 문서화 완료
+  - `docs/portal-integration-strategy.md`
+  - Wanted / Jumpit: sitemap-first
+  - RocketPunch: manual/secondary source
+- resume tailoring bridge 구현 완료
+  - `prepare-resume-tailoring`로 `jds/*.md` + `reports/*.md` -> `output/resume-tailoring/*.json`
+  - 선택된 domain / role profile / score summary를 deterministic packet으로 변환
+  - `--base-context`가 있으면 matched skill / missing focus keyword 계산
+- tailored resume context merge helper 구현 완료
+  - `apply-resume-tailoring`로 packet + base context -> `output/resume-contexts/*.json`
+  - `headline`, `summary`, `skills` 순서, `experience/projects` 정렬만 자동 반영
+  - 없는 기술은 자동 추가하지 않고 `tailoringGuidance` metadata로만 남김
+- role-specific resume context example 추가 완료
+  - `examples/resume-context.backend.example.json`
+  - `examples/resume-context.backend.ko.example.json`
+  - `examples/resume-context.platform.example.json`
+  - `examples/resume-context.platform.ko.example.json`
+  - `examples/resume-context.data-platform.example.json`
+  - `examples/resume-context.data-platform.ko.example.json`
+  - `examples/resume-context.data-ai.example.json`
+  - `examples/resume-context.data-ai.ko.example.json`
+  - 템플릿 render smoke용 example test 추가
+- 한국어 resume 템플릿 정비 완료
+  - `templates/resume-ko.html`의 섹션 라벨을 한국어로 정리
+  - summary `pre-wrap`, contact box, 경력 중심 레이아웃 반영
+  - KO 전용 render smoke 보강
+- 영문 resume 템플릿 정비 완료
+  - `templates/resume-en.html`을 2-column resume 레이아웃으로 조정
+  - summary / skills / education rail과 experience / projects main 영역 분리
+  - EN 전용 render smoke 보강
+- 경력기술서 템플릿 1차 추가 완료
+  - `templates/career-description-ko.html`
+  - `examples/career-description-context.backend.ko.example.json`
+  - `examples/career-description-context.data-platform.ko.example.json`
+  - `examples/career-description-context.data-ai.ko.example.json`
+  - `examples/career-description-context.platform.ko.example.json`
+  - 별도 전용 smoke test file 추가
+- Remember/structured-data extractor 보강 완료
+  - `jobs.py`가 `JobPosting` JSON-LD / hydration JSON에서 title, company, description, qualifications를 우선 추출
+  - 실제 Remember JD 기준 `General` fallback 문제 해소
+- resume pipeline chain regression 추가 완료
+  - saved JD/report fixture 기반 `prepare-resume-tailoring -> apply-resume-tailoring -> render-resume` 체인 고정
+- tailored resume wrapper command 추가 완료
+  - `build-tailored-resume`로 `prepare -> apply -> render` 3단계를 한 번에 실행
+  - PDF는 `--pdf-out`이 있을 때만 선택적으로 생성
+  - wrapper가 `tailoring/context/html/pdf` 출력 경로를 먼저 preflight해서 partial write 없이 실패하도록 정리
+- URL-first resume wrapper 추가 완료
+  - `build-tailored-resume-from-url`로 `fetch -> score -> prepare -> apply -> render`를 한 번에 실행
+  - `job/report/tailoring/context/html/pdf` 출력 경로를 먼저 preflight
+  - tracker addition은 `--tracker-out`을 준 경우에만 생성
+- live public-JD smoke helper 추가 완료
+  - `smoke-live-resume`로 공개 공고 기준 `build-tailored-resume-from-url` 경로를 수동 검증
+  - 기본은 example profile + KO platform context + Remember 공개 URL 사용
+  - 성공 후 artifact 자동 정리, 필요시 `--keep-artifacts`
+- live smoke target registry 추가 완료
+  - `config/live-smoke-targets.yml`로 named target 관리
+  - `list-live-smoke-targets`, `smoke-live-resume --target ...` 지원
+  - `validate-live-smoke-targets`로 network-free registry validation 지원
+  - Remember platform/backend/data-ai target 추가
+- batch live smoke helper 추가 완료
+  - `smoke-live-resume-batch`로 여러 target을 순차 실행
+  - target별 success/failure summary 출력
+  - single/batch smoke 모두 fallback candidate URL과 실제 사용 URL reporting 지원
+  - Remember 편중 완화를 위해 Wanted/Jumpit target 추가
+  - 모든 live smoke target에 fallback candidate를 붙여 `validate-live-smoke-targets --strict` 통과 가능 상태로 정리
+  - `--report-out` JSON report로 batch smoke 운영 기록 저장 지원
+  - candidate가 3개 이상인 crowded target warning을 validator에 추가
+  - batch stdout에 winning candidate label 노출 지원
+  - `validate-live-smoke-targets --max-candidates <N>`으로 crowded target gate 지원
+  - crowded Data-AI smoke target을 2-candidate 기준으로 pruning 완료
+  - pruning 이후 live smoke batch `6/6` 실제 네트워크 통과 확인 완료
+  - `smoke-live-resume --report-out`으로 single smoke 성공 manifest 저장 지원
+  - `show-live-smoke-report`로 single/batch smoke JSON 요약 출력 지원
+  - `compare-live-smoke-reports`로 saved smoke report 간 변화 비교 지원
+  - `list-live-smoke-reports`로 saved smoke report inventory 출력 지원
+  - `list-live-smoke-reports`에 `--type`, `--target`, `--failed-only`, `--used-fallback-only`, `--latest` inventory filter 지원
+  - `show-live-smoke-report --latest-from`으로 latest matching report shortcut 지원
+  - live smoke report no-match/corrupted-json 메시지에 filter 요약과 ignored file count 지원
+  - `compare-live-smoke-reports --latest-from`으로 latest matching report pair shortcut 지원
+  - `list-live-smoke-reports --latest-per-target`으로 target별 최신 상태 inventory 지원
+  - `validate-live-smoke-reports`로 saved report freshness/success coverage gate 지원
+  - 2026-04-07 live smoke batch + freshness gate 실검증 완료
+- source role 분류 정리 완료
+  - Remember: primary intake
+  - Indeed: manual intake with `jk`-based canonicalization
+  - JobPlanet / Blind: company research
+  - Saramin: supplemental intake via official API path
+  - JobKorea: manual intake
+  - LinkedIn: manual intake
+- 국내 포털 수집기 추가
+  - Wanted sitemap discovery CLI 완료
+  - Jumpit sitemap discovery CLI 완료
+  - Remember sitemap discovery CLI 완료
+  - pipeline URL에서 `fetch-job`까지 이어지는 반자동 처리 흐름 완료
+  - `process-pipeline --score`로 report/tracker-addition까지 이어지는 반자동 처리 흐름 완료
+  - 같은 pipeline 파일에 대한 sidecar lock 보호 완료
+  - JobPlanet / Blind company research workflow 완료
+    - `prepare-company-research`로 `research/*.md` 생성
+    - `prepare-company-followup`로 summary / outreach scaffold 생성
+    - crawler/intake와 분리된 수동 조사 입력원 유지
+  - RocketPunch manual intake guardrail 구현 완료
+    - manual detail-only reference policy 유지
+    - `jobs/<job_id>`를 canonical detail로 사용하고 localized/slug 변형은 canonicalize
+    - listing/company recruit URL은 intake에서 제외
+    - 로그인/anti-crawl/WAF gate 응답은 fetch 단계에서 실패시켜 bogus JD 저장 방지
+  - Indeed manual canonicalization policy 완료
+    - `viewjob?jk=<job_key>` detail URL만 허용
+    - tracking query 제거
+    - pipeline dedup에 canonical URL 반영
+  - Saramin official API access path 구현 완료
+    - `discover-jobs saramin`가 공식 API를 사용
+    - `SARAMIN_ACCESS_KEY`가 없으면 fail-fast
+    - detail URL은 `rec_idx` 기준 canonicalize
+  - JobKorea feasibility review 완료
+    - company recruit listing 공개
+    - detail path robots 차단으로 manual intake 유지
+  - LinkedIn feasibility review 완료
+    - guest detail page 공개
+    - robots/TOS 제약으로 manual intake 유지
+- 직군별 점수화 분리
+  - Backend / Platform / Data-Platform / Data-AI role profile split 완료
+  - Data-Platform profile을 추가해 data infra / ETL / warehouse 계열을 별도 분리
+  - role-specific company signal keyword 반영 완료
+  - generic keyword 축소 + minimum match ratio fallback 반영 완료
+  - sample-JD 기반 score band 보정 1차 완료
+    - `General` fallback의 role alignment floor 반영
+    - role/stack ratio threshold를 `0.7 / 0.4 / 0.2 / 0.08`로 조정
+    - seniority를 first-match가 아니라 keyword count + priority로 판정
+    - compensation 부정 문구는 disclosure 신호로 가산하지 않도록 조정
+  - mixed/ambiguous JD selection 안정화 1차 완료
+    - role profile별 `selection_anchor_keywords` 도입
+    - anchor phrase -> general keyword count/ratio 순으로 tie-break
+    - `ML Platform` AI-heavy / platform-heavy fixture 고정
+  - mixed/ambiguous JD selection 안정화 2차 완료
+    - role profile별 `selection_signal_keywords` 도입
+    - anchor가 비슷할 때 domain signal로 한 번 더 tie-break
+    - `AI team data infra` / `analytics infrastructure platform` fixture 고정
+  - 2-stage taxonomy 1차 완료
+    - `Backend / Platform / Data` domain 도입
+    - domain first -> role profile second selection 경로 반영
+    - report에 `Selected Domain` 표시
+  - Data domain specialization 1차 완료
+    - `specialization_keywords`로 `Data-Platform` vs `Data-AI` 보정
+    - specialization 차이가 작으면 기존 selector로 fallback
+    - feature/training pipeline vs model-serving/inference fixture 고정
+  - Data domain specialization 2차 완료
+    - near-tie에서 `specialization_anchor_keywords`로 한 번 더 보정
+    - anchor도 애매하면 기존 selector로 fallback
+  - Platform/Data domain near-tie 안정화 1차 완료
+    - domain selection에서 total signal 우선 반영
+    - `Platform` / `Data` near-tie fixture 고정
+  - public Korean JD 기반 realistic regression fixture 1차 완료
+    - 현재 공개 공고에서 추출한 익명화 fixture 추가
+    - 네트워크 없이 재현되는 scoring regression set 확보
+  - public Korean JD 기반 realistic regression fixture 2차 완료
+    - `LLM/RAG 서비스형 Data-AI`
+    - `feature store / Airflow / warehouse형 Data-Platform`
+  - public Korean JD 기반 realistic regression fixture 3차 완료
+    - `streaming / Databricks / Kafka / Flink형 Data-Platform`
+    - `AI 플랫폼 운영 / observability형 Platform`
+  - public Korean JD 기반 realistic regression fixture 4차 완료
+    - `Next.js / React / TypeScript형 Frontend -> General fallback`
+    - `Swift / SwiftUI형 iOS -> General fallback`
+    - `Generative AI research / fine-tuning형 ML Research -> Data-AI`
+  - `score-job`, `process-pipeline --score`의 `--profile-path`, `--scorecard-path` override 완료
+  - `tests/test_cli.py`로 `score-job`, `process-pipeline --score` override CLI coverage 완료
+  - `tests/test_cli.py`로 non-default `--scorecard-path` direct coverage 완료
+    - `score-job`
+    - `process-pipeline --score`
+  - 이후 domain/subspecialization taxonomy와 margin 규칙 정교화는 남음
+- 공고 리포트 정성 평가 강화
+
+### P2
+
+- lock UX 개선
+  - 필요시 stale/corrupt lock 안내 메시지 보강
+  - 필요시 운영용 unlock 절차 문서화
+- `process-pipeline --score` 이후 tracker 반영 기본 흐름 정리 완료
+  - `finalize-tracker`를 표준 helper로 승격
+  - 필요시 개별 명령 `merge-tracker`, `normalize-statuses`, `verify` 사용
+- 회사 리서치 workflow 확장
+  - brief 후속 요약/아웃리치 scaffold 명령 완료
+  - exact company URL 보조 탐색용 search hint 생성 완료
+  - exact company URL의 자동 해석/선택은 아직 남음
+  - 회사별 source metadata 보강
+- 템플릿 다변화
+  - 한국어 이력서
+  - 영문 이력서
+  - 경력기술서
+
+## 우선순위
+
+1. Python CLI 안정화
+2. Codex 로컬 설정 정착과 튜닝
+3. 한국 채용 포털 대응
+4. 직군별 평가 로직 세분화
+   - 1차 role profile split은 완료
+   - 이후 weight/signals 정교화
+5. 부가 자동화 기능
+
+## 의존 관계
+
+- 포털 스캐너 구현 전:
+  - `fetch-job` 네트워크 처리 정책 정리 필요
+  - 포털별 HTML 구조 조사 필요
+  - JobPlanet / Blind는 crawler가 아니라 research workflow로 분리할 기준 필요
+- Codex local skill/agent 튜닝 전:
+  - 실제 작업에서 skill/agent 트리거가 과한지 확인 필요
+  - docs research에 MCP가 필요한지 추후 판단
+- 직군별 점수화 분리 전:
+  - 현재 `config/scorecard.kr.yml`의 공통 규칙 유지
+  - 역할별 설정 파일 구조 결정 필요
+- pipeline 자동화 전:
+  - tracker merge/verify가 안정적으로 유지되어야 함
+  - intake source와 research source 구분이 유지되어야 함
+- pipeline 자동화 고도화 전:
+  - fetch 성공 후 scoring 실패 시 재시도 흐름을 문서화한 상태로 유지해야 함
+  - company research source는 `prepare-company-research`로만 연결하고 crawler로 섞지 않아야 함
+
+## 성공 기준
+
+- 새 세션의 에이전트가 `PLAN.md`, `PROGRESS.md`, `AGENTS.md`만 읽고 현재 작업 상태를 복구할 수 있다.
+- 주요 CLI 명령이 `.venv` 환경에서 실행된다.
+- `process-pipeline --score`가 report와 tracker addition을 생성하면서도, pipeline의 `- [x]` 의미는 fetch/save 완료로 유지한다.
+- `prepare-company-research`와 `prepare-company-followup`가 `research/*.md`를 생성하고, tracker/pipeline을 직접 수정하지 않는다.
+- `career-ops-kr verify`와 `python -m compileall src`가 통과한다.
+- `python -m unittest discover -s tests`가 통과한다.
+- 문서와 실제 명령 이름이 일치한다.
+- project-local skill과 agent 이름, 역할, 트리거 기준이 문서화되어 있다.
+- 이 저장소는 `.claude/` 없이 Codex 로컬 설정만으로 운영 가능하다.
+
+## 보류 항목
+
+- 포털별 로그인 자동화
+- 대규모 병렬 배치 처리
+- 웹 UI 또는 TUI 추가
+- 외부 LLM API 직접 연동
+- project-local plugin 배포 구조
+- MCP 서버 추가

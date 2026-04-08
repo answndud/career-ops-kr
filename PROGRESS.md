@@ -1,0 +1,603 @@
+# PROGRESS.md
+
+## 완료한 작업
+
+- 원본 `career-ops` 조사 후, 포크 대신 Codex 친화적인 새 저장소 구조가 더 적합하다는 방향을 정함
+- 한국 개발자용 Python 기반 스캐폴드 생성
+- 아래 문서와 설정 파일 생성
+  - `README.md`
+  - `docs/architecture.md`
+  - `docs/workflows.md`
+  - `docs/scoring-kr.md`
+  - `config/profile.example.yml`
+  - `config/profile.yml`
+  - `config/portals.kr.example.yml`
+  - `config/states.yml`
+  - `config/scorecard.kr.yml`
+  - `prompts/*.md`
+- `README.md`를 비개발자도 따라 할 수 있는 초보자용 전체 가이드로 재작성
+  - 설치, 첫 설정, one-shot 이력서 생성, pipeline 처리, tracker 반영, 회사 조사, 문제 해결 순서로 재구성
+  - 자주 쓰는 명령과 폴더 역할을 쉬운 한국어로 설명
+  - live smoke/report tooling은 일반 사용자 흐름과 분리해 고급 기능으로 안내
+- git commit 준비를 위해 생성 산출물 정리와 ignore 규칙 보강
+  - `jds/`, `reports/`, `research/`, `output/`, `data/tracker-additions/`는 `.gitkeep`만 추적하고 실제 생성물은 `.gitignore`로 제외
+  - demo smoke 산출물 삭제 후 clean starter 상태 유지
+- Python CLI 구현
+  - `src/career_ops_kr/cli.py`
+  - `src/career_ops_kr/utils.py`
+  - `pyproject.toml`
+- Jinja resume 템플릿 정리
+  - `templates/resume-ko.html`
+  - `templates/resume-en.html`
+- resume tailoring bridge 추가
+  - `src/career_ops_kr/commands/resume.py`
+  - `career-ops-kr prepare-resume-tailoring`
+  - `jds/*.md`와 `reports/*.md`를 `output/resume-tailoring/*.json`으로 구조화
+  - `--base-context`가 있으면 matched skill / missing focus keyword 계산
+  - `render-resume`, `generate-pdf`, 템플릿 schema는 유지
+- tailored resume context merge helper 추가
+  - `career-ops-kr apply-resume-tailoring`
+  - `output/resume-tailoring/*.json` + base context -> `output/resume-contexts/*.json`
+  - visible patch는 `headline`, `summary`, `skills` 순서, `experience/projects` 정렬까지만 자동 반영
+  - 없는 기술은 자동 추가하지 않고 `tailoringGuidance` metadata로만 남김
+- role-specific resume context examples 추가
+  - `examples/resume-context.backend.example.json`
+  - `examples/resume-context.backend.ko.example.json`
+  - `examples/resume-context.platform.example.json`
+  - `examples/resume-context.platform.ko.example.json`
+  - `examples/resume-context.data-platform.example.json`
+  - `examples/resume-context.data-platform.ko.example.json`
+  - `examples/resume-context.data-ai.example.json`
+  - `examples/resume-context.data-ai.ko.example.json`
+  - `tests/test_examples.py`로 example JSON schema와 template render smoke를 고정
+- 한국어 resume 템플릿 정비
+  - `templates/resume-ko.html`을 한국어 이력서다운 라벨과 정보 밀도로 조정
+  - `요약 / 기술 스택 / 경력 / 프로젝트 / 학력` 섹션 라벨 반영
+  - summary `pre-wrap`, contact box, 경력 안내 문구 추가
+  - `tests/test_examples.py`에 KO 전용 section/contact/bullet smoke 추가
+- 영문 resume 템플릿 정비
+  - `templates/resume-en.html`을 2-column resume 레이아웃으로 조정
+  - summary / skills / education rail과 experience / projects main 영역 분리
+  - contact box와 section note 추가
+  - `tests/test_examples.py`에 EN 전용 section/contact/bullet smoke 추가
+- 경력기술서 템플릿 1차 추가
+  - `templates/career-description-ko.html`
+  - `examples/career-description-context.backend.ko.example.json`
+  - `examples/career-description-context.data-platform.ko.example.json`
+  - `examples/career-description-context.data-ai.ko.example.json`
+  - `examples/career-description-context.platform.ko.example.json`
+  - `tests/test_career_description.py`로 전용 schema/render smoke 추가
+- Remember structured-data extractor 보강
+  - `src/career_ops_kr/jobs.py`가 `JobPosting` JSON-LD / JSON hydration data에서 title, company, description, qualifications를 우선 추출
+  - Remember detail page에서 body가 비어도 JD markdown을 안정적으로 생성
+  - front matter에 `company`를 같이 저장
+- resume pipeline fixture chain 추가
+  - `tests/fixtures/remember_platform_job.md`
+  - `tests/fixtures/remember_platform_report.md`
+  - `tests/test_resume_pipeline.py`로 `prepare-resume-tailoring -> apply-resume-tailoring -> render-resume` 체인 고정
+  - 실제 Remember 공고 smoke에서 `General` fallback이 아니라 `Platform / 4.1`로 정상 점수화되는 것 확인
+- tailored resume wrapper command 추가
+  - `career-ops-kr build-tailored-resume`
+  - `prepare-resume-tailoring -> apply-resume-tailoring -> render-resume`를 한 번에 실행
+  - `--pdf-out`이 있을 때만 PDF 생성
+  - `tests/test_resume.py`, `tests/test_cli.py`에 helper/CLI orchestration 회귀 추가
+  - wrapper가 intermediate output collision에서 partial 산출물을 남기지 않도록 `tailoring/context/html/pdf` 경로를 upfront preflight하도록 보강
+  - `tests/test_resume.py`에 existing `tailoring_out`, `context_out` 충돌 회귀 추가
+- URL-first tailored resume wrapper 추가
+  - `career-ops-kr build-tailored-resume-from-url`
+  - `fetch-job -> score-job -> build-tailored-resume`를 한 번에 실행
+  - `job/report/tailoring/context/html/pdf` 경로를 upfront preflight해 collision을 먼저 차단
+  - tracker addition은 기본 부작용으로 만들지 않고 `--tracker-out`일 때만 생성
+  - `tests/test_resume.py`, `tests/test_cli.py`에 helper/CLI 회귀 추가
+- live public-JD smoke helper 추가
+  - `career-ops-kr smoke-live-resume`
+  - 기본은 example profile + KO platform context + Remember 공개 URL로 `build-tailored-resume-from-url` 경로를 검증
+  - 성공 후 artifact를 자동 정리하고, 필요하면 `--keep-artifacts`로 보존 가능
+  - `tests/test_resume.py`, `tests/test_cli.py`에 helper/CLI 회귀 추가
+- live smoke target registry 추가
+  - `config/live-smoke-targets.yml`
+  - `career-ops-kr list-live-smoke-targets`
+  - `career-ops-kr smoke-live-resume --target <name>`
+  - `career-ops-kr validate-live-smoke-targets`
+  - 기본 target은 `remember_platform_ko`, 현재 KO/EN platform + KO backend + KO data-ai smoke target을 registry로 관리
+- batch live smoke helper 추가
+  - `career-ops-kr smoke-live-resume-batch`
+  - 여러 target을 순차 실행하고 success/failure summary를 출력
+  - normal test suite에서는 mocked aggregation만 검증하고 live network는 수동 command로 유지
+- live smoke fallback / portal diversification 반영
+  - `config/live-smoke-targets.yml`이 ordered `candidates` fallback URL을 지원
+  - single/batch smoke가 실제로 성공한 URL과 fallback 여부를 출력
+  - Wanted / Jumpit smoke target 추가로 Remember 편중 완화
+  - 모든 live smoke target에 fallback candidate를 부여
+  - `validate-live-smoke-targets`가 fallback coverage와 single-candidate target 유무를 출력
+  - `validate-live-smoke-targets --strict`가 full fallback coverage에서는 통과하도록 정리
+  - `smoke-live-resume-batch --report-out`으로 JSON 운영 기록 저장 지원
+  - `validate-live-smoke-targets`가 candidate 3개 이상인 crowded target도 경고하도록 보강
+  - batch stdout에서 winning candidate label을 함께 보여주도록 보강
+  - `validate-live-smoke-targets --max-candidates <N>`으로 crowded target을 opt-in gate로 쓸 수 있게 보강
+  - crowded Data-AI smoke target 2개를 모두 2-candidate로 pruning해서 기본 registry를 정리
+  - pruning 이후 `career-ops-kr smoke-live-resume-batch`를 실제 네트워크로 다시 실행해 `6 passed, 0 failed` 확인
+  - `smoke-live-resume --report-out`으로 single smoke 성공 manifest JSON 저장 지원
+  - `show-live-smoke-report`로 single/batch smoke JSON을 사람이 읽기 쉬운 요약으로 다시 출력할 수 있게 보강
+  - `compare-live-smoke-reports`로 saved smoke report 간 added/removed/changed target 비교 지원
+  - `list-live-smoke-reports`로 saved smoke report inventory를 출력할 수 있게 보강
+  - `list-live-smoke-reports`에 `--type`, `--target`, `--failed-only`, `--used-fallback-only`, `--latest` filter를 추가해 최근 실패 batch나 fallback 사용 report를 바로 좁힐 수 있게 보강
+  - `show-live-smoke-report --latest-from`을 추가해 inventory에서 가장 최근 matching report를 경로 복사 없이 바로 열 수 있게 보강
+  - live smoke report inventory/show no-match 메시지에 current filter summary, recognized report count, ignored invalid/unrecognized JSON file count를 같이 보여주도록 보강
+  - `compare-live-smoke-reports --latest-from`을 추가해 inventory에서 가장 최근 matching report 두 개를 경로 복사 없이 바로 비교할 수 있게 보강
+  - `list-live-smoke-reports --latest-per-target`을 추가해 batch/single report를 target별 최신 상태 inventory로 바로 볼 수 있게 보강
+  - `validate-live-smoke-reports`를 추가해 saved report 기준으로 각 registry target의 최신 상태가 fresh success인지 gate할 수 있게 보강
+  - `career-ops-kr smoke-live-resume-batch --report-out <tmp>` + `career-ops-kr validate-live-smoke-reports <tmp> --max-age-hours 1` 실제 실행으로 2026-04-07 기준 `6 ok, 0 failing` 확인
+- 세션 운영 규칙 문서 추가
+  - `AGENTS.md`
+- Codex 공식 문서와 `everything-claude-code` 조사 완료
+  - Codex 공식 문서: `AGENTS.md`, skills, subagents, `.codex/config.toml`
+  - `everything-claude-code`: Codex용 `.codex/` + `.agents/skills/` 구조, skill/agent 분리 패턴, docs-research/planner/reviewer 계열 패턴 확인
+- Codex 전용 project-local 설정 추가
+  - `.codex/config.toml`
+  - `.codex/agents/career-ops-planner.toml`
+  - `.codex/agents/career-ops-docs-researcher.toml`
+  - `.codex/agents/career-ops-builder.toml`
+  - `.codex/agents/career-ops-reviewer.toml`
+  - `.codex/agents/career-ops-tester.toml`
+  - `.agents/skills/career-ops-session-bootstrap/SKILL.md`
+  - `.agents/skills/career-ops-portal-research/SKILL.md`
+  - `.agents/skills/career-ops-scorecard-design/SKILL.md`
+  - `.agents/skills/career-ops-tracker-audit/SKILL.md`
+  - `.agents/skills/career-ops-resume-pipeline/SKILL.md`
+- 규칙 정리
+  - 이 저장소는 `.claude/`를 두지 않음
+  - Codex에서 command surface는 별도 command 파일이 아니라 skills를 우선 사용
+  - config / agent / skill 역할이 겹치지 않도록 분리
+- Codex agent 구조 개편 완료
+  - `planner / builder / reviewer / tester / docs_researcher` 역할 분리
+  - 기존 `career_ops_python_reviewer`는 `career_ops_reviewer`로 대체
+  - builder와 tester는 workspace-write, reviewer와 docs/planner는 read-only로 유지
+  - reviewer/tester 성격의 subagent를 병렬로 써서 설계 리스크와 smoke test 매트릭스를 점검하는 흐름 시험
+- 국내 포털 공개 진입점 조사 및 문서화
+  - `docs/portal-integration-strategy.md`
+  - Wanted: 상세 fetch 가능, sitemap 공개, sitemap-first discovery 권장
+  - Jumpit: 상세 fetch 가능, sitemap 공개, sitemap-first discovery 권장
+  - RocketPunch: 초기 조사 시 direct fetch 403 관찰, v1에서는 manual/secondary source로 제한
+- 국내 포털 discovery 1차 구현 완료
+  - `src/career_ops_kr/portals.py`
+  - `career-ops-kr discover-jobs`
+  - Wanted / Jumpit sitemap index -> detail URL 추출
+  - `data/pipeline.md` 형식으로 pending URL dedup 적재
+- pipeline 처리 흐름 1차 구현 완료
+  - `src/career_ops_kr/jobs.py`
+  - `src/career_ops_kr/pipeline.py`
+  - `career-ops-kr process-pipeline`
+  - pending URL을 실제 `jds/` 저장까지 연결
+  - 성공한 URL만 `- [x]`로 표시하고 실패 항목은 pending 유지
+  - `fetch-job`와 같은 내부 helper를 재사용해 drift 방지
+- 점수화 로직 모듈 분리 및 pipeline 후처리 연결 완료
+  - `src/career_ops_kr/scoring.py`
+  - `career-ops-kr process-pipeline --score`
+  - `career-ops-kr score-job --tracker-out`
+  - `score-job`와 pipeline scoring이 같은 helper를 재사용하도록 정리
+  - fetch 성공 후 scoring 실패 시 pipeline은 fetch 완료로 간주하고, 점수화는 `score-job`로 재실행 가능하게 유지
+- pipeline 동시 실행 보호 완료
+  - `src/career_ops_kr/pipeline.py`
+  - `career-ops-kr process-pipeline`가 per-pipeline `.lock` sidecar를 잡고 실행
+  - live holder가 있으면 즉시 실패
+  - stale lock은 PID 기준으로 자동 회수
+- 최소 자동 검증 추가
+  - `tests/test_scoring.py`
+  - `tests/test_pipeline.py`
+  - `python -m unittest discover -s tests`
+  - score helper의 리포트/tracker 생성과 explicit output path 동작 고정
+  - pipeline lock 생성, live holder 차단, stale lock 회수 동작 고정
+- 관련 문서와 운영 규칙 갱신
+  - README quick start에 `discover-jobs` 반영
+  - `AGENTS.md`에 discovery 검증 명령과 `src/career_ops_kr/portals.py` 추가
+  - `config/portals.kr.example.yml`에 discovery metadata 추가
+- 채용 source 분류 규칙 정리
+  - Remember: primary intake로 승격
+  - Indeed: manual detail-only source로 재분류
+  - JobPlanet / Blind: crawler가 아니라 company research source
+  - intake source와 research source를 문서와 설정에서 분리
+- Remember feasibility review 및 구현 완료
+  - public listing, robots.txt, sitemap.xml, sitemap-jobs.xml 확인
+  - `career-ops-kr fetch-job`로 상세 페이지 smoke test 통과
+  - `career-ops-kr discover-jobs remember` 구현 및 dedup 확인
+- RocketPunch 관찰 갱신
+  - discovery 경로는 여전히 미검증
+  - browser-like header로 `jobs`, `robots.txt`, `sitemap.xml`은 200 응답을 받을 수 있음
+  - 하지만 detail fetch가 로그인/anti-crawl gate HTML을 반환하는 경우가 있어 usable JD로 보기 어려움
+  - manual reference source 정책을 유지하고, bogus JD 저장을 막는 fetch guard 추가
+  - `jobs/<job_id>` detail URL만 수동 참고용으로 허용하고 listing/company recruit URL은 intake에서 제외
+- Saramin / JobKorea / LinkedIn feasibility review 완료
+  - Saramin: public listing/detail 확인, 공식 API와 access-key 요구 확인
+  - JobKorea: public company recruit listing 확인, detail path `/Recruit/GI_Read/`의 robots 차단 확인
+  - LinkedIn: guest detail page 공개 확인, robots와 explicit permission 문구로 인해 automated crawling 부적합 판단
+  - config와 portal strategy 문서에 source role을 반영
+- company research workflow 1차 구현 완료
+  - `src/career_ops_kr/research.py`
+  - `career-ops-kr prepare-company-research`
+  - `prompts/company-research.md`의 번호 목록을 checklist seed로 사용
+  - `research/*.md`에 JobPlanet / Blind / official source / local artifact 경로를 함께 정리
+  - `prepare-company-research`는 네트워크 fetch 없이 수동 조사 브리프만 생성
+  - `tests/test_research.py`로 overwrite guard, extra source validation, prompt parsing/fallback, local path validation 고정
+- role-specific scoring 1차 구현 완료
+  - `config/scorecard.kr.yml`에 `backend / platform / data_ai` role profile 추가
+  - `src/career_ops_kr/scoring.py`가 JD와 profile target role overlap으로 active role profile을 선택
+  - overlap이 0이면 `General` fallback으로 내려가 기본 weight를 사용
+  - report에 `Selected Target Role`, `Selected Role Profile`, role candidate summary를 기록
+  - `tests/test_scoring.py`로 Backend / Platform / Data-AI role selection 검증 추가
+  - `docs/scoring-kr.md`에 role profile 규칙과 weight 적용 원칙 반영
+- scoring CLI 입력 override 추가
+  - `career-ops-kr score-job`와 `career-ops-kr process-pipeline --score`에 `--profile-path`, `--scorecard-path` 추가
+  - 로컬 개인 `config/profile.yml` 대신 example 또는 fixture profile로 재현 가능한 실행 가능
+  - AGENTS, README, scoring/workflow 문서의 smoke 예시를 override 기준으로 갱신
+- scoring CLI override 테스트 보강
+  - `tests/test_cli.py`에 `score-job --profile-path` 통합 테스트 추가
+  - `tests/test_cli.py`에 mocked fetch + real scoring 기반 `process-pipeline --score --profile-path` 통합 테스트 추가
+  - pipeline 항목 처리 완료와 sidecar lock 정리까지 CLI 레벨에서 검증
+  - `tests/test_cli.py`에 non-default `--scorecard-path` 통합 테스트 추가
+  - temp scorecard에서 `platform.weights.company_signal=99`를 주고 report 표에 반영되는지 검증
+  - 위 `--scorecard-path` 검증을 `process-pipeline --score` 경로까지 확장
+  - mocked fetch + real scoring + non-default scorecard 조합에서 report table override 반영 확인
+- Indeed canonicalization / dedup policy 구현 완료
+  - `src/career_ops_kr/portals.py`에 canonical URL normalization 추가
+  - Wanted / Jumpit / Remember detail URL normalization 고정
+  - Indeed detail URL은 `jk` 기준으로 canonicalize하고 tracking query 제거
+  - pipeline dedup이 canonical URL 기준으로 동작하도록 정리
+  - `src/career_ops_kr/jobs.py`가 Indeed search/listing URL을 명시적으로 거부
+  - `tests/test_portals.py`, `tests/test_jobs.py`로 canonicalization과 validation 검증 추가
+- tracker and finalize flow 정리
+  - `src/career_ops_kr/tracker.py`의 markdown table parser가 빈 셀을 보존하도록 수정
+  - recursive tracker additions merge + normalize 흐름 회귀를 복구
+  - `finalize-tracker`를 표준 tracker 반영 helper로 문서화
+  - README, workflows, architecture, AGENTS를 `process-pipeline --score -> finalize-tracker` 기준으로 갱신
+- RocketPunch manual intake guardrail 강화
+  - `src/career_ops_kr/portals.py`가 `jobs/<job_id>`, localized detail, slug detail variant를 canonical `jobs/<job_id>`로 정규화
+  - `src/career_ops_kr/jobs.py`가 listing/company recruit URL을 계속 거부하고, AWS WAF marker까지 gate detection에 포함
+  - `tests/test_portals.py`, `tests/test_jobs.py`로 RocketPunch canonicalization, canonical fetch path, WAF marker rejection 검증 추가
+  - README, workflows, portal strategy, portals config, AGENTS를 RocketPunch canonical/manual policy 기준으로 재정렬
+- RocketPunch discovery 재검토 완료
+  - `robots.txt`, `sitemap.xml`, listing, detail URL이 현재는 `200`을 반환하는 경우가 있음을 재확인
+  - detail HTML에는 여전히 AWS WAF marker가 남아 있고, sitemap 응답도 직접 XML parse에 안정적으로 쓰기 어려워 자동 intake로 승격하지 않음
+  - 결론은 manual reference 유지로 고정
+- Codex local agent/skill 튜닝 1차 반영
+  - `.codex/config.toml`에 `finalize-tracker` 기본 helper와 `prepare-company-research` 분리 원칙을 명시
+  - planner / builder / tester / docs_researcher instructions를 현재 workflow 기준으로 좁혀 역할 중복 완화
+  - `career-ops-tracker-audit`를 `finalize-tracker` 기준으로 갱신
+  - `career-ops-portal-research`에서 company research brief generation을 범위 밖으로 명시
+  - `career-ops-company-research` skill 추가로 `prepare-company-research` 계열 작업의 전용 surface를 확보
+- company research follow-up workflow 정리
+  - `src/career_ops_kr/research.py`의 `create_company_research_followup` 입력 검증 보강
+  - `career-ops-kr prepare-company-followup`를 기존 research brief 기반 summary / outreach scaffold 경로로 채택
+  - `tests/test_cli.py`, `tests/test_research.py`로 follow-up 생성과 missing-brief validation 추가
+  - README, workflows, architecture, AGENTS, company research skill validation을 follow-up 흐름까지 반영
+- company research follow-up workflow 1차 구현 완료
+  - `career-ops-kr prepare-company-followup` 추가
+  - `src/career_ops_kr/research.py`가 기존 research brief를 입력으로 `summary` / `outreach` scaffold를 생성
+  - follow-up 문서는 research brief metadata와 prompt checklist를 재사용하고, intake/tracker mutation 없이 `research/*.md`에만 생성
+  - `tests/test_research.py`, `tests/test_cli.py`로 summary/outreach scaffold와 CLI entry를 검증
+- exact company URL 보조 탐색 1차 반영
+  - `prepare-company-research`가 `Search Hints` 섹션에 JobPlanet / Blind exact page 탐색용 query와 search URL을 같이 생성
+  - exact company URL 자동 해석은 하지 않고, manual browse를 보조하는 수준으로 범위를 제한
+- Saramin official API discovery 1차 구현 완료
+  - `discover-jobs saramin` 추가
+  - `SARAMIN_ACCESS_KEY`가 있으면 공식 API를 사용하고, 없으면 fail-fast
+  - API 응답 detail URL을 `rec_idx` 기준 canonical URL로 정규화
+  - `tests/test_portals.py`로 access-key 요구와 canonicalized API discovery 검증 추가
+- CLI command module split 완료
+  - `src/career_ops_kr/cli.py`를 얇은 엔트리포인트로 유지
+  - 실제 명령을 `src/career_ops_kr/commands/intake.py`, `research.py`, `resume.py`, `tracker.py`로 분리
+  - 기존 command name과 `career_ops_kr.cli.app` 표면은 유지하고 테스트 patch 경로만 새 모듈 기준으로 조정
+- scorecard 2차 tuning 1차 반영
+  - `config/scorecard.kr.yml`에 `Data-Platform` role profile 추가
+  - `config/profile.example.yml`에 `Data Platform Engineer` target role 예시 추가
+  - `tests/test_scoring.py`로 Data-Platform selection과 weight 적용 검증 추가
+  - `docs/scoring-kr.md`를 4개 role profile 기준으로 갱신
+- scorecard 2차 tuning 2차 반영
+  - role profile별 positive / negative company signal keyword 추가
+  - `src/career_ops_kr/scoring.py`가 후보자 공통 선호/회피 도메인과 role-specific company signal을 함께 반영하도록 확장
+  - report에 role-specific positive/negative company signal count를 표시
+  - `tests/test_scoring.py`로 positive/negative company signal reporting 검증 추가
+  - `docs/scoring-kr.md`, `prompts/evaluate-job.md`를 새 signal 해석 규칙에 맞게 갱신
+- scorecard 2차 tuning 3차 반영
+  - Backend / Platform / Data-Platform / Data-AI weight를 소폭 재배치해 generic 신호보다 역할 맥락 비중을 높임
+  - Backend의 언어명, Platform의 `aws`/`docker`, Data-AI의 generic `data` 같은 boundary-blurring keyword를 match에서 축소
+  - role selection에 minimum match ratio fallback을 추가해 약한 generic overlap은 `General`로 내리도록 조정
+  - `tests/test_scoring.py`로 Data-Platform 우선 선택과 generic language-only fallback 경계 검증 추가
+- scorecard 2차 tuning 4차 반영
+  - `src/career_ops_kr/scoring.py`의 role/stack ratio threshold를 `0.7 / 0.4 / 0.2 / 0.08`로 조정해 strong-fit JD가 4점대에 더 잘 올라오도록 보정
+  - `General` fallback일 때 role keyword overlap이 없으면 `role_alignment`를 최저점으로 두어 weak generic JD 과대평가를 줄임
+  - seniority detection을 first-match에서 keyword count + priority 기반으로 바꿔 `Senior Backend Engineer` 같은 JD가 `mid`로 잘못 판정되지 않게 수정
+  - `mid ↔ senior`는 인접 mismatch로 보고 `seniority_fit 4.0`을 주도록 조정
+  - `compensation_signal`이 `no compensation details`, `salary not disclosed`, `연봉 비공개` 같은 부정 문구를 disclosure 가산점으로 잘못 읽지 않도록 수정
+  - `tests/test_scoring.py`에 strong backend high-band, general mismatch downgrade, strong data-platform high-band, mixed platform mid-band 샘플 테스트 추가
+  - `docs/scoring-kr.md`를 sample-JD tuning 규칙에 맞게 갱신
+- scorecard 2차 tuning 5차 반영
+  - `config/scorecard.kr.yml`에 role profile별 `selection_anchor_keywords`를 추가해 mixed JD 분류에서 고신호 phrase를 먼저 반영
+  - `src/career_ops_kr/scoring.py`의 role selection이 anchor count -> general keyword count -> ratio 순으로 tie-break 하도록 조정
+  - `Data-AI` anchor에 `model serving`, `eval`, `embeddings`, `llmops`를 보강해 AI-heavy `ML Platform` JD가 Platform으로 과도하게 끌리는 현상 수정
+  - `tests/test_scoring.py`에 AI-heavy `ML Platform`은 `Data-AI`, platform-heavy `ML Platform`은 `Platform`으로 선택되는 fixture 추가
+  - `docs/scoring-kr.md`에 anchor phrase 기반 mixed JD 보정 원칙을 반영
+- scorecard 2차 tuning 6차 반영
+  - `config/scorecard.kr.yml`에 role profile별 `selection_signal_keywords`를 추가해 anchor가 비슷한 경우 domain signal을 한 번 더 비교하도록 정리
+  - `src/career_ops_kr/scoring.py`의 role selection이 anchor -> domain signal -> general keyword count -> ratio 순으로 tie-break 하도록 조정
+  - `tests/test_scoring.py`에 `AI team data infra`는 `Data-Platform`, `analytics infrastructure platform`은 `Platform`으로 유지되는 mixed fixture 추가
+  - `docs/scoring-kr.md`에 `selection_signal_keywords`와 mixed JD 보정 원칙을 반영
+- scorecard 2차 tuning 7차 반영
+  - `config/scorecard.kr.yml`에 `domains` 블록과 role profile별 `domain`을 추가해 `Backend / Platform / Data` 2-stage taxonomy를 도입
+  - `src/career_ops_kr/scoring.py`에 `_select_role_domain`을 추가하고, `domain -> role profile` 순으로 선택하도록 변경
+  - `Data-Platform`과 `Data-AI`는 `Data` domain 안에서 2차 선택하도록 정리해 cross-domain 오염을 줄임
+  - report summary에 `Selected Domain`을 추가해 mixed JD 튜닝 시 선택 이유를 더 쉽게 확인할 수 있게 함
+  - `tests/test_scoring.py`에 data domain 내부 `Data-Platform` 우선 선택 fixture를 추가하고, 기존 mixed JD fixture를 `Selected Domain`까지 검증하도록 확장
+  - `docs/scoring-kr.md`에 domain-first selection 원칙을 반영
+- scorecard 2차 tuning 8차 반영
+  - `config/scorecard.kr.yml`에 `data_platform` / `data_ai`용 `specialization_keywords`를 추가해 Data domain 안에서 pipeline/warehouse 계열과 model-serving/inference 계열을 더 안정적으로 분리
+  - `src/career_ops_kr/scoring.py`에 `_select_data_specialization`을 추가하고, specialization 차이가 충분히 클 때만 preferred profile로 우선권을 주도록 조정
+  - specialization 차이가 작으면 기존 data-domain selector로 fallback 하게 해 과한 강제 분류를 피함
+  - `tests/test_scoring.py`에 `feature pipelines for ML teams`는 `Data-Platform`, `model serving pipelines for AI products`는 `Data-AI`로 유지되는 fixture 추가
+  - `docs/scoring-kr.md`에 Data specialization 규칙과 fallback 원칙을 반영
+- scorecard 2차 tuning 9차 반영
+  - `config/scorecard.kr.yml`에 `specialization_anchor_keywords`를 추가해 Data-domain near-tie에서 strong phrase를 한 번 더 비교하도록 정리
+  - `src/career_ops_kr/scoring.py`의 `_select_data_specialization`이 점수 차가 `1`일 때 anchor 우세 쪽을 우선 선택하고, anchor도 애매하면 기존 selector로 fallback 하도록 조정
+  - `tests/test_scoring.py`에 near-tie `Data-Platform` / `Data-AI` fixture를 추가해 phrasing variation 회귀를 고정
+  - `docs/scoring-kr.md`에 near-tie anchor fallback 규칙을 반영
+- scorecard 2차 tuning 10차 반영
+  - `src/career_ops_kr/scoring.py`의 domain ranking 순서를 `total signal -> anchor -> signal -> ratio`로 조정해 `Platform` anchor가 조금 강하더라도 `Data` signal이 더 많은 JD는 `Data` domain으로 갈 수 있게 수정
+  - `config/scorecard.kr.yml`에 `Platform` / `Data` domain용 `tie_break_anchor_keywords`를 추가해 domain near-tie 참고 신호를 명시
+  - `tests/test_scoring.py`에 `Platform` 유지 near-tie fixture와 `Data`로 전환되는 near-tie fixture를 추가해 domain-level phrasing 회귀를 고정
+  - `docs/scoring-kr.md`에 domain selection이 total signal을 우선한다는 점과 near-tie domain rule을 반영
+- realistic regression fixture 1차 반영
+  - `tests/fixtures/realistic_jds.py`를 추가해 2026-04-06 기준 공개 한국 JD에서 추출한 익명화 fixture를 정리
+  - `tests/test_scoring.py`에 realistic backend / platform / data-ml-platform fixture 테스트를 추가
+  - 실제 current JD 기반으로 보면 `Data/ML Platform DevOps` 성격의 공고는 현재 규칙상 `Platform`으로 분류되는 것이 더 타당해, regression 기대값도 그 기준으로 고정
+  - `tests/__init__.py`, `tests/fixtures/__init__.py`를 추가해 fixture import를 안정화
+- realistic regression fixture 2차 반영
+  - `tests/fixtures/realistic_jds.py`에 `LLM/RAG 서비스형 Data-AI`, `feature store / Airflow / warehouse형 Data-Platform` fixture를 추가
+  - `tests/test_scoring.py`에 두 realistic fixture를 검증하는 scoring regression 테스트를 추가
+  - synthetic 경계 문장 외에도 공개 한국 JD 기반 패턴이 `Data-AI`와 `Data-Platform`으로 안정적으로 분류되는지 고정
+- realistic regression fixture 3차 반영
+  - `tests/fixtures/realistic_jds.py`에 `streaming / Databricks / Kafka / Flink형 Data-Platform`, `AI 플랫폼 운영 / observability형 Platform` fixture를 추가
+  - `tests/test_scoring.py`에 두 realistic fixture를 검증하는 scoring regression 테스트를 추가
+  - 공개 한국 JD 기반 패턴에서 `Data-Platform`과 `Platform`의 실제 경계가 현재 규칙에서 안정적으로 유지되는지 고정
+- realistic regression fixture 4차 반영
+  - `tests/fixtures/realistic_jds.py`에 `Next.js / React / TypeScript형 Frontend`, `Swift / SwiftUI형 iOS`, `Generative AI research / fine-tuning형 ML Research` fixture를 추가
+  - `tests/test_scoring.py`에 Frontend/iOS는 `General` fallback, ML Research는 `Data-AI`로 분류되는 regression 테스트를 추가
+  - 현재 scorecard가 아직 직접 지원하지 않는 역할군과 이미 포괄 가능한 역할군의 경계를 realistic fixture로 명확히 고정
+
+## 수정한 파일
+
+- [README.md](/Users/alex/project/career-ops-kr/README.md)
+- [AGENTS.md](/Users/alex/project/career-ops-kr/AGENTS.md)
+- [pyproject.toml](/Users/alex/project/career-ops-kr/pyproject.toml)
+- [src/career_ops_kr/cli.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/cli.py)
+- [src/career_ops_kr/commands/__init__.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/commands/__init__.py)
+- [src/career_ops_kr/commands/intake.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/commands/intake.py)
+- [src/career_ops_kr/commands/research.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/commands/research.py)
+- [src/career_ops_kr/commands/resume.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/commands/resume.py)
+- [src/career_ops_kr/commands/tracker.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/commands/tracker.py)
+- [src/career_ops_kr/jobs.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/jobs.py)
+- [src/career_ops_kr/pipeline.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/pipeline.py)
+- [src/career_ops_kr/portals.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/portals.py)
+- [src/career_ops_kr/research.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/research.py)
+- [src/career_ops_kr/scoring.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/scoring.py)
+- [src/career_ops_kr/tracker.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/tracker.py)
+- [tests/test_cli.py](/Users/alex/project/career-ops-kr/tests/test_cli.py)
+- [tests/test_jobs.py](/Users/alex/project/career-ops-kr/tests/test_jobs.py)
+- [tests/test_portals.py](/Users/alex/project/career-ops-kr/tests/test_portals.py)
+- [src/career_ops_kr/utils.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/utils.py)
+- [docs/architecture.md](/Users/alex/project/career-ops-kr/docs/architecture.md)
+- [docs/workflows.md](/Users/alex/project/career-ops-kr/docs/workflows.md)
+- [docs/scoring-kr.md](/Users/alex/project/career-ops-kr/docs/scoring-kr.md)
+- [docs/portal-integration-strategy.md](/Users/alex/project/career-ops-kr/docs/portal-integration-strategy.md)
+- [prompts/evaluate-job.md](/Users/alex/project/career-ops-kr/prompts/evaluate-job.md)
+- [prompts/company-research.md](/Users/alex/project/career-ops-kr/prompts/company-research.md)
+- [research/.gitkeep](/Users/alex/project/career-ops-kr/research/.gitkeep)
+- [.codex/config.toml](/Users/alex/project/career-ops-kr/.codex/config.toml)
+- [.codex/agents/career-ops-planner.toml](/Users/alex/project/career-ops-kr/.codex/agents/career-ops-planner.toml)
+- [.codex/agents/career-ops-docs-researcher.toml](/Users/alex/project/career-ops-kr/.codex/agents/career-ops-docs-researcher.toml)
+- [.codex/agents/career-ops-builder.toml](/Users/alex/project/career-ops-kr/.codex/agents/career-ops-builder.toml)
+- [.codex/agents/career-ops-reviewer.toml](/Users/alex/project/career-ops-kr/.codex/agents/career-ops-reviewer.toml)
+- [.codex/agents/career-ops-tester.toml](/Users/alex/project/career-ops-kr/.codex/agents/career-ops-tester.toml)
+- [.agents/skills/career-ops-session-bootstrap/SKILL.md](/Users/alex/project/career-ops-kr/.agents/skills/career-ops-session-bootstrap/SKILL.md)
+- [.agents/skills/career-ops-portal-research/SKILL.md](/Users/alex/project/career-ops-kr/.agents/skills/career-ops-portal-research/SKILL.md)
+- [.agents/skills/career-ops-company-research/SKILL.md](/Users/alex/project/career-ops-kr/.agents/skills/career-ops-company-research/SKILL.md)
+- [.agents/skills/career-ops-scorecard-design/SKILL.md](/Users/alex/project/career-ops-kr/.agents/skills/career-ops-scorecard-design/SKILL.md)
+- [.agents/skills/career-ops-tracker-audit/SKILL.md](/Users/alex/project/career-ops-kr/.agents/skills/career-ops-tracker-audit/SKILL.md)
+- [.agents/skills/career-ops-resume-pipeline/SKILL.md](/Users/alex/project/career-ops-kr/.agents/skills/career-ops-resume-pipeline/SKILL.md)
+- [config/profile.example.yml](/Users/alex/project/career-ops-kr/config/profile.example.yml)
+- [config/profile.yml](/Users/alex/project/career-ops-kr/config/profile.yml)
+- [config/portals.kr.example.yml](/Users/alex/project/career-ops-kr/config/portals.kr.example.yml)
+- [config/states.yml](/Users/alex/project/career-ops-kr/config/states.yml)
+- [config/scorecard.kr.yml](/Users/alex/project/career-ops-kr/config/scorecard.kr.yml)
+- [templates/resume-ko.html](/Users/alex/project/career-ops-kr/templates/resume-ko.html)
+- [templates/resume-en.html](/Users/alex/project/career-ops-kr/templates/resume-en.html)
+- [data/applications.md](/Users/alex/project/career-ops-kr/data/applications.md)
+- [data/pipeline.md](/Users/alex/project/career-ops-kr/data/pipeline.md)
+- [tests/test_scoring.py](/Users/alex/project/career-ops-kr/tests/test_scoring.py)
+- [tests/test_pipeline.py](/Users/alex/project/career-ops-kr/tests/test_pipeline.py)
+- [tests/test_tracker.py](/Users/alex/project/career-ops-kr/tests/test_tracker.py)
+- [tests/test_research.py](/Users/alex/project/career-ops-kr/tests/test_research.py)
+
+## 테스트 결과
+
+실행 완료:
+
+- `source .venv/bin/activate && pip install -e .`
+- `source .venv/bin/activate && python -m playwright install chromium`
+- `source .venv/bin/activate && career-ops-kr --help`
+- `source .venv/bin/activate && career-ops-kr verify`
+- `source .venv/bin/activate && career-ops-kr render-resume templates/resume-en.html examples/resume-context.example.json output/test-resume.html`
+- `source .venv/bin/activate && career-ops-kr generate-pdf output/test-resume.html output/test-resume.pdf`
+- `source .venv/bin/activate && career-ops-kr fetch-job https://example.com --out jds/test-example.md --source smoke-test --insecure`
+- `source .venv/bin/activate && career-ops-kr score-job jds/test-example.md --out reports/test-example.md`
+- `source .venv/bin/activate && career-ops-kr merge-tracker`
+- `source .venv/bin/activate && python -m compileall src`
+- `source .venv/bin/activate && career-ops-kr fetch-job https://recruit.wanted.co.kr/wd/343686 --out jds/_smoke_wanted.md --source wanted-smoke`
+- `source .venv/bin/activate && career-ops-kr fetch-job https://jumpit.saramin.co.kr/position/48685313 --out jds/_smoke_jumpit.md --source jumpit-smoke`
+- `source .venv/bin/activate && career-ops-kr verify`
+- `source .venv/bin/activate && career-ops-kr discover-jobs wanted --limit 5 --out data/pipeline-smoke-wanted.md`
+- `source .venv/bin/activate && career-ops-kr discover-jobs jumpit --limit 5 --out data/pipeline-smoke-jumpit.md`
+- `source .venv/bin/activate && career-ops-kr discover-jobs wanted --limit 5 --out data/pipeline-smoke-wanted.md`
+- `source .venv/bin/activate && career-ops-kr --help`
+- `source .venv/bin/activate && career-ops-kr verify`
+- `source .venv/bin/activate && python -m compileall src`
+- `source .venv/bin/activate && career-ops-kr verify`
+- `source .venv/bin/activate && career-ops-kr fetch-job https://career.rememberapp.co.kr/job/posting/24786 --out jds/_smoke_remember.md --source remember-smoke`
+- `source .venv/bin/activate && career-ops-kr --help`
+- `source .venv/bin/activate && career-ops-kr discover-jobs remember --limit 5 --out data/pipeline-smoke-remember.md`
+- `source .venv/bin/activate && python -m compileall src`
+- `source .venv/bin/activate && career-ops-kr discover-jobs remember --limit 5 --out data/pipeline-smoke-remember.md`
+- `source .venv/bin/activate && career-ops-kr verify`
+- `source .venv/bin/activate && python - <<'PY' ... tomllib로 .codex/config.toml 및 .codex/agents/*.toml 파싱 확인`
+- `source .venv/bin/activate && career-ops-kr --help`
+- `source .venv/bin/activate && python -m compileall src`
+- `source .venv/bin/activate && career-ops-kr process-pipeline --pipeline data/pipeline-process-success.md --limit 1 --out-dir jds/process-success`
+- `source .venv/bin/activate && career-ops-kr process-pipeline --pipeline data/pipeline-process-failure.md --limit 2 --out-dir jds/process-failure`
+- `source .venv/bin/activate && career-ops-kr process-pipeline --pipeline data/pipeline-process-404.md --limit 2 --out-dir jds/process-404`
+- `source .venv/bin/activate && career-ops-kr process-pipeline --pipeline data/pipeline-process-success.md --limit 1 --out-dir jds/process-success`
+- `source .venv/bin/activate && career-ops-kr process-pipeline --pipeline data/pipeline-process-success.md --limit 1 --out-dir jds/process-success`
+- `source .venv/bin/activate && career-ops-kr verify`
+- `source .venv/bin/activate && python -m compileall src`
+- `source .venv/bin/activate && career-ops-kr process-pipeline --help`
+- `source .venv/bin/activate && career-ops-kr score-job --help`
+- `source .venv/bin/activate && career-ops-kr fetch-job https://career.rememberapp.co.kr/job/posting/24786 --out jds/test-score.md --source remember-smoke`
+- `source .venv/bin/activate && career-ops-kr score-job jds/test-score.md --out reports/test-score.md --tracker-out data/tracker-additions/test-score.tsv`
+- `source .venv/bin/activate && career-ops-kr merge-tracker`
+- `source .venv/bin/activate && career-ops-kr normalize-statuses`
+- `source .venv/bin/activate && career-ops-kr process-pipeline --pipeline data/pipeline-score-smoke.md --limit 1 --out-dir jds/pipeline-score-smoke --score --report-dir reports/pipeline-score-smoke --tracker-dir data/tracker-additions/pipeline-score-smoke`
+- `source .venv/bin/activate && career-ops-kr process-pipeline --pipeline data/pipeline-score-smoke.md --limit 1 --out-dir jds/pipeline-score-smoke --score --report-dir reports/pipeline-score-smoke --tracker-dir data/tracker-additions/pipeline-score-smoke`
+- `source .venv/bin/activate && career-ops-kr verify`
+- `source .venv/bin/activate && career-ops-kr process-pipeline --pipeline data/pipeline-process-score-success.md --limit 1 --out-dir jds/process-score-success --score --report-dir reports/process-score-success --tracker-dir data/tracker-additions/process-score-success`
+- `source .venv/bin/activate && career-ops-kr process-pipeline --pipeline data/pipeline-process-score-failure.md --limit 2 --out-dir jds/process-score-failure --score --report-dir reports/process-score-failure --tracker-dir data/tracker-additions/process-score-failure`
+- `source .venv/bin/activate && career-ops-kr process-pipeline --pipeline data/pipeline-process-score-success.md --limit 1 --out-dir jds/process-score-success --score --report-dir reports/process-score-success --tracker-dir data/tracker-additions/process-score-success`
+- `source .venv/bin/activate && python -m unittest discover -s tests`
+- `source .venv/bin/activate && career-ops-kr score-job --help`
+- `source .venv/bin/activate && career-ops-kr fetch-job https://career.rememberapp.co.kr/job/posting/24786 --out jds/direct-smoke.md --source remember-smoke`
+- `source .venv/bin/activate && career-ops-kr score-job jds/direct-smoke.md --out reports/direct-score.md --tracker-out data/tracker-additions/direct-score.tsv`
+- `source .venv/bin/activate && career-ops-kr process-pipeline --pipeline data/pipeline-score-seq.md --limit 1 --out-dir jds/pipeline-score-seq --score --report-dir reports/pipeline-score-seq --tracker-dir data/tracker-additions/pipeline-score-seq`
+- `source .venv/bin/activate && career-ops-kr process-pipeline --pipeline data/pipeline-score-seq.md --limit 1 --out-dir jds/pipeline-score-seq --score --report-dir reports/pipeline-score-seq --tracker-dir data/tracker-additions/pipeline-score-seq`
+- `source .venv/bin/activate && career-ops-kr process-pipeline --pipeline data/pipeline-scorefail-seq.md --limit 1 --out-dir jds/pipeline-scorefail-seq --score --report-dir reports/pipeline-scorefail-seq --tracker-dir /dev/null`
+- `source .venv/bin/activate && career-ops-kr verify`
+- live lock smoke: running PID를 넣은 `data/pipeline-lock-live.md.lock`이 있을 때 `career-ops-kr process-pipeline --pipeline data/pipeline-lock-live.md --limit 1`이 lock error로 즉시 실패하는 것 확인
+- stale lock smoke: `pid=999999`인 `data/pipeline-lock-stale.md.lock`이 있을 때 `career-ops-kr process-pipeline --pipeline data/pipeline-lock-stale.md --limit 1`이 stale lock을 회수하고 정상 종료하는 것 확인
+- `source .venv/bin/activate && career-ops-kr prepare-company-research --help`
+- `source .venv/bin/activate && python -m compileall src`
+- `source .venv/bin/activate && python -m unittest discover -s tests`
+- `printf '# JD\n' > jds/test-company-research.md && printf '# Report\n' > reports/test-company-research.md`
+- `source .venv/bin/activate && career-ops-kr prepare-company-research "Toss" --out research/test-toss.md --homepage https://toss.im --careers-url https://toss.im/career/jobs --job-url https://toss.im/career/jobs/backend --jobplanet-url https://www.jobplanet.co.kr/companies/000/info --blind-url https://www.teamblind.com/company/Toss --job-path jds/test-company-research.md --report-path reports/test-company-research.md --extra-source news=https://example.com/news`
+- `source .venv/bin/activate && career-ops-kr prepare-company-research "Toss" --out research/test-toss.md`
+  - expected failure: overwrite guard 확인
+- `source .venv/bin/activate && career-ops-kr prepare-company-research "Toss" --out research/test-toss.md --overwrite`
+- `source .venv/bin/activate && career-ops-kr prepare-company-research "Toss" --out research/test-invalid.md --extra-source not-valid`
+  - expected failure: invalid `LABEL=URL` 형식 확인
+- `source .venv/bin/activate && career-ops-kr prepare-company-followup --help`
+- `source .venv/bin/activate && python -m unittest tests.test_research tests.test_cli`
+- `source .venv/bin/activate && python -m unittest discover -s tests`
+- `source .venv/bin/activate && career-ops-kr --help`
+- `source .venv/bin/activate && python -m compileall src tests`
+- `source .venv/bin/activate && python -m unittest discover -s tests`
+- `source .venv/bin/activate && career-ops-kr verify`
+- `source .venv/bin/activate && career-ops-kr verify`
+- `source .venv/bin/activate && career-ops-kr prepare-resume-tailoring --help`
+- `source .venv/bin/activate && career-ops-kr apply-resume-tailoring --help`
+- `source .venv/bin/activate && python -m unittest tests.test_examples`
+- `source .venv/bin/activate && career-ops-kr render-resume templates/resume-ko.html examples/resume-context.platform.ko.example.json output/test-platform-ko-resume.html`
+- `source .venv/bin/activate && career-ops-kr render-resume templates/resume-en.html examples/resume-context.platform.example.json output/test-platform-resume.html`
+- `source .venv/bin/activate && career-ops-kr render-resume templates/career-description-ko.html examples/career-description-context.platform.ko.example.json output/test-career-description.html`
+- `source .venv/bin/activate && career-ops-kr fetch-job https://career.rememberapp.co.kr/job/posting/293599 --out jds/demo-platform-remember.md --source remember`
+- `source .venv/bin/activate && career-ops-kr score-job jds/demo-platform-remember.md --out reports/demo-platform-remember.md --tracker-out data/tracker-additions/demo-platform-remember.tsv --profile-path config/profile.example.yml`
+- `source .venv/bin/activate && career-ops-kr prepare-resume-tailoring jds/demo-platform-remember.md reports/demo-platform-remember.md --base-context examples/resume-context.platform.ko.example.json --out output/demo-platform-tailoring.json --overwrite`
+- `source .venv/bin/activate && career-ops-kr apply-resume-tailoring output/demo-platform-tailoring.json examples/resume-context.platform.ko.example.json --out output/demo-platform-context.json --overwrite`
+- `source .venv/bin/activate && career-ops-kr render-resume templates/resume-ko.html output/demo-platform-context.json output/demo-platform-resume.html`
+- `source .venv/bin/activate && career-ops-kr generate-pdf output/demo-platform-resume.html output/demo-platform-resume.pdf`
+- `source .venv/bin/activate && career-ops-kr build-tailored-resume jds/test-example.md reports/test-example.md examples/resume-context.platform.ko.example.json templates/resume-ko.html --html-out output/test-wrapper-resume.html --tailoring-out output/test-wrapper-tailoring.json --context-out output/test-wrapper-context.json`
+- `source .venv/bin/activate && python -m unittest tests.test_resume`
+- `source .venv/bin/activate && python -m unittest tests.test_cli`
+- `source .venv/bin/activate && python -m unittest discover -s tests`
+- `source .venv/bin/activate && python -m compileall src tests`
+- `source .venv/bin/activate && career-ops-kr verify`
+- `rm -f research/test-toss.md jds/test-company-research.md reports/test-company-research.md`
+- `source .venv/bin/activate && career-ops-kr verify`
+- `source .venv/bin/activate && python3 -m compileall src`
+- `source .venv/bin/activate && python3 -m unittest discover -s tests`
+- `source .venv/bin/activate && python -m unittest tests.test_portals tests.test_jobs tests.test_pipeline tests.test_tracker tests.test_cli`
+- `source .venv/bin/activate && python -m compileall src tests`
+- `source .venv/bin/activate && career-ops-kr finalize-tracker --help`
+- `source .venv/bin/activate && career-ops-kr prepare-company-followup --help`
+- `source .venv/bin/activate && python -m unittest discover -s tests`
+- `source .venv/bin/activate && career-ops-kr verify`
+- `source .venv/bin/activate && python - <<'PY' ... tomllib로 .codex/config.toml 및 .codex/agents/*.toml 재파싱 확인`
+- `source .venv/bin/activate && career-ops-kr verify`
+- `source .venv/bin/activate && career-ops-kr score-job jds/test-role-ai.md --out reports/test-role-ai.md --tracker-out data/tracker-additions/test-role-ai.tsv`
+  - local `config/profile.yml` 기준 overlap이 0인 경우 `Selected Target Role: General`, `Selected Role Profile: General` fallback 확인
+- browser/web 조사:
+  - `https://www.saramin.co.kr/zf_user/jobs/list/job-category`
+  - `https://oapi.saramin.co.kr/introduce`
+  - `https://oapi.saramin.co.kr/guide/job-search-id`
+  - `https://www.jobkorea.co.kr/robots.txt`
+  - `https://www.jobkorea.co.kr/company/46081318/recruit`
+  - `https://www.jobkorea.co.kr/Recruit/GI_Read/48773523?Oem_Code=C1`
+  - `https://www.linkedin.com/robots.txt`
+  - `https://www.linkedin.com/jobs/`
+  - `https://kr.linkedin.com/jobs/view/senior-backend-engineer-at-konnect-co-ltd-4380663845`
+  - `https://business.linkedin.com/content/dam/me/business/en-us/talent-solutions/learning-center/tip-sheets/en-us/JobWrapping_TSEP.pdf`
+
+정리 완료:
+
+- smoke test 산출물 삭제
+- pipeline smoke lock sidecar 삭제
+- `jds/`, `reports/`, `research/`, `data/tracker-additions/`는 현재 `.gitkeep`만 남김
+- tracker를 초기 상태로 복구
+- `career-ops-kr verify` 재실행 후 통과 확인
+
+## 남은 문제
+
+- `fetch-job`는 일부 로컬 Python 환경에서 TLS 인증서 검증 실패가 날 수 있다. 현재는 `--insecure` 옵션으로 우회 가능하다.
+- `discover-jobs`는 현재 Wanted / Jumpit / Remember / Saramin을 지원한다. Saramin은 `SARAMIN_ACCESS_KEY`가 있어야 한다.
+- `process-pipeline --score`는 score/report/addition까지 생성하지만, tracker 반영은 의도적으로 `finalize-tracker`를 별도 실행해야 한다.
+- `process-pipeline --score`에서 fetch는 성공했지만 scoring이 실패한 경우에도 URL은 이미 `jds/`에 저장된 것으로 간주하고 처리 완료로 표시한다. 재시도는 `score-job`로 해야 한다.
+- lock file이 live PID를 가리키는 동안에는 같은 pipeline 파일을 처리할 수 없다. 장시간 hang가 나면 운영적으로 lock file 상태를 먼저 확인해야 한다.
+- JobPlanet / Blind는 company research source로 분류했고 summary/outreach scaffold와 search hint는 생겼지만, exact company URL 자동 추론은 아직 없다.
+- role profile taxonomy는 `Data-Platform`까지 확장됐고 role-specific company signal, generic keyword 축소, minimum match ratio fallback까지 들어갔지만, 더 세밀한 taxonomy와 실전 tuning은 아직 남아 있다.
+- mixed `Platform / Data-Platform / Data-AI` 경계는 여전히 phrasing 영향이 있어, 2-stage taxonomy나 더 좁은 grouped signal 설계는 후속 과제로 남아 있다.
+- domain-first, data specialization near-tie anchor, platform/data domain near-tie, realistic JD fixture까지 넣었지만 mixed `Platform / Data-Platform / Data-AI` 경계는 여전히 heuristic 기반이다. margin 규칙과 specialization taxonomy는 더 다듬을 수 있다.
+- realistic fixture를 늘렸지만 여전히 paraphrase 기반이다. 실전 JD 다양성을 더 반영하려면 공개 공고 패턴을 계속 추가할 수 있다.
+- realistic fixture는 늘었지만 여전히 일부 역할군은 비어 있다. 프론트엔드, 모바일, pure ML research 계열은 아직 scoring regression fixture가 부족하다.
+- Frontend, 모바일, ML research fixture는 추가됐지만, 아직 pure product design, QA, embedded, game client 같은 역할군은 비어 있다.
+- `score-job`와 `process-pipeline --score`는 override flag가 생겼지만, 기본값은 여전히 로컬 `config/profile.yml`, `config/scorecard.kr.yml`이다.
+- pytest 등 더 넓은 테스트 스위트는 아직 없고, 현재는 `tests/test_cli.py`, `tests/test_jobs.py`, `tests/test_pipeline.py`, `tests/test_portals.py`, `tests/test_research.py`, `tests/test_scoring.py`, `tests/test_tracker.py` 중심의 `unittest`만 있다.
+- 현재 테스트 스위트는 주요 CLI override와 tracker finalize 흐름까지 커버하지만, live network fetch path 자체를 고정하는 테스트는 아니다.
+- Codex local config는 1차 tuning을 반영했지만, 실제 세션에서 skill/agent 트리거 품질과 handoff 품질은 계속 관찰이 필요하다.
+- docs research용 MCP는 아직 연결하지 않았다. 현재는 web search 중심 전제다.
+- RocketPunch는 manual detail-only reference source로 정리됐고 canonical/manual guardrail도 들어갔지만, stable discovery 경로는 여전히 별도로 설계해야 한다.
+- RocketPunch는 latest re-review에서도 manual detail-only reference source 유지가 맞다. `200` 응답만으로 discovery 가능 판정을 내리기 어렵다.
+- Saramin은 공식 API discovery 경로가 들어갔지만, 실제 운영에는 여전히 승인된 `SARAMIN_ACCESS_KEY`가 필요하다.
+- README는 현재 CLI 표면 기준으로 맞춰져 있다. 이후 명령 이름이나 기본 경로가 바뀌면 문서 예시도 같이 갱신해야 한다.
+- git 초기 커밋 이후에도 새 smoke/demo 산출물이 남지 않도록 `.gitignore` 패턴과 실제 디렉터리 상태를 같이 유지해야 한다.
+
+## 다음 세션 시작 포인트
+
+우선순위가 높은 다음 작업:
+
+1. 실제 세션에서 skill / agent 동작 추가 점검
+   - 과호출 여부
+   - 새 company research skill이 portal research와 잘 분리되는지 확인
+   - builder / reviewer / tester handoff 품질 추가 점검
+2. 직군별 scorecard 2차 tuning
+   - specialization margin 규칙 추가 정교화
+   - mixed fixture를 더 늘려 phrasing variation 회귀 방지
+   - realistic public-JD fixture를 더 늘려 synthetic 편향 줄이기
+   - 아직 비어 있는 역할군 fixture 채우기
+3. resume tailoring 후속 흐름
+   - `tailoringGuidance`를 실제 template field에 더 반영할지 검토
+   - role별 ko/en variant example을 더 늘릴지 검토
+   - 경력기술서 EN variant를 둘지 검토
+   - `fetch-job -> score-job -> build-tailored-resume`까지 확장할 상위 wrapper를 둘지 검토
+4. README와 실제 CLI 표면 동기화 유지
+   - 새 명령 추가나 경로 변경 시 초보자 가이드 예시도 함께 갱신
+   - 일반 사용자 흐름과 운영자용 live smoke 기능 설명이 섞이지 않게 유지
+
+다음 세션 시작 전 반드시 읽을 것:
+
+- `PLAN.md`
+- `PROGRESS.md`
+- `AGENTS.md`
