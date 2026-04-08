@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "career-ops-kr"
+version = "0.1.0"
+description = "Codex-first job search operations toolkit for Korean developers."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "beautifulsoup4>=4.12.3",
+  "httpx>=0.27.2",
+  "jinja2>=3.1.4",
+  "playwright>=1.58.0",
+  "pyyaml>=6.0.2",
+  "typer>=0.12.5"
+]
+
+[project.scripts]
+career-ops-kr = "career_ops_kr.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

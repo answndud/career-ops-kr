@@ -1,0 +1,56 @@
+{
+  "name": "Hong Gil-dong",
+  "headline": "Senior Backend Engineer",
+  "contactLine": "Seoul, KR | hong@example.com | github.com/example | example.com",
+  "summary": "Backend engineer focused on API design, transactional systems, and production reliability for customer-facing products.",
+  "skills": [
+    "Python",
+    "TypeScript",
+    "FastAPI",
+    "Django",
+    "PostgreSQL",
+    "Redis",
+    "Kafka",
+    "AWS"
+  ],
+  "experience": [
+    {
+      "role": "Senior Backend Engineer",
+      "company": "Commerce Stack",
+      "period": "2022 - Present",
+      "location": "Seoul",
+      "bullets": [
+        "Designed and shipped order, settlement, and partner APIs for high-volume commerce workflows.",
+        "Reduced incident recovery time by improving service-level monitoring, runbooks, and alert routing.",
+        "Led schema and query tuning for PostgreSQL services handling critical payment and order paths."
+      ]
+    },
+    {
+      "role": "Backend Engineer",
+      "company": "Growth SaaS",
+      "period": "2019 - 2022",
+      "location": "Remote",
+      "bullets": [
+        "Built internal workflow services and admin tools used by operations and customer success teams.",
+        "Introduced asynchronous job handling and queue-based retry policies for external integrations."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Partner Sync Platform",
+      "subtitle": "Integration and reconciliation tooling",
+      "bullets": [
+        "Implemented a partner data sync service with retryable ingestion pipelines and reconciliation reports.",
+        "Added audit trails and operator controls to reduce manual recovery work during partner incidents."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "school": "Example University",
+      "program": "B.S. in Computer Science",
+      "period": "2014 - 2018"
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "name": "Hong Gil-dong",
+  "headline": "Senior Platform Engineer",
+  "contactLine": "Seoul, KR | hong@example.com | github.com/example | example.com",
+  "summary": "Platform engineer focused on developer productivity, cloud infrastructure, and service reliability at scale.",
+  "skills": [
+    "Terraform",
+    "Kubernetes",
+    "AWS",
+    "Docker",
+    "GitHub Actions",
+    "Prometheus",
+    "Grafana",
+    "Python"
+  ],
+  "experience": [
+    {
+      "role": "Senior Platform Engineer",
+      "company": "Infra Systems",
+      "period": "2021 - Present",
+      "location": "Seoul",
+      "bullets": [
+        "Standardized infrastructure provisioning across environments with Terraform modules and guardrails.",
+        "Operated multi-service Kubernetes clusters and improved deployment safety with progressive rollout patterns.",
+        "Built internal platform tooling that shortened service onboarding time for application teams."
+      ]
+    },
+    {
+      "role": "DevOps Engineer",
+      "company": "Product Cloud",
+      "period": "2018 - 2021",
+      "location": "Seoul",
+      "bullets": [
+        "Improved CI/CD reliability and observability for backend and data workloads.",
+        "Defined monitoring baselines and runbook patterns for on-call rotations."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Service Bootstrap Platform",
+      "subtitle": "Golden path for internal engineering teams",
+      "bullets": [
+        "Created reusable templates for deployment, secret management, and observability setup.",
+        "Documented platform standards and operational checklists for new service teams."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "school": "Example University",
+      "program": "B.S. in Computer Science",
+      "period": "2013 - 2017"
+    }
+  ]
+}

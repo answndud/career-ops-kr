@@ -1,0 +1,415 @@
+weights:
+  role_alignment: 30
+  stack_overlap: 20
+  seniority_fit: 15
+  work_mode_fit: 10
+  language_fit: 10
+  compensation_signal: 10
+  company_signal: 5
+
+rules:
+  seniority_keywords:
+    junior:
+      - intern
+      - junior
+      - entry
+      - 신입
+      - 주니어
+    mid:
+      - engineer
+      - developer
+      - backend
+      - software
+      - 개발자
+    senior:
+      - senior
+      - lead
+      - staff
+      - principal
+      - senior backend
+      - 시니어
+      - 리드
+  work_mode_keywords:
+    remote:
+      - remote
+      - fully remote
+      - 재택
+      - 원격
+    hybrid:
+      - hybrid
+      - flexible
+      - 하이브리드
+    onsite:
+      - onsite
+      - office
+      - 출근
+      - 상주
+  language_keywords:
+    ko:
+      - korean
+      - 한국어
+    en:
+      - english
+      - 영어
+
+domains:
+  backend:
+    label: Backend
+    anchor_keywords:
+      - backend engineer
+      - backend developer
+      - service backend
+      - backend api
+      - distributed systems
+    signal_keywords:
+      - backend
+      - server
+      - api
+      - microservices
+      - distributed systems
+  platform:
+    label: Platform
+    anchor_keywords:
+      - platform engineer
+      - infrastructure engineer
+      - sre
+      - kubernetes
+      - terraform
+    signal_keywords:
+      - platform
+      - infrastructure
+      - sre
+      - observability
+      - reliability
+      - devops
+      - kubernetes
+      - terraform
+    tie_break_anchor_keywords:
+      - sre
+      - observability
+      - reliability
+      - kubernetes
+      - terraform
+      - devops
+  data:
+    label: Data
+    anchor_keywords:
+      - data platform
+      - data infrastructure
+      - data engineer
+      - applied ai
+      - generative ai
+      - machine learning
+      - llm
+      - rag
+      - model serving
+    signal_keywords:
+      - data pipeline
+      - etl
+      - airflow
+      - spark
+      - warehouse
+      - batch
+      - streaming
+      - ai
+      - ml
+      - machine learning
+      - llm
+      - rag
+      - eval
+      - agent
+      - prompt
+      - inference
+      - embeddings
+    tie_break_anchor_keywords:
+      - feature store
+      - training pipeline
+      - analytics infrastructure
+      - warehouse
+      - airflow
+      - spark
+      - dbt
+      - data pipeline
+
+role_profiles:
+  backend:
+    label: Backend
+    domain: backend
+    selection_anchor_keywords:
+      - backend engineer
+      - backend developer
+      - service backend
+      - distributed systems
+      - backend api
+    selection_signal_keywords:
+      - backend
+      - server
+      - api
+      - microservices
+      - distributed systems
+    match_keywords:
+      - backend
+      - server
+      - api
+      - microservices
+      - distributed systems
+      - backend engineer
+      - backend developer
+      - service backend
+    stack_keywords:
+      - postgres
+      - postgresql
+      - redis
+      - kafka
+      - grpc
+      - aws
+      - docker
+    positive_company_keywords:
+      - developer tools
+      - b2b saas
+      - fintech
+      - payments
+      - commerce
+    negative_company_keywords:
+      - outsourcing
+      - si
+      - maintenance
+    weights:
+      role_alignment: 34
+      stack_overlap: 20
+      seniority_fit: 15
+      work_mode_fit: 10
+      language_fit: 10
+      compensation_signal: 7
+      company_signal: 4
+  platform:
+    label: Platform
+    domain: platform
+    selection_anchor_keywords:
+      - platform engineer
+      - infrastructure engineer
+      - sre
+      - kubernetes
+      - terraform
+      - observability
+    selection_signal_keywords:
+      - platform
+      - infrastructure
+      - sre
+      - observability
+      - reliability
+      - devops
+      - kubernetes
+      - terraform
+    match_keywords:
+      - platform
+      - infrastructure
+      - sre
+      - observability
+      - kubernetes
+      - devops
+      - reliability
+      - terraform
+      - platform engineer
+      - infrastructure engineer
+    stack_keywords:
+      - kubernetes
+      - terraform
+      - docker
+      - aws
+      - observability
+      - prometheus
+      - grafana
+      - redis
+    positive_company_keywords:
+      - developer tools
+      - platform
+      - cloud
+      - reliability
+      - infra
+    negative_company_keywords:
+      - outsourcing
+      - agency
+    weights:
+      role_alignment: 30
+      stack_overlap: 22
+      seniority_fit: 15
+      work_mode_fit: 10
+      language_fit: 8
+      compensation_signal: 8
+      company_signal: 6
+  data_platform:
+    label: Data-Platform
+    domain: data
+    specialization_anchor_keywords:
+      - feature store
+      - training pipeline
+      - experimentation platform
+      - analytics infrastructure
+      - warehouse
+      - airflow
+      - spark
+    specialization_keywords:
+      - feature store
+      - feature pipeline
+      - training dataset
+      - training pipeline
+      - experimentation platform
+      - analytics infrastructure
+      - warehouse
+      - airflow
+      - spark
+      - batch
+      - streaming
+      - feature engineering
+    selection_anchor_keywords:
+      - data platform
+      - data pipeline
+      - etl
+      - airflow
+      - warehouse
+      - streaming
+    selection_signal_keywords:
+      - data platform
+      - data infrastructure
+      - data infra
+      - data pipeline
+      - etl
+      - airflow
+      - spark
+      - warehouse
+      - batch
+      - streaming
+      - analytics
+    match_keywords:
+      - data platform
+      - data engineer
+      - analytics engineer
+      - data infra
+      - data infrastructure
+      - data pipeline
+      - etl
+      - airflow
+      - spark
+      - flink
+      - warehouse
+      - kafka
+      - batch
+      - streaming
+    stack_keywords:
+      - python
+      - spark
+      - flink
+      - airflow
+      - kafka
+      - dbt
+      - bigquery
+      - snowflake
+      - redshift
+      - warehouse
+    positive_company_keywords:
+      - analytics
+      - data product
+      - warehouse
+      - b2b saas
+      - experimentation
+    negative_company_keywords:
+      - outsourcing
+      - agency
+      - pure reporting
+    weights:
+      role_alignment: 31
+      stack_overlap: 23
+      seniority_fit: 15
+      work_mode_fit: 10
+      language_fit: 8
+      compensation_signal: 6
+      company_signal: 7
+  data_ai:
+    label: Data-AI
+    domain: data
+    specialization_anchor_keywords:
+      - model serving
+      - inference
+      - llm
+      - rag
+      - prompt
+      - eval
+      - embeddings
+      - llmops
+    specialization_keywords:
+      - model serving
+      - inference
+      - llm
+      - rag
+      - machine learning
+      - prompt
+      - eval
+      - agent
+      - embeddings
+      - fine-tuning
+      - llmops
+    selection_anchor_keywords:
+      - applied ai
+      - generative ai
+      - machine learning
+      - llm
+      - rag
+      - inference
+      - model serving
+      - eval
+      - embeddings
+      - llmops
+    selection_signal_keywords:
+      - ai
+      - machine learning
+      - llm
+      - rag
+      - eval
+      - agent
+      - prompt
+      - inference
+      - model serving
+      - embeddings
+      - llmops
+    match_keywords:
+      - ai
+      - ml
+      - machine learning
+      - llm
+      - rag
+      - eval
+      - agent
+      - prompt
+      - model
+      - inference
+      - generative ai
+      - applied ai
+    stack_keywords:
+      - python
+      - pytorch
+      - tensorflow
+      - pandas
+      - numpy
+      - spark
+      - embeddings
+      - vector database
+      - llm
+    positive_company_keywords:
+      - ai tooling
+      - agent
+      - llm
+      - inference
+      - research
+    negative_company_keywords:
+      - outsourcing
+      - annotation only
+      - pure labeling
+    weights:
+      role_alignment: 30
+      stack_overlap: 20
+      seniority_fit: 15
+      work_mode_fit: 10
+      language_fit: 10
+      compensation_signal: 8
+      company_signal: 7

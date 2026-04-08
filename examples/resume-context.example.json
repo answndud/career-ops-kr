@@ -1,0 +1,42 @@
+{
+  "name": "Hong Gil-dong",
+  "headline": "Senior Backend Engineer",
+  "contactLine": "Seoul, KR | hong@example.com | github.com/example | example.com",
+  "summary": "Backend and platform engineer with experience building APIs, internal tooling, and production systems.",
+  "skills": [
+    "Python",
+    "TypeScript",
+    "Node.js",
+    "PostgreSQL",
+    "AWS",
+    "Docker"
+  ],
+  "experience": [
+    {
+      "role": "Senior Backend Engineer",
+      "company": "Example Corp",
+      "period": "2022 - Present",
+      "location": "Seoul",
+      "bullets": [
+        "Built internal APIs and workflow automation for core business systems.",
+        "Improved service reliability and observability for production workloads."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Career Ops KR",
+      "subtitle": "Codex-first job search toolkit",
+      "bullets": [
+        "Designed a file-based workflow for job evaluation and resume generation."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "school": "Example University",
+      "program": "B.S. in Computer Science",
+      "period": "2014 - 2018"
+    }
+  ]
+}

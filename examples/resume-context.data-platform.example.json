@@ -1,0 +1,56 @@
+{
+  "name": "Hong Gil-dong",
+  "headline": "Senior Data Platform Engineer",
+  "contactLine": "Seoul, KR | hong@example.com | github.com/example | example.com",
+  "summary": "Data platform engineer building reliable ingestion, warehouse, and orchestration systems for analytics and ML teams.",
+  "skills": [
+    "Python",
+    "SQL",
+    "Airflow",
+    "Spark",
+    "Kafka",
+    "dbt",
+    "BigQuery",
+    "Terraform"
+  ],
+  "experience": [
+    {
+      "role": "Senior Data Platform Engineer",
+      "company": "Insight Data",
+      "period": "2022 - Present",
+      "location": "Seoul",
+      "bullets": [
+        "Built orchestration and data quality workflows for batch and streaming pipelines used across analytics teams.",
+        "Improved warehouse modeling and transformation review processes with dbt standards and reusable checks.",
+        "Partnered with ML teams on feature pipeline reliability and dataset freshness monitoring."
+      ]
+    },
+    {
+      "role": "Data Engineer",
+      "company": "Growth Analytics",
+      "period": "2019 - 2022",
+      "location": "Remote",
+      "bullets": [
+        "Implemented event ingestion paths and warehouse marts for product and business reporting.",
+        "Maintained Airflow DAGs, Spark jobs, and schema change workflows across multiple stakeholders."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Warehouse Quality Guardrails",
+      "subtitle": "Automated checks for ingestion and marts",
+      "bullets": [
+        "Added lineage-aware checks and freshness alerts for critical marts supporting weekly decision making.",
+        "Reduced broken downstream dashboards by catching schema drift before scheduled transformations ran."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "school": "Example University",
+      "program": "B.S. in Statistics",
+      "period": "2012 - 2016"
+    }
+  ]
+}

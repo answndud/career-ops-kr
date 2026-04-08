@@ -1,0 +1,56 @@
+{
+  "name": "홍길동",
+  "headline": "시니어 데이터 플랫폼 엔지니어",
+  "contactLine": "서울, KR | hong@example.com | github.com/example | example.com",
+  "summary": "분석 및 ML 팀이 신뢰할 수 있는 적재, 오케스트레이션, 웨어하우스 기반을 만드는 데이터 플랫폼 엔지니어입니다.",
+  "skills": [
+    "Python",
+    "SQL",
+    "Airflow",
+    "Spark",
+    "Kafka",
+    "dbt",
+    "BigQuery",
+    "Terraform"
+  ],
+  "experience": [
+    {
+      "role": "시니어 데이터 플랫폼 엔지니어",
+      "company": "인사이트 데이터",
+      "period": "2022 - 현재",
+      "location": "서울",
+      "bullets": [
+        "배치 및 스트리밍 파이프라인의 오케스트레이션과 데이터 품질 체크를 구축했습니다.",
+        "dbt 표준과 재사용 가능한 검증 로직을 도입해 웨어하우스 모델링 리뷰 품질을 높였습니다.",
+        "ML 팀과 협업해 피처 파이프라인 신뢰성과 데이터 최신성 모니터링을 정비했습니다."
+      ]
+    },
+    {
+      "role": "데이터 엔지니어",
+      "company": "그로스 애널리틱스",
+      "period": "2019 - 2022",
+      "location": "원격",
+      "bullets": [
+        "제품 이벤트 적재 경로와 비즈니스 리포팅용 웨어하우스 마트를 구축했습니다.",
+        "Airflow DAG, Spark 작업, 스키마 변경 운영 절차를 여러 조직과 함께 관리했습니다."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "웨어하우스 품질 가드레일",
+      "subtitle": "적재 및 마트용 자동 검증 체계",
+      "bullets": [
+        "핵심 마트의 freshness 알림과 lineage 기반 검증을 추가했습니다.",
+        "스키마 드리프트를 변환 작업 이전에 감지해 깨진 다운스트림 대시보드를 줄였습니다."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "school": "예시대학교",
+      "program": "통계학 학사",
+      "period": "2012 - 2016"
+    }
+  ]
+}

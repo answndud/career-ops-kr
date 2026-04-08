@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ name }} Resume</title>
+    <style>
+      :root {
+        --bg: #f5f1e8;
+        --paper: #fffdf8;
+        --ink: #1b2733;
+        --muted: #607080;
+        --line: #d7dfdf;
+        --accent: #155d4d;
+        --accent-soft: #e7f3ef;
+        --accent-ink: #103e34;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        line-height: 1.58;
+      }
+
+      .page {
+        width: 816px;
+        margin: 0 auto;
+        padding: 48px 54px 56px;
+        background: var(--paper);
+      }
+
+      header {
+        display: grid;
+        grid-template-columns: 1.7fr 1fr;
+        gap: 24px;
+        padding-bottom: 22px;
+        border-bottom: 2px solid var(--accent);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 34px;
+        line-height: 1.1;
+        letter-spacing: -0.03em;
+      }
+
+      .headline {
+        margin-top: 10px;
+        color: var(--accent);
+        font-size: 17px;
+        font-weight: 700;
+      }
+
+      .contact {
+        display: flex;
+        justify-content: flex-end;
+        align-items: flex-start;
+      }
+
+      .contact-box {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        background: var(--accent-soft);
+        color: var(--accent-ink);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 0.78fr 1.42fr;
+        gap: 22px;
+        margin-top: 24px;
+      }
+
+      .rail section:first-child,
+      .main section:first-child {
+        margin-top: 0;
+      }
+
+      section {
+        margin-top: 22px;
+      }
+
+      h2 {
+        margin: 0 0 10px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--accent);
+      }
+
+      .card {
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 10px;
+      }
+
+      .meta {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .item + .item {
+        margin-top: 18px;
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+      }
+
+      .item-title {
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      ul {
+        margin: 10px 0 0 18px;
+        padding: 0;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      .skills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        padding: 5px 11px;
+        background: var(--accent-soft);
+        border-radius: 999px;
+        font-size: 12px;
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+
+      .summary {
+        white-space: pre-wrap;
+      }
+
+      .section-note {
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      @media print {
+        body {
+          background: #fff;
+        }
+
+        .page {
+          background: #fff;
+        }
+      }
+
+      @media (max-width: 860px) {
+        .page {
+          width: 100%;
+          padding: 32px 24px 40px;
+        }
+
+        header,
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .contact {
+          justify-content: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <div>
+          <h1>{{ name }}</h1>
+          <div class="headline">{{ headline }}</div>
+        </div>
+        <div class="contact">
+          <div class="contact-box">{{ contactLine }}</div>
+        </div>
+      </header>
+
+      <div class="layout">
+        <aside class="rail">
+          <section>
+            <h2>Summary</h2>
+            <div class="card summary">{{ summary }}</div>
+          </section>
+
+          <section>
+            <h2>Skills</h2>
+            <div class="skills">
+              {% for skill in skills %}
+              <span class="chip">{{ skill }}</span>
+              {% endfor %}
+            </div>
+          </section>
+
+          <section>
+            <h2>Education</h2>
+            <div class="card">
+              {% for entry in education %}
+              <div class="item">
+                <div class="item-title">{{ entry.school }}</div>
+                <div class="meta">{{ entry.program }}{% if entry.period %} | {{ entry.period }}{% endif %}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </section>
+        </aside>
+
+        <div class="main">
+          <section>
+            <h2>Experience</h2>
+            <p class="section-note">Lead with recent work that best proves scope, ownership, and operational impact.</p>
+            <div class="card">
+              {% for entry in experience %}
+              <div class="item">
+                <div class="item-title">{{ entry.role }} | {{ entry.company }}</div>
+                <div class="meta">{{ entry.period }}{% if entry.location %} | {{ entry.location }}{% endif %}</div>
+                <ul>
+                  {% for bullet in entry.bullets %}
+                  <li>{{ bullet }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+              {% endfor %}
+            </div>
+          </section>
+
+          <section>
+            <h2>Projects</h2>
+            <div class="card">
+              {% for entry in projects %}
+              <div class="item">
+                <div class="item-title">{{ entry.name }}</div>
+                <div class="meta">{{ entry.subtitle }}</div>
+                <ul>
+                  {% for bullet in entry.bullets %}
+                  <li>{{ bullet }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+              {% endfor %}
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </body>
+  </html>

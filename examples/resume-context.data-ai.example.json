@@ -1,0 +1,56 @@
+{
+  "name": "Hong Gil-dong",
+  "headline": "Applied AI Engineer",
+  "contactLine": "Seoul, KR | hong@example.com | github.com/example | example.com",
+  "summary": "Applied AI engineer focused on LLM product integration, evaluation, serving, and production-grade data workflows.",
+  "skills": [
+    "Python",
+    "PyTorch",
+    "LLM Evaluation",
+    "RAG",
+    "Vector Search",
+    "FastAPI",
+    "Docker",
+    "AWS"
+  ],
+  "experience": [
+    {
+      "role": "Applied AI Engineer",
+      "company": "AI Product Lab",
+      "period": "2023 - Present",
+      "location": "Seoul",
+      "bullets": [
+        "Built LLM-backed product features with retrieval, prompt iteration, and evaluation loops tied to user-facing KPIs.",
+        "Implemented model serving APIs and experiment scaffolding for prompt and model version comparisons.",
+        "Worked with product teams to translate ambiguous AI requirements into measurable service behavior."
+      ]
+    },
+    {
+      "role": "Machine Learning Engineer",
+      "company": "Search Systems",
+      "period": "2020 - 2023",
+      "location": "Seoul",
+      "bullets": [
+        "Operated inference services and offline evaluation jobs for ranking and recommendation systems.",
+        "Improved experiment reproducibility with dataset versioning and baseline tracking workflows."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "LLM Support Assistant",
+      "subtitle": "RAG and evaluation workflow",
+      "bullets": [
+        "Built a retrieval-augmented support assistant with citation checks and failure-case review workflows.",
+        "Defined offline evaluation slices and regression checks for prompt and model updates."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "school": "Example University",
+      "program": "M.S. in Artificial Intelligence",
+      "period": "2018 - 2020"
+    }
+  ]
+}

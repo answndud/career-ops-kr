@@ -1,0 +1,56 @@
+{
+  "name": "홍길동",
+  "headline": "시니어 플랫폼 엔지니어",
+  "contactLine": "서울, KR | hong@example.com | github.com/example | example.com",
+  "summary": "개발 생산성, 클라우드 인프라, 서비스 안정성을 개선하는 플랫폼 엔지니어입니다.",
+  "skills": [
+    "Terraform",
+    "Kubernetes",
+    "AWS",
+    "Docker",
+    "GitHub Actions",
+    "Prometheus",
+    "Grafana",
+    "Python"
+  ],
+  "experience": [
+    {
+      "role": "시니어 플랫폼 엔지니어",
+      "company": "인프라 시스템즈",
+      "period": "2021 - 현재",
+      "location": "서울",
+      "bullets": [
+        "Terraform 모듈과 운영 가드레일을 표준화해 환경별 인프라 구성 편차를 줄였습니다.",
+        "여러 서비스가 올라가는 Kubernetes 클러스터를 운영하며 배포 안정성을 높였습니다.",
+        "애플리케이션 팀의 초기 셋업 시간을 줄이는 내부 플랫폼 도구를 설계하고 도입했습니다."
+      ]
+    },
+    {
+      "role": "DevOps 엔지니어",
+      "company": "프로덕트 클라우드",
+      "period": "2018 - 2021",
+      "location": "서울",
+      "bullets": [
+        "백엔드와 데이터 워크로드의 CI/CD 신뢰성과 관측 가능성을 개선했습니다.",
+        "온콜 운영을 위한 모니터링 기준선과 런북 패턴을 정리했습니다."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "서비스 부트스트랩 플랫폼",
+      "subtitle": "내부 엔지니어링 팀용 골든 패스",
+      "bullets": [
+        "배포, 시크릿 관리, 관측성 설정을 재사용 가능한 템플릿으로 제공했습니다.",
+        "플랫폼 표준과 운영 체크리스트를 문서화해 신규 서비스 온보딩을 단순화했습니다."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "school": "예시대학교",
+      "program": "컴퓨터공학 학사",
+      "period": "2013 - 2017"
+    }
+  ]
+}

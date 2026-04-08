@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ name }} Resume</title>
+    <style>
+      :root {
+        --bg: #f8f5ef;
+        --paper: #fffdf8;
+        --ink: #17202a;
+        --muted: #5d6d7e;
+        --line: #d7dbdd;
+        --accent: #0f5c73;
+        --accent-soft: #e6f1f4;
+        --accent-ink: #0b4253;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+        line-height: 1.62;
+      }
+
+      .page {
+        width: 816px;
+        margin: 0 auto;
+        padding: 48px 54px 56px;
+        background: var(--paper);
+      }
+
+      header {
+        display: grid;
+        grid-template-columns: 1.6fr 1fr;
+        gap: 20px;
+        padding-bottom: 20px;
+        border-bottom: 2px solid var(--accent);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 34px;
+        line-height: 1.1;
+        letter-spacing: -0.03em;
+      }
+
+      .headline {
+        margin-top: 10px;
+        color: var(--accent);
+        font-size: 17px;
+        font-weight: 700;
+      }
+
+      .contact {
+        display: flex;
+        justify-content: flex-end;
+        align-items: flex-start;
+      }
+
+      .contact-box {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        background: var(--accent-soft);
+        color: var(--accent-ink);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      section {
+        margin-top: 22px;
+      }
+
+      h2 {
+        margin: 0 0 10px;
+        font-size: 14px;
+        letter-spacing: -0.01em;
+        color: var(--accent);
+      }
+
+      .card {
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        background: #fff;
+        border-radius: 10px;
+      }
+
+      .meta {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .item + .item {
+        margin-top: 18px;
+        padding-top: 18px;
+        border-top: 1px solid var(--line);
+      }
+
+      .item-title {
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      ul {
+        margin: 10px 0 0 18px;
+        padding: 0;
+      }
+
+      li + li {
+        margin-top: 6px;
+      }
+
+      .skills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        padding: 5px 11px;
+        background: var(--accent-soft);
+        border-radius: 999px;
+        font-size: 12px;
+        color: var(--accent-ink);
+        font-weight: 600;
+      }
+
+      .summary {
+        white-space: pre-wrap;
+      }
+
+      .section-note {
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      @media print {
+        body {
+          background: #fff;
+        }
+
+        .page {
+          background: #fff;
+        }
+      }
+
+      @media (max-width: 860px) {
+        .page {
+          width: 100%;
+          padding: 32px 24px 40px;
+        }
+
+        header {
+          grid-template-columns: 1fr;
+        }
+
+        .contact {
+          justify-content: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <div>
+          <h1>{{ name }}</h1>
+          <div class="headline">{{ headline }}</div>
+        </div>
+        <div class="contact">
+          <div class="contact-box">{{ contactLine }}</div>
+        </div>
+      </header>
+
+      <section>
+        <h2>요약</h2>
+        <div class="card summary">{{ summary }}</div>
+      </section>
+
+      <section>
+        <h2>기술 스택</h2>
+        <div class="skills">
+          {% for skill in skills %}
+          <span class="chip">{{ skill }}</span>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section>
+        <h2>경력</h2>
+        <p class="section-note">최근 경험과 운영 영향이 큰 성과를 먼저 배치합니다.</p>
+        <div class="card">
+          {% for entry in experience %}
+          <div class="item">
+            <div class="item-title">{{ entry.role }} | {{ entry.company }}</div>
+            <div class="meta">{{ entry.period }}{% if entry.location %} | {{ entry.location }}{% endif %}</div>
+            <ul>
+              {% for bullet in entry.bullets %}
+              <li>{{ bullet }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section>
+        <h2>프로젝트</h2>
+        <div class="card">
+          {% for entry in projects %}
+          <div class="item">
+            <div class="item-title">{{ entry.name }}</div>
+            <div class="meta">{{ entry.subtitle }}</div>
+            <ul>
+              {% for bullet in entry.bullets %}
+              <li>{{ bullet }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section>
+        <h2>학력</h2>
+        <div class="card">
+          {% for entry in education %}
+          <div class="item">
+            <div class="item-title">{{ entry.school }}</div>
+            <div class="meta">{{ entry.program }}{% if entry.period %} | {{ entry.period }}{% endif %}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+    </main>
+  </body>
+  </html>

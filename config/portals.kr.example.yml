@@ -1,0 +1,136 @@
+title_filter:
+  positive:
+    - backend
+    - platform
+    - server
+    - software engineer
+    - data engineer
+    - machine learning
+    - ai engineer
+    - ml engineer
+    - devops
+    - sre
+  negative:
+    - intern
+    - junior
+    - php
+    - unity
+    - cobol
+    - sap
+
+# source_role values:
+# - primary_intake: primary discovery/fetch target
+# - supplemental_intake: usable as a job source, but dedup/canonicalization is required
+# - manual_intake: user-provided or manually captured source
+# - intake_candidate: worth evaluating as a future intake source, but not implemented yet
+# - company_research: use for company signal gathering, not for primary job crawling
+
+sources:
+  - name: Wanted
+    type: portal
+    region: kr
+    enabled: true
+    source_role: primary_intake
+    research_status: implemented
+    discovery_mode: sitemap
+    sitemap_index: https://www.wanted.co.kr/sitemap.xml
+    notes: Use sitemap-first discovery. Detail pages are fetchable via /wd/<id> and recruit.wanted.co.kr/wd/<id>.
+  - name: Jumpit
+    type: portal
+    region: kr
+    enabled: true
+    source_role: primary_intake
+    research_status: implemented
+    discovery_mode: sitemap
+    sitemap_index: https://jumpit.saramin.co.kr/sitemap.xml
+    notes: Use sitemap-first discovery. Detail pages under /position/<id> are fetchable.
+  - name: RocketPunch
+    type: portal
+    region: kr
+    enabled: true
+    source_role: manual_intake
+    research_status: partial
+    discovery_mode: manual
+    notes: Keep as manual reference only. Accept canonical jobs/<job_id> detail URLs; localized or slug variants should be canonicalized back to jobs/<job_id>. Listing or company recruit pages are not intake URLs. Some 200 responses still return login, anti-crawl, or AWS WAF challenge content instead of a usable JD.
+  - name: Remember
+    type: portal
+    region: kr
+    enabled: true
+    source_role: primary_intake
+    research_status: implemented
+    discovery_mode: sitemap
+    sitemap_index: https://career.rememberapp.co.kr/sitemap.xml
+    notes: Public B2C job pages, robots, and sitemap-jobs.xml are accessible. Use sitemap-first discovery with /job/posting/<id> detail URLs.
+  - name: Saramin
+    type: portal
+    region: kr
+    enabled: true
+    source_role: supplemental_intake
+    research_status: implemented
+    discovery_mode: official_api
+    notes: Prefer the official Saramin job API over HTML scraping. `discover-jobs saramin` uses the API when `SARAMIN_ACCESS_KEY` is present, defaults to `job_mid_cd=2 (IT개발·데이터)`, and canonicalizes detail URLs by `rec_idx`.
+  - name: JobKorea
+    type: portal
+    region: kr
+    enabled: true
+    source_role: manual_intake
+    research_status: partial
+    discovery_mode: manual
+    notes: Public company recruit pages are readable, but robots disallow /Recruit/GI_Read/ detail crawling. Treat as manual intake only for now.
+  - name: Indeed
+    type: portal
+    region: mixed
+    enabled: true
+    source_role: manual_intake
+    research_status: partial
+    discovery_mode: manual
+    notes: Use manually captured detail URLs only. Canonicalize Indeed detail pages to /viewjob?jk=<job_key> and strip tracking params; do not use search or company listing pages as intake URLs.
+  - name: LinkedIn
+    type: portal
+    region: global
+    enabled: true
+    source_role: manual_intake
+    research_status: partial
+    discovery_mode: manual
+    notes: Guest job pages are public, but robots and platform terms make automated crawling inappropriate. Use as a manual source or dedup reference only.
+  - name: JobPlanet
+    type: research
+    region: kr
+    enabled: true
+    source_role: company_research
+    research_status: implemented
+    notes: Use for company review and interview signal gathering through prepare-company-research. Prefer manual browse from https://www.jobplanet.co.kr/companies and keep it out of automated discovery.
+  - name: Blind
+    type: research
+    region: mixed
+    enabled: true
+    source_role: company_research
+    research_status: implemented
+    notes: Use for company sentiment and issue tracking through prepare-company-research. Prefer manual browse from https://www.teamblind.com/company/ and keep it out of automated discovery.
+  - name: Company Careers
+    type: direct
+    region: mixed
+    enabled: true
+    source_role: primary_intake
+    research_status: planned
+    notes: Prefer direct company careers pages when public HTML is stable.
+
+tracked_companies:
+  - name: Toss
+    careers_url: https://toss.im/career/jobs
+    enabled: true
+  - name: Karrot
+    careers_url: https://about.daangn.com/jobs/
+    enabled: true
+  - name: Kakao
+    careers_url: https://careers.kakao.com/index
+    enabled: true
+  - name: Naver
+    careers_url: https://recruit.navercorp.com/
+    enabled: true
+  - name: Coupang
+    careers_url: https://www.coupang.jobs/kr/
+    enabled: true
+  - name: Riiid
+    careers_url: https://riiid.com/careers
+    enabled: true

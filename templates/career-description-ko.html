@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ name }} Career Description</title>
+    <style>
+      :root {
+        --bg: #f6f3ee;
+        --paper: #fffdfa;
+        --ink: #18232d;
+        --muted: #607080;
+        --line: #d8dddf;
+        --accent: #7a3f1d;
+        --accent-soft: #f6ece4;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+        line-height: 1.7;
+      }
+
+      .page {
+        width: 816px;
+        margin: 0 auto;
+        padding: 46px 52px 56px;
+        background: var(--paper);
+      }
+
+      header {
+        padding-bottom: 20px;
+        border-bottom: 2px solid var(--accent);
+      }
+
+      .eyebrow {
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 34px;
+        line-height: 1.12;
+        letter-spacing: -0.03em;
+      }
+
+      .headline {
+        margin-top: 10px;
+        color: var(--accent);
+        font-size: 17px;
+        font-weight: 700;
+      }
+
+      .contact {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      section {
+        margin-top: 24px;
+      }
+
+      h2 {
+        margin: 0 0 10px;
+        font-size: 15px;
+        color: var(--accent);
+        letter-spacing: -0.01em;
+      }
+
+      .lead {
+        margin: 0;
+        padding: 16px 18px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+        white-space: pre-wrap;
+      }
+
+      .skills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        padding: 5px 11px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .entry {
+        padding: 18px 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .entry:first-child {
+        padding-top: 0;
+        border-top: 0;
+      }
+
+      .entry-title {
+        font-size: 17px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .entry-meta {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .entry-note {
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      ul {
+        margin: 12px 0 0 18px;
+        padding: 0;
+      }
+
+      li + li {
+        margin-top: 7px;
+      }
+
+      .project-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      .project-card {
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+      }
+
+      .project-title {
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .project-subtitle {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .education-card {
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+      }
+
+      .education-row + .education-row {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+      }
+
+      @media print {
+        body {
+          background: #fff;
+        }
+
+        .page {
+          background: #fff;
+        }
+      }
+
+      @media (max-width: 860px) {
+        .page {
+          width: 100%;
+          padding: 30px 22px 40px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <div class="eyebrow">Career Description</div>
+        <h1>{{ name }}</h1>
+        <div class="headline">{{ headline }}</div>
+        <div class="contact">{{ contactLine }}</div>
+      </header>
+
+      <section>
+        <h2>핵심 요약</h2>
+        <p class="lead">{{ summary }}</p>
+      </section>
+
+      <section>
+        <h2>기술 역량</h2>
+        <div class="skills">
+          {% for skill in skills %}
+          <span class="chip">{{ skill }}</span>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section>
+        <h2>주요 경력</h2>
+        {% for entry in experience %}
+        <article class="entry">
+          <div class="entry-title">{{ entry.role }} | {{ entry.company }}</div>
+          <div class="entry-meta">{{ entry.period }}{% if entry.location %} | {{ entry.location }}{% endif %}</div>
+          <div class="entry-note">문제 정의, 설계 판단, 운영 영향이 드러나는 순서로 정리합니다.</div>
+          <ul>
+            {% for bullet in entry.bullets %}
+            <li>{{ bullet }}</li>
+            {% endfor %}
+          </ul>
+        </article>
+        {% endfor %}
+      </section>
+
+      <section>
+        <h2>프로젝트 및 부가 경험</h2>
+        <div class="project-grid">
+          {% for entry in projects %}
+          <article class="project-card">
+            <div class="project-title">{{ entry.name }}</div>
+            <div class="project-subtitle">{{ entry.subtitle }}</div>
+            <ul>
+              {% for bullet in entry.bullets %}
+              <li>{{ bullet }}</li>
+              {% endfor %}
+            </ul>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section>
+        <h2>학력</h2>
+        <div class="education-card">
+          {% for entry in education %}
+          <div class="education-row">
+            <div class="entry-title">{{ entry.school }}</div>
+            <div class="entry-meta">{{ entry.program }}{% if entry.period %} | {{ entry.period }}{% endif %}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,73 @@
+targets:
+  remember_platform_ko:
+    description: "Remember public JD smoke for KO platform resume flow."
+    candidates:
+      - url: "https://career.rememberapp.co.kr/job/posting/293599"
+        source: "remember"
+        label: "primary"
+      - url: "https://career.rememberapp.co.kr/job/posting/275546"
+        source: "remember"
+        label: "fallback-devops"
+    base_context_path: "examples/resume-context.platform.ko.example.json"
+    template_path: "templates/resume-ko.html"
+    profile_path: "config/profile.example.yml"
+  remember_platform_en:
+    description: "Remember public JD smoke for EN platform resume flow."
+    candidates:
+      - url: "https://career.rememberapp.co.kr/job/posting/293599"
+        source: "remember"
+        label: "primary"
+      - url: "https://career.rememberapp.co.kr/job/posting/275546"
+        source: "remember"
+        label: "fallback-devops"
+    base_context_path: "examples/resume-context.platform.example.json"
+    template_path: "templates/resume-en.html"
+    profile_path: "config/profile.example.yml"
+  remember_backend_ko:
+    description: "Remember public JD smoke for KO backend resume flow."
+    candidates:
+      - url: "https://career.rememberapp.co.kr/job/posting/264691"
+        source: "remember"
+        label: "primary"
+      - url: "https://www.wanted.co.kr/wd/157"
+        source: "wanted"
+        label: "fallback-wanted-web-dev"
+    base_context_path: "examples/resume-context.backend.ko.example.json"
+    template_path: "templates/resume-ko.html"
+    profile_path: "config/profile.example.yml"
+  remember_data_ai_ko:
+    description: "Remember public JD smoke for KO data-ai resume flow."
+    candidates:
+      - url: "https://career.rememberapp.co.kr/job/posting/251631"
+        source: "remember"
+        label: "primary"
+      - url: "https://jumpit.saramin.co.kr/position/53543924"
+        source: "jumpit"
+        label: "fallback-jumpit-vision-algorithm-10y"
+    base_context_path: "examples/resume-context.data-ai.ko.example.json"
+    template_path: "templates/resume-ko.html"
+    profile_path: "config/profile.example.yml"
+  wanted_backend_ko:
+    description: "Wanted public JD smoke for KO backend resume flow."
+    candidates:
+      - url: "https://www.wanted.co.kr/wd/157"
+        source: "wanted"
+        label: "primary"
+      - url: "https://career.rememberapp.co.kr/job/posting/264691"
+        source: "remember"
+        label: "fallback-remember-backend"
+    base_context_path: "examples/resume-context.backend.ko.example.json"
+    template_path: "templates/resume-ko.html"
+    profile_path: "config/profile.example.yml"
+  jumpit_data_ai_ko:
+    description: "Jumpit public JD smoke for KO data-ai resume flow."
+    candidates:
+      - url: "https://jumpit.saramin.co.kr/position/53543924"
+        source: "jumpit"
+        label: "primary"
+      - url: "https://jumpit.saramin.co.kr/position/53543915"
+        source: "jumpit"
+        label: "fallback-algorithm"
+    base_context_path: "examples/resume-context.data-ai.ko.example.json"
+    template_path: "templates/resume-ko.html"
+    profile_path: "config/profile.example.yml"

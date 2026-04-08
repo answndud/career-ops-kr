@@ -1,0 +1,30 @@
+canonical:
+  - 검토중
+  - 지원예정
+  - 지원완료
+  - 서류통과
+  - 과제
+  - 1차면접
+  - 2차면접
+  - 최종면접
+  - 오퍼
+  - 보류
+  - 불합격
+  - 스킵
+
+aliases:
+  evaluated: 검토중
+  review: 검토중
+  pending: 지원예정
+  applied: 지원완료
+  interview: 1차면접
+  final interview: 최종면접
+  offer: 오퍼
+  rejected: 불합격
+  skip: 스킵
+  no apply: 스킵
+  no_apply: 스킵
+  hold: 보류
+  서류: 서류통과
+  면접: 1차면접
+  탈락: 불합격

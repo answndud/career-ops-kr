@@ -1,0 +1,101 @@
+candidate:
+  name: Hong Gil-dong
+  email: hong@example.com
+  phone: "010-0000-0000"
+  location: Seoul, KR
+  timezone: Asia/Seoul
+  portfolio_url: https://example.com
+  github_url: https://github.com/example
+  linkedin_url: https://linkedin.com/in/example
+
+preferences:
+  preferred_languages:
+    - ko
+    - en
+  work_modes:
+    preferred:
+      - remote
+      - hybrid
+    acceptable:
+      - onsite
+  salary:
+    target_min_krw: 80000000
+    target_ideal_krw: 110000000
+  locations:
+    primary:
+      - seoul
+      - pangyo
+    acceptable_remote_countries:
+      - kr
+      - sg
+      - jp
+      - us
+
+target_roles:
+  - name: Senior Backend Engineer
+    scorecard_profile: backend
+    keywords:
+      - backend
+      - server
+      - platform
+      - api
+      - distributed systems
+      - python
+      - java
+      - kotlin
+      - go
+  - name: Platform Engineer
+    scorecard_profile: platform
+    keywords:
+      - platform
+      - infrastructure
+      - sre
+      - kubernetes
+      - observability
+      - devops
+      - reliability
+  - name: Applied AI Engineer
+    scorecard_profile: data_ai
+    keywords:
+      - ai
+      - llm
+      - ml
+      - rag
+      - eval
+      - agent
+      - prompt
+  - name: Data Platform Engineer
+    scorecard_profile: data_platform
+    keywords:
+      - data platform
+      - data engineer
+      - analytics engineer
+      - data pipeline
+      - airflow
+      - spark
+      - kafka
+
+skills:
+  primary:
+    - Python
+    - TypeScript
+    - Node.js
+    - PostgreSQL
+    - AWS
+    - Docker
+  secondary:
+    - Go
+    - Kubernetes
+    - Redis
+    - Terraform
+
+signals:
+  preferred_domains:
+    - b2b saas
+    - developer tools
+    - ai tooling
+    - fintech
+  avoid_domains:
+    - gambling
+    - crypto speculation
+    - pure outsourcing
