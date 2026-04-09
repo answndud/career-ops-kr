@@ -15,7 +15,7 @@
 5. `prompts/`
    Codex가 일관된 방식으로 평가와 작성 작업을 수행하도록 돕는 운영 프롬프트입니다.
 6. `src/career_ops_kr/web/`
-   선택적으로 띄울 수 있는 FastAPI 기반 product surface입니다. 홈 대시보드, 검색, 설정, 이력서 업로드, tracker UI, 저장 공고 detail view를 제공합니다. 홈 대시보드는 최근 공고, 최근 업로드 이력서, 최근 생성 웹 HTML/PDF를 한 번에 보여주고, 저장 공고 detail view는 tracker row와 연결된 artifact를 다시 열거나 같은 공고 URL로 resume build를 재실행하는 entry point로 동작합니다. 이 계층은 local-only SQLite sidecar를 쓰지만, HTML/PDF resume 산출은 기존 CLI resume pipeline을 그대로 호출합니다. AI surface는 기본 비활성화이고, 필요할 때만 `serve-web --enable-ai`로 켭니다.
+   선택적으로 띄울 수 있는 FastAPI 기반 product surface입니다. 홈 대시보드, 검색, 설정, 이력서 업로드, tracker UI, 저장 공고 detail view를 제공합니다. 홈 대시보드는 최근 공고, 최근 업로드 이력서, 최근 생성 웹 HTML/PDF를 한 번에 보여주고, 저장 공고 detail view는 tracker row와 연결된 artifact를 다시 열거나 같은 공고 URL로 resume build를 재실행하는 entry point로 동작합니다. 이 계층은 local-only SQLite sidecar를 쓰지만, HTML/PDF resume 산출은 기존 CLI resume pipeline을 그대로 호출합니다. AI surface는 기본 비활성화이고, 필요할 때만 `serve-web --enable-ai`로 켭니다. 시각 규칙은 `/Users/alex/project/career-ops-kr/design-guidelines.md`를 기준으로 grayscale-first admin dashboard 패턴을 공유합니다.
 
 ## Core Flow
 

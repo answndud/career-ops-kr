@@ -1,9 +1,13 @@
 {% extends "base.html" %}
 {% block title %}설정 | Career Ops KR Web{% endblock %}
 {% block content %}
-<section class="card">
-  <span class="pill">설정</span>
-  <h1>웹 설정과 데이터 관리</h1>
+<section class="card section-stack">
+  <div class="section-header">
+    <div>
+      <span class="pill">설정</span>
+      <h1>웹 설정과 데이터 관리</h1>
+    </div>
+  </div>
   <p class="muted">현재 DB 경로: <code>{{ db_path }}</code></p>
   <p class="muted">설정 페이지에 저장하면 로컬 SQLite sidecar에 보관됩니다.</p>
   {% if ai_enabled %}
@@ -11,26 +15,34 @@
   {% else %}
     <div class="notice warn">AI 기능은 현재 비활성화되어 있습니다. 지금은 검색, tracker, deterministic resume build만 사용하면 됩니다.</div>
   {% endif %}
-  <div class="grid two" style="margin-top: 16px;">
-    <section class="card" style="padding: 16px;">
-      <h2>검색 연동 키</h2>
-      <table>
-        <thead>
-          <tr><th>키</th><th>값</th><th>액션</th></tr>
-        </thead>
-        <tbody>
-          {% for key in allowed_search_keys %}
-            <tr>
-              <td>{{ key }}</td>
-              <td><input id="setting-{{ key }}" value="{{ settings.get(key, '') }}"></td>
-              <td><button type="button" onclick="CareerOpsSettings.save('{{ key }}')">저장</button></td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  <div class="grid two">
+    <section class="subcard section-stack">
+      <h2>검색 연동</h2>
+      {% if allowed_search_keys %}
+        <div class="table-frame">
+        <table>
+          <thead>
+            <tr><th>키</th><th>값</th><th>액션</th></tr>
+          </thead>
+          <tbody>
+            {% for key in allowed_search_keys %}
+              <tr>
+                <td>{{ key }}</td>
+                <td><input id="setting-{{ key }}" value="{{ settings.get(key, '') }}"></td>
+                <td><button type="button" onclick="CareerOpsSettings.save('{{ key }}')">저장</button></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      {% else %}
+        <div class="notice">
+          현재 기본 검색 소스는 별도 API 키가 필요하지 않습니다. 한국 채용공고를 찾을 때는 사람인, 원티드, 리멤버, 점핏과 회사 채용 페이지를 우선 사용하세요.
+        </div>
+      {% endif %}
     </section>
 
-    <section class="card" style="padding: 16px;">
+    <section class="subcard section-stack">
       <h2>DB 백업 / 내보내기 / 가져오기</h2>
       <div class="grid">
         <button type="button" onclick="CareerOpsSettings.backupDb()">DB 백업 생성</button>
@@ -42,8 +54,9 @@
     </section>
   </div>
   {% if ai_enabled %}
-    <section class="card" style="margin-top: 16px; padding: 16px;">
+    <section class="subcard section-stack">
       <h2>AI 키</h2>
+      <div class="table-frame">
       <table>
         <thead>
           <tr><th>키</th><th>값</th><th>액션</th></tr>
@@ -58,10 +71,10 @@
           {% endfor %}
         </tbody>
       </table>
+      </div>
     </section>
   {% endif %}
-  <div class="spacer"></div>
-  <pre id="settings-output" style="white-space: pre-wrap;">아직 저장한 결과가 없습니다.</pre>
+  <pre id="settings-output">아직 저장한 결과가 없습니다.</pre>
 </section>
 
 <script>

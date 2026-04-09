@@ -13,6 +13,10 @@ from career_ops_kr.utils import ensure_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DB_PATH = REPO_ROOT / "data" / "career-ops-web.db"
+LEGACY_REMOVED_SETTING_KEYS = {
+    "ADZUNA_APP_ID",
+    "ADZUNA_API_KEY",
+}
 
 
 def resolve_db_path(db_path: Path | None = None) -> Path:
@@ -92,6 +96,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "jobs", "context_path", "TEXT")
     _ensure_column(conn, "jobs", "html_path", "TEXT")
     _ensure_column(conn, "jobs", "pdf_path", "TEXT")
+    _delete_legacy_settings(conn)
     conn.commit()
 
 
@@ -101,6 +106,16 @@ def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) 
     if column in column_names:
         return
     conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
+
+
+def _delete_legacy_settings(conn: sqlite3.Connection) -> None:
+    if not LEGACY_REMOVED_SETTING_KEYS:
+        return
+    placeholders = ", ".join("?" for _ in LEGACY_REMOVED_SETTING_KEYS)
+    conn.execute(
+        f"DELETE FROM settings WHERE key IN ({placeholders})",
+        tuple(sorted(LEGACY_REMOVED_SETTING_KEYS)),
+    )
 
 
 def get_connection(db_path: Path | None = None) -> sqlite3.Connection:
@@ -149,7 +164,7 @@ def export_database_snapshot(*, out_path: Path, db_path: Path | None = None) -> 
             "version": 1,
             "exported_at": datetime.now(UTC).isoformat(),
             "tables": {
-                "settings": conn.execute("SELECT * FROM settings ORDER BY key").fetchall(),
+                "settings": _filtered_settings_rows(conn.execute("SELECT * FROM settings ORDER BY key").fetchall()),
                 "jobs": conn.execute("SELECT * FROM jobs ORDER BY id").fetchall(),
                 "resumes": conn.execute("SELECT * FROM resumes ORDER BY id").fetchall(),
                 "match_results": conn.execute("SELECT * FROM match_results ORDER BY id").fetchall(),
@@ -177,6 +192,8 @@ def import_database_snapshot(
         if table not in tables_payload or not isinstance(tables_payload[table], list):
             raise ValueError(f"Database snapshot is missing table: {table}")
 
+    tables_payload["settings"] = _filtered_settings_rows(tables_payload["settings"])
+
     backup_path = create_database_backup(backup_dir=backup_dir, db_path=db_path)
 
     with connection_scope(db_path) as conn:
@@ -197,6 +214,19 @@ def import_database_snapshot(
         "backup_path": backup_path.as_posix(),
         "counts": {table: len(tables_payload[table]) for table in required_tables},
     }
+
+
+def _filtered_settings_rows(rows: list[object]) -> list[object]:
+    filtered: list[object] = []
+    for raw_row in rows:
+        if not isinstance(raw_row, dict):
+            filtered.append(raw_row)
+            continue
+        key = str(raw_row.get("key") or "")
+        if key in LEGACY_REMOVED_SETTING_KEYS:
+            continue
+        filtered.append(raw_row)
+    return filtered
 
 
 def _bulk_insert_rows(conn: sqlite3.Connection, table: str, rows: list[object]) -> None:

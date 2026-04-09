@@ -1,13 +1,18 @@
 {% extends "base.html" %}
 {% block title %}어시스턴트 | Career Ops KR Web{% endblock %}
 {% block content %}
-<section class="card">
-  <span class="pill">AI</span>
-  <h1>AI 어시스턴트</h1>
+<div class="page-stack">
+<section class="card section-stack">
+  <div class="section-header">
+    <div>
+      <span class="pill">AI</span>
+      <h1>AI 어시스턴트</h1>
+    </div>
+  </div>
   {% if ai_enabled %}
     <p class="muted">자기소개서, 면접 준비, 공고 분석, 스킬 갭 분석을 한 화면에서 실행합니다.</p>
     <div class="grid two">
-      <div>
+      <div class="field">
         <label>모드</label>
         <select id="assistant-mode">
           {% for mode in modes %}
@@ -15,7 +20,7 @@
           {% endfor %}
         </select>
       </div>
-      <div>
+      <div class="field">
         <label>이력서</label>
         <select id="assistant-resume-id">
           <option value="">사용 안 함</option>
@@ -24,19 +29,19 @@
           {% endfor %}
         </select>
       </div>
-      <div>
+      <div class="field">
         <label>회사</label>
         <input id="assistant-company" placeholder="예: Toss">
       </div>
-      <div>
+      <div class="field">
         <label>포지션</label>
         <input id="assistant-position" placeholder="예: Backend Engineer">
       </div>
-      <div style="grid-column: 1 / -1;">
+      <div class="field span-full">
         <label>공고 설명</label>
         <textarea id="assistant-job-description" rows="10"></textarea>
       </div>
-      <div style="grid-column: 1 / -1;">
+      <div class="span-full">
         <button type="button" onclick="CareerOpsAssistant.run()">실행</button>
       </div>
     </div>
@@ -48,11 +53,12 @@
 </section>
 
 {% if ai_enabled %}
-  <section class="card" style="margin-top: 16px;">
+  <section class="card section-stack">
     <span class="pill">출력</span>
-    <pre id="assistant-output" style="white-space: pre-wrap;">아직 실행한 결과가 없습니다.</pre>
+    <pre id="assistant-output">아직 실행한 결과가 없습니다.</pre>
   </section>
 {% endif %}
+</div>
 
 {% if ai_enabled %}
 <script>

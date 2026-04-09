@@ -39,6 +39,12 @@
   - saved job detail은 tracker 상태와 연결된 JD / report / context / HTML / PDF, related match activity를 다시 확인하고, 저장된 공고 URL이 있으면 같은 화면에서 resume build를 다시 시작하는 entry point로 유지
   - AI surface는 기본 비활성화로 유지하고 필요할 때만 `serve-web --enable-ai`로 노출
   - settings 화면에서 web DB backup/export/import를 지원
+  - 국내 구직 기준으로 불필요한 Adzuna web search/provider 연동 제거 완료
+  - legacy DB snapshot import/export에서도 Adzuna 설정이 복원되지 않도록 scrub 완료
+  - `design-guidelines.md` 기준 grayscale-first admin dashboard 전면 개편 완료
+    - shared design tokens 정의 완료
+    - base layout / shared primitives / tables / forms / badges 통일 완료
+    - 각 화면에서 inline style 제거 완료
 - AI harness 로컬 설정 추가 설계
   - Codex: `AGENTS.md`, `.codex/config.toml`, `.codex/agents/`, `.agents/skills/`
   - command surface는 skill 우선으로 통일하고, 별도 command 계층은 만들지 않음
@@ -272,6 +278,10 @@
    - 1차 role profile split은 완료
    - 이후 weight/signals 정교화
 5. 부가 자동화 기능
+6. optional web surface 운영 안정화
+   - 디자인 시스템은 `design-guidelines.md` 기준으로 정리 완료
+   - 카드/배경 구분감을 위해 page background와 surface border 대비 조정 완료
+   - 이후에는 산출물 inventory 정책, 화면별 UX polish, 포털 drift 대응에 집중
 
 ## 의존 관계
 

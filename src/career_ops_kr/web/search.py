@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-from career_ops_kr.web.ai import get_setting, translate_query
+from career_ops_kr.web.ai import translate_query
 
 
 SEARCH_HEADERS = {
@@ -47,46 +47,6 @@ def _query_pair(query: str) -> tuple[str, str, str | None]:
         return query, english, f"EN: {english}" if english != query else None
     korean = translate_query(query, target_language="ko")
     return korean, query, f"KR: {korean}" if korean != query else None
-
-
-def _search_adzuna(query: str) -> list[JobSearchResult]:
-    app_id = get_setting("ADZUNA_APP_ID")
-    app_key = get_setting("ADZUNA_API_KEY")
-    if not app_id or not app_key:
-        return []
-
-    url = "https://api.adzuna.com/v1/api/jobs/us/search/1"
-    params = {
-        "app_id": app_id,
-        "app_key": app_key,
-        "what": query,
-        "results_per_page": 15,
-    }
-    response = httpx.get(url, params=params, headers=SEARCH_HEADERS, timeout=30.0)
-    response.raise_for_status()
-    payload = response.json()
-    results: list[JobSearchResult] = []
-    for index, item in enumerate(payload.get("results") or []):
-        results.append(
-            JobSearchResult(
-                id=f"adzuna-{item.get('id') or index}",
-                title=str(item.get("title") or ""),
-                company=str((item.get("company") or {}).get("display_name") or ""),
-                location=str((item.get("location") or {}).get("display_name") or "-"),
-                source="Adzuna",
-                url=str(item.get("redirect_url") or ""),
-                type=str(item.get("contract_time") or "-"),
-                experience="-",
-                salary=(
-                    f"${round(item['salary_min']):,} - ${round(item['salary_max']):,}"
-                    if item.get("salary_min") and item.get("salary_max")
-                    else "-"
-                ),
-                deadline="-",
-                description=str(item.get("description") or "")[:300],
-            )
-        )
-    return results
 
 
 def _search_efinancial(query: str) -> list[JobSearchResult]:
@@ -209,7 +169,6 @@ def search_jobs(query: str) -> dict[str, Any]:
         lambda: _search_saramin(korean_query),
         lambda: _search_wanted(korean_query),
         lambda: _search_efinancial(english_query),
-        lambda: _search_adzuna(english_query),
     ):
         try:
             all_results.extend(call())
@@ -226,6 +185,5 @@ def search_jobs(query: str) -> dict[str, Any]:
             "사람인": sum(1 for item in result_dicts if item["source"] == "사람인"),
             "원티드": sum(1 for item in result_dicts if item["source"] == "원티드"),
             "eFinancial": sum(1 for item in result_dicts if item["source"] == "eFinancial"),
-            "Adzuna": sum(1 for item in result_dicts if item["source"] == "Adzuna"),
         },
     }

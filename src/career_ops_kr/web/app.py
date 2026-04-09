@@ -72,7 +72,7 @@ TEMPLATE_PRESETS: dict[str, Path] = {
 }
 WEB_DB_OUTPUT_DIR = OUTPUT_DIR / "web-db"
 AI_SETTING_KEYS = ("AI_PROVIDER", "GEMINI_API_KEY", "OPENAI_API_KEY")
-SEARCH_SETTING_KEYS = ("ADZUNA_APP_ID", "ADZUNA_API_KEY")
+SEARCH_SETTING_KEYS: tuple[str, ...] = ()
 
 
 def _strip_html(value: str) -> str:
@@ -122,7 +122,7 @@ def _latest_resume_content() -> str:
 def _analyze_job_listing(payload: dict[str, Any]) -> dict[str, Any]:
     url = str(payload.get("url") or "")
     page_content = ""
-    if url and "adzuna" not in url:
+    if url:
         try:
             response = httpx.get(url, timeout=10.0, follow_redirects=True)
             response.raise_for_status()
@@ -416,7 +416,7 @@ def _normalize_web_source(source: str | None, url: str) -> str | None:
         return "remember"
     if normalized in {"점핏", "jumpit"}:
         return "jumpit"
-    if normalized in {"efinancial", "adzuna"}:
+    if normalized == "efinancial":
         return None
     if "wanted.co.kr" in url:
         return "wanted"

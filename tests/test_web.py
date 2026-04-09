@@ -64,8 +64,14 @@ class WebAppTests(unittest.TestCase):
             response = self.client.get(route)
             self.assertEqual(response.status_code, 200, route)
         home = self.client.get("/")
+        search = self.client.get("/search")
+        settings = self.client.get("/settings")
         self.assertNotIn("어시스턴트</a>", home.text)
         self.assertIn("AI 기능은 현재 기본 비활성화 상태입니다.", home.text)
+        self.assertNotIn("Adzuna", home.text)
+        self.assertNotIn("Adzuna", search.text)
+        self.assertNotIn("ADZUNA_API_KEY", settings.text)
+        self.assertIn("별도 API 키가 필요하지 않습니다.", settings.text)
 
     def test_settings_roundtrip(self) -> None:
         response = self.client.post("/api/settings", json={"key": "AI_PROVIDER", "value": "gemini"})
@@ -74,6 +80,11 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(payload["AI_PROVIDER"], "gemini")
         self.assertFalse(payload["ai_enabled"])
         self.assertEqual(payload["active_provider"], "disabled")
+
+    def test_removed_search_setting_keys_are_rejected(self) -> None:
+        response = self.client.post("/api/settings", json={"key": "ADZUNA_API_KEY", "value": "secret"})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "Invalid key")
 
     def test_ai_routes_are_disabled_by_default(self) -> None:
         for path, body in (
@@ -367,6 +378,12 @@ class WebAppTests(unittest.TestCase):
                 "source": "web",
             },
         )
+        with connection_scope() as conn:
+            conn.execute(
+                "INSERT INTO settings(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                ("ADZUNA_API_KEY", "legacy-secret"),
+            )
+            conn.commit()
 
         backup_response = self.client.post("/api/system/db/backup")
         self.assertEqual(backup_response.status_code, 200)
@@ -379,9 +396,14 @@ class WebAppTests(unittest.TestCase):
         self.assertTrue(export_path.exists())
         exported_payload = json.loads(export_path.read_text(encoding="utf-8"))
         self.assertEqual(exported_payload["tables"]["jobs"][0]["company"], "Backup Co")
+        self.assertNotIn("ADZUNA_API_KEY", {row["key"] for row in exported_payload["tables"]["settings"]})
+
+        exported_payload["tables"]["settings"].append({"key": "ADZUNA_API_KEY", "value": "should-not-come-back"})
+        export_path.write_text(json.dumps(exported_payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
         with connection_scope() as conn:
             conn.execute("DELETE FROM jobs")
+            conn.execute("DELETE FROM settings")
             conn.commit()
         self.assertEqual(self.client.get("/api/jobs").json(), [])
 
@@ -393,6 +415,11 @@ class WebAppTests(unittest.TestCase):
         restored_jobs = self.client.get("/api/jobs").json()
         self.assertEqual(len(restored_jobs), 1)
         self.assertEqual(restored_jobs[0]["company"], "Backup Co")
+        settings_payload = self.client.get("/api/settings").json()
+        self.assertNotIn("ADZUNA_API_KEY", settings_payload)
+        with connection_scope() as conn:
+            count = conn.execute("SELECT COUNT(*) AS count FROM settings WHERE key = ?", ("ADZUNA_API_KEY",)).fetchone()["count"]
+        self.assertEqual(count, 0)
 
 
 if __name__ == "__main__":

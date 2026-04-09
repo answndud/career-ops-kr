@@ -1,22 +1,30 @@
 {% extends "base.html" %}
 {% block title %}이력서 | Career Ops KR Web{% endblock %}
 {% block content %}
+<div class="page-stack">
 <div class="grid two">
-  <section class="card">
-    <span class="pill">Upload</span>
-    <h1>이력서 업로드</h1>
-    <p class="muted">PDF, TXT, MD를 지원합니다. 업로드 후 아래 도구에서 선택할 수 있습니다.</p>
+  <section class="card section-stack">
+    <div class="section-header">
+      <div>
+        <span class="pill">Upload</span>
+        <h1>이력서 업로드</h1>
+        <p class="muted">PDF, TXT, MD를 지원합니다. 업로드 후 아래 도구에서 선택할 수 있습니다.</p>
+      </div>
+    </div>
     <form id="upload-form" class="inline-form">
       <input id="resume-file" type="file" accept=".pdf,.txt,.md">
       <button type="submit">업로드</button>
     </form>
-    <div class="spacer"></div>
     <div id="upload-status" class="notice">아직 업로드하지 않았습니다.</div>
   </section>
 
-  <section class="card">
-    <span class="pill">Saved Resumes</span>
-    <h2>업로드된 이력서</h2>
+  <section class="card section-stack">
+    <div class="section-header">
+      <div>
+        <span class="pill">Saved Resumes</span>
+        <h2>업로드된 이력서</h2>
+      </div>
+    </div>
     <ul id="resume-list">
       {% for resume in resumes %}
         <li>#{{ resume.id }} · {{ resume.filename }} · {{ resume.created_at }}</li>
@@ -27,89 +35,134 @@
   </section>
 </div>
 
-<div class="grid two" style="margin-top: 16px;">
+<div class="grid two">
   {% if ai_enabled %}
-    <section class="card">
-      <span class="pill">Match</span>
-      <h2>이력서 적합도 분석</h2>
+    <section class="card section-stack">
+      <div class="section-header">
+        <div>
+          <span class="pill">Match</span>
+          <h2>이력서 적합도 분석</h2>
+        </div>
+      </div>
       <div class="grid">
-        <label for="match-resume-id">Resume ID</label>
-        <input id="match-resume-id" type="number" min="1" placeholder="예: 1">
-        <label for="match-job-description">Job Description</label>
-        <textarea id="match-job-description" placeholder="공고 본문을 붙여넣으세요"></textarea>
+        <div class="field">
+          <label for="match-resume-id">Resume ID</label>
+          <input id="match-resume-id" type="number" min="1" placeholder="예: 1">
+        </div>
+        <div class="field">
+          <label for="match-job-description">Job Description</label>
+          <textarea id="match-job-description" placeholder="공고 본문을 붙여넣으세요"></textarea>
+        </div>
         <button type="button" onclick="runResumeMatch()">매칭 분석</button>
       </div>
       <pre id="match-output">결과가 여기에 표시됩니다.</pre>
     </section>
 
-    <section class="card">
-      <span class="pill">Rewrite</span>
-      <h2>공고 맞춤 이력서 재작성</h2>
+    <section class="card section-stack">
+      <div class="section-header">
+        <div>
+          <span class="pill">Rewrite</span>
+          <h2>공고 맞춤 이력서 재작성</h2>
+        </div>
+      </div>
       <div class="grid">
-        <label for="rewrite-resume-id">Resume ID</label>
-        <input id="rewrite-resume-id" type="number" min="1" placeholder="비우면 최신 이력서 사용">
-        <label for="rewrite-company">Company</label>
-        <input id="rewrite-company" type="text" placeholder="회사명">
-        <label for="rewrite-position">Position</label>
-        <input id="rewrite-position" type="text" placeholder="포지션">
-        <label for="rewrite-language">Language</label>
-        <select id="rewrite-language">
-          <option value="ko">한국어</option>
-          <option value="en">English</option>
-        </select>
-        <label for="rewrite-job-description">Job Description</label>
-        <textarea id="rewrite-job-description" placeholder="공고 본문을 붙여넣으세요"></textarea>
+        <div class="field">
+          <label for="rewrite-resume-id">Resume ID</label>
+          <input id="rewrite-resume-id" type="number" min="1" placeholder="비우면 최신 이력서 사용">
+        </div>
+        <div class="field">
+          <label for="rewrite-company">Company</label>
+          <input id="rewrite-company" type="text" placeholder="회사명">
+        </div>
+        <div class="field">
+          <label for="rewrite-position">Position</label>
+          <input id="rewrite-position" type="text" placeholder="포지션">
+        </div>
+        <div class="field">
+          <label for="rewrite-language">Language</label>
+          <select id="rewrite-language">
+            <option value="ko">한국어</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+        <div class="field span-full">
+          <label for="rewrite-job-description">Job Description</label>
+          <textarea id="rewrite-job-description" placeholder="공고 본문을 붙여넣으세요"></textarea>
+        </div>
         <button type="button" onclick="runRewrite()">재작성</button>
       </div>
       <pre id="rewrite-output">재작성 결과가 여기에 표시됩니다.</pre>
     </section>
   {% else %}
-    <section class="card">
-      <span class="pill">Focus</span>
-      <h2>지금은 deterministic resume build만 사용</h2>
+    <section class="card section-stack">
+      <div class="section-header">
+        <div>
+          <span class="pill">Focus</span>
+          <h2>지금은 deterministic resume build만 사용</h2>
+        </div>
+      </div>
       <div class="notice warn">
         AI 기반 매칭, 재작성, 추천은 현재 비활성화되어 있습니다. 업로드된 이력서 관리와 URL 기반 맞춤 이력서 생성만 사용하세요.
       </div>
     </section>
   {% endif %}
 
-  <section class="card">
-    <span class="pill">Build</span>
-    <h2>URL에서 맞춤 이력서 HTML/PDF 생성</h2>
+  <section class="card section-stack">
+    <div class="section-header">
+      <div>
+        <span class="pill">Build</span>
+        <h2>URL에서 맞춤 이력서 HTML/PDF 생성</h2>
+      </div>
+    </div>
     <div class="grid">
-      <label for="build-url">Job URL</label>
-      <input id="build-url" type="text" placeholder="https://career.rememberapp.co.kr/job/posting/...">
-      <label for="build-company">Company</label>
-      <input id="build-company" type="text" placeholder="회사명">
-      <label for="build-position">Position</label>
-      <input id="build-position" type="text" placeholder="포지션">
-      <label for="build-preset">Preset</label>
-      <select id="build-preset">
-        {% for preset in resume_presets %}
-          <option value="{{ preset.key }}">{{ preset.role_label }} · {{ preset.language_label }}</option>
-        {% endfor %}
-      </select>
-      <label><input id="build-pdf" type="checkbox" checked style="width:auto;"> PDF도 같이 생성</label>
+      <div class="field span-full">
+        <label for="build-url">Job URL</label>
+        <input id="build-url" type="text" placeholder="https://career.rememberapp.co.kr/job/posting/...">
+      </div>
+      <div class="field">
+        <label for="build-company">Company</label>
+        <input id="build-company" type="text" placeholder="회사명">
+      </div>
+      <div class="field">
+        <label for="build-position">Position</label>
+        <input id="build-position" type="text" placeholder="포지션">
+      </div>
+      <div class="field">
+        <label for="build-preset">Preset</label>
+        <select id="build-preset">
+          {% for preset in resume_presets %}
+            <option value="{{ preset.key }}">{{ preset.role_label }} · {{ preset.language_label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <label class="checkbox-inline"><input id="build-pdf" type="checkbox" checked> PDF도 같이 생성</label>
       <button type="button" onclick="runBuildFromUrl()">HTML/PDF 생성</button>
     </div>
-    <div id="build-output" class="notice">생성 결과가 여기에 표시됩니다.</div>
+    <div id="build-output" class="notice result-panel">생성 결과가 여기에 표시됩니다.</div>
   </section>
 </div>
 
 {% if ai_enabled %}
-  <div class="grid two" style="margin-top: 16px;">
-    <section class="card">
-      <span class="pill">Recommend</span>
-      <h2>이력서 기반 추천 공고</h2>
+  <div class="grid two">
+    <section class="card section-stack">
+      <div class="section-header">
+        <div>
+          <span class="pill">Recommend</span>
+          <h2>이력서 기반 추천 공고</h2>
+        </div>
+      </div>
       <div class="grid">
-        <label for="recommend-resume-id">Resume ID</label>
-        <input id="recommend-resume-id" type="number" min="1" placeholder="비우면 최신 이력서 사용">
+        <div class="field">
+          <label for="recommend-resume-id">Resume ID</label>
+          <input id="recommend-resume-id" type="number" min="1" placeholder="비우면 최신 이력서 사용">
+        </div>
         <button type="button" onclick="runRecommend()">추천 공고 찾기</button>
       </div>
       <pre id="recommend-output">추천 결과가 여기에 표시됩니다.</pre>
     </section>
   </div>
 {% endif %}
+</div>
 
 <script>
   function renderResumeBuildResult(targetId, payload, headline) {
@@ -121,22 +174,21 @@
       ? `<a class="link" href="${CareerOpsWeb.escapeHtml(payload.pdf_url)}" target="_blank" rel="noreferrer">PDF 열기</a>`
       : '<span class="muted">PDF 없음</span>';
     const rawPayload = CareerOpsWeb.escapeHtml(JSON.stringify(payload, null, 2));
-    target.className = "notice ok";
+    target.className = "notice ok result-panel";
     target.innerHTML = `
       <div><strong>${CareerOpsWeb.escapeHtml(headline || "생성 완료")}</strong></div>
       <div class="muted">맞춤 이력서 산출물이 생성되었습니다.</div>
-      <div class="spacer"></div>
-      <div><strong>출력 링크</strong></div>
-      <div class="stack" style="margin-top: 8px;">${htmlLink}${pdfLink}</div>
-      <div class="spacer"></div>
+      <div class="link-stack">${htmlLink}${pdfLink}</div>
       <div><strong>저장 경로</strong></div>
-      <div class="muted">Job: ${CareerOpsWeb.escapeHtml(payload.job_path || "-")}</div>
-      <div class="muted">Report: ${CareerOpsWeb.escapeHtml(payload.report_path || "-")}</div>
-      <div class="muted">Tailoring: ${CareerOpsWeb.escapeHtml(payload.tailoring_path || "-")}</div>
-      <div class="muted">Context: ${CareerOpsWeb.escapeHtml(payload.context_path || "-")}</div>
-      <div class="muted">HTML: ${CareerOpsWeb.escapeHtml(payload.html_path || "-")}</div>
-      <div class="muted">PDF: ${CareerOpsWeb.escapeHtml(payload.pdf_path || "-")}</div>
-      <details style="margin-top: 12px;">
+      <div class="path-list">
+        <div class="muted">Job: ${CareerOpsWeb.escapeHtml(payload.job_path || "-")}</div>
+        <div class="muted">Report: ${CareerOpsWeb.escapeHtml(payload.report_path || "-")}</div>
+        <div class="muted">Tailoring: ${CareerOpsWeb.escapeHtml(payload.tailoring_path || "-")}</div>
+        <div class="muted">Context: ${CareerOpsWeb.escapeHtml(payload.context_path || "-")}</div>
+        <div class="muted">HTML: ${CareerOpsWeb.escapeHtml(payload.html_path || "-")}</div>
+        <div class="muted">PDF: ${CareerOpsWeb.escapeHtml(payload.pdf_path || "-")}</div>
+      </div>
+      <details>
         <summary>원본 응답 보기</summary>
         <pre>${rawPayload}</pre>
       </details>
@@ -247,6 +299,7 @@
 
   async function runBuildFromUrl() {
     const output = document.getElementById("build-output");
+    output.className = "notice warn result-panel";
     output.textContent = "Loading...";
     try {
       const [role, language] = document.getElementById("build-preset").value.split(":");
@@ -266,6 +319,7 @@
       if (!res.ok) throw new Error(data.detail || "생성 실패");
       renderResumeBuildResult("build-output", data, "생성 완료");
     } catch (error) {
+      output.className = "notice error result-panel";
       output.textContent = error.message;
     }
   }

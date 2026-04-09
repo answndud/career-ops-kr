@@ -1,24 +1,28 @@
 {% extends "base.html" %}
 {% block title %}트래커 | Career Ops KR Web{% endblock %}
 {% block content %}
+<div class="page-stack">
 <div class="grid two">
-  <section class="card">
-    <span class="pill">대시보드</span>
-    <h1>지원 현황</h1>
-    <div class="grid three">
-      <div class="notice">
+  <section class="card section-stack">
+    <div class="section-header">
+      <div>
+        <span class="pill">대시보드</span>
+        <h1>지원 현황</h1>
+      </div>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi-box">
         <div class="muted">총 항목</div>
         <div class="metric">{{ dashboard.totalJobs }}</div>
       </div>
       {% for row in dashboard.statusCounts[:2] %}
-        <div class="notice">
+        <div class="kpi-box">
           <div class="muted">{{ row.status }}</div>
           <div class="metric">{{ row.count }}</div>
         </div>
       {% endfor %}
     </div>
-    <div class="spacer"></div>
-    <ul>
+    <ul class="plain-list">
       {% for row in dashboard.statusCounts %}
         <li>{{ row.status }}: {{ row.count }}</li>
       {% else %}
@@ -27,32 +31,39 @@
     </ul>
   </section>
 
-  <section class="card">
-    <span class="pill">동기화</span>
-    <h2>CLI tracker와 맞추기</h2>
+  <section class="card section-stack">
+    <div class="section-header">
+      <div>
+        <span class="pill">동기화</span>
+        <h2>CLI tracker와 맞추기</h2>
+      </div>
+    </div>
     <p class="muted">웹 DB는 product surface용 sidecar이고, <code>data/applications.md</code>와 연결해 같이 운영합니다.</p>
     <div class="actions">
       <button type="button" onclick="CareerOpsTracker.syncTracker()">tracker 가져오기</button>
       <button type="button" class="secondary" onclick="CareerOpsTracker.refreshJobs()">목록 새로고침</button>
     </div>
-    <div class="spacer"></div>
-    <pre id="tracker-sync-output" style="white-space: pre-wrap;">아직 동기화하지 않았습니다.</pre>
+    <pre id="tracker-sync-output">아직 동기화하지 않았습니다.</pre>
   </section>
 </div>
 
-<section class="card" style="margin-top: 16px;">
-  <span class="pill">빠른 추가</span>
-  <h2>수동 항목 추가</h2>
-  <form id="tracker-create-form" class="grid two" onsubmit="CareerOpsTracker.createJob(event)">
+<section class="card section-stack">
+  <div class="section-header">
     <div>
+      <span class="pill">빠른 추가</span>
+      <h2>수동 항목 추가</h2>
+    </div>
+  </div>
+  <form id="tracker-create-form" class="grid two" onsubmit="CareerOpsTracker.createJob(event)">
+    <div class="field">
       <label>회사</label>
       <input name="company" required>
     </div>
-    <div>
+    <div class="field">
       <label>포지션</label>
       <input name="position" required>
     </div>
-    <div>
+    <div class="field">
       <label>상태</label>
       <select name="status">
         {% for status in statuses %}
@@ -60,45 +71,49 @@
         {% endfor %}
       </select>
     </div>
-    <div>
+    <div class="field">
       <label>출처</label>
       <input name="source" value="web">
     </div>
-    <div>
+    <div class="field">
       <label>위치</label>
       <input name="location">
     </div>
-    <div>
+    <div class="field">
       <label>공고 URL</label>
       <input name="url">
     </div>
-    <div>
+    <div class="field">
       <label>지원일</label>
       <input name="date_applied" placeholder="YYYY-MM-DD">
     </div>
-    <div>
+    <div class="field">
       <label>팔로업</label>
       <input name="follow_up" placeholder="YYYY-MM-DD">
     </div>
-    <div style="grid-column: 1 / -1;">
+    <div class="field span-full">
       <label>메모</label>
       <textarea name="notes" rows="3"></textarea>
     </div>
-    <div style="grid-column: 1 / -1;">
+    <div class="span-full">
       <button type="submit">추가</button>
     </div>
   </form>
 </section>
 
-<section class="card" style="margin-top: 16px;">
-  <span class="pill">필터</span>
-  <h2>검색 / 상태 / 정렬</h2>
-  <div class="grid three">
+<section class="card section-stack">
+  <div class="section-header">
     <div>
+      <span class="pill">필터</span>
+      <h2>검색 / 상태 / 정렬</h2>
+    </div>
+  </div>
+  <div class="grid three">
+    <div class="field">
       <label for="filter-q">검색어</label>
       <input id="filter-q" placeholder="회사, 포지션, 메모">
     </div>
-    <div>
+    <div class="field">
       <label for="filter-status">상태</label>
       <select id="filter-status">
         <option value="">전체</option>
@@ -107,7 +122,7 @@
         {% endfor %}
       </select>
     </div>
-    <div>
+    <div class="field">
       <label for="filter-sort">정렬</label>
       <select id="filter-sort">
         <option value="updated_at:DESC">최근 업데이트</option>
@@ -118,16 +133,21 @@
       </select>
     </div>
   </div>
-  <div class="spacer"></div>
   <div class="actions">
     <button type="button" onclick="CareerOpsTracker.refreshJobs()">필터 적용</button>
     <button type="button" class="secondary" onclick="CareerOpsTracker.resetFilters()">초기화</button>
   </div>
 </section>
 
-<section class="card" style="margin-top: 16px;">
-  <h2>Jobs</h2>
+<section class="card section-stack">
+  <div class="section-header">
+    <div>
+      <span class="pill">Jobs</span>
+      <h2>Jobs</h2>
+    </div>
+  </div>
   <div id="jobs-table">
+    <div class="table-frame">
     <table>
       <thead>
         <tr>
@@ -153,12 +173,10 @@
                   <option value="{{ status }}" {% if row.status == status %}selected{% endif %}>{{ status }}</option>
                 {% endfor %}
               </select>
-              <div class="spacer"></div>
               <input id="follow-up-{{ row.id }}" value="{{ row.follow_up or '' }}" placeholder="Follow-up">
             </td>
             <td>
               <input id="source-{{ row.id }}" value="{{ row.source or '' }}" placeholder="source">
-              <div class="spacer"></div>
               <input id="location-{{ row.id }}" value="{{ row.location or '' }}" placeholder="location">
             </td>
             <td>
@@ -177,8 +195,10 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
 </section>
+</div>
 
 <script>
   const CareerOpsTracker = {
@@ -218,12 +238,10 @@
             <td><strong>${CareerOpsTracker.escapeHtml(row.company)}</strong><br><span class="muted">${CareerOpsTracker.escapeHtml(row.position)}</span></td>
             <td>
               <select id="status-${row.id}">${statusOptions}</select>
-              <div class="spacer"></div>
               <input id="follow-up-${row.id}" value="${CareerOpsTracker.escapeHtml(row.follow_up || "")}" placeholder="Follow-up">
             </td>
             <td>
               <input id="source-${row.id}" value="${CareerOpsTracker.escapeHtml(row.source || "")}" placeholder="source">
-              <div class="spacer"></div>
               <input id="location-${row.id}" value="${CareerOpsTracker.escapeHtml(row.location || "")}" placeholder="location">
             </td>
             <td><textarea id="notes-${row.id}" rows="2">${CareerOpsTracker.escapeHtml(row.notes || "")}</textarea></td>

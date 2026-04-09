@@ -51,6 +51,23 @@
     - `CAREER_OPS_WEB_ENABLE_AI`가 없으면 nav, 홈, 검색, 이력서 화면에서 AI surface를 숨김
     - `serve-web --enable-ai`로 나중에 다시 켤 수 있게 정리
     - AI API route는 비활성 상태에서 404로 막고, 검색/저장/build 중심 웹 흐름을 기본값으로 유지
+  - 한국 구직 기준으로 불필요한 Adzuna web search/provider 연동 제거
+    - `web/search.py`에서 Adzuna provider 제거
+    - `web/ai.py`, `web/app.py`, `settings.html`에서 ADZUNA 설정 키 제거
+    - 홈/검색/README에서 Adzuna 언급 제거
+    - `tests/test_web.py`에 settings/search 화면과 invalid key rejection 회귀 추가
+  - legacy DB snapshot import/export에서도 Adzuna 설정 scrub 추가
+    - `web/db.py`에서 `ADZUNA_*` legacy setting key를 schema init 시 자동 삭제
+    - snapshot export 시 legacy setting rows 제외
+    - snapshot import 시 legacy setting rows를 무시
+    - `tests/test_web.py`에 export/import roundtrip에서 legacy key가 복원되지 않는 회귀 추가
+  - web UI 디자인 시스템 전면 개편 완료
+    - `design-guidelines.md` 기준으로 gradient, blur, translucent panel, 강한 accent를 제거
+    - `base.html`에서 grayscale token, 공통 form, table, badge, result-panel primitives를 재정의
+    - `home.html`, `search.html`, `resume.html`, `tracker.html`, `settings.html`, `job-detail.html`, `assistant.html`의 inline style 제거
+    - landing-page 톤 hero와 ad hoc card 스타일을 내부 운영 화면 밀도로 재정렬
+    - 기존 테스트가 묶인 홈 문구, nav 접근 이름, tracker/detail id는 유지
+    - 카드와 배경이 겹쳐 보이던 문제를 줄이기 위해 page background를 한 단계 내리고 card/subcard/notice/table border 대비를 보강
   - settings 화면에 web DB backup/export/import 추가
     - SQLite backup 생성
     - JSON snapshot export/import
@@ -622,17 +639,21 @@
    - 과호출 여부
    - 새 company research skill이 portal research와 잘 분리되는지 확인
    - builder / reviewer / tester handoff 품질 추가 점검
-2. 직군별 scorecard 2차 tuning
+2. optional web surface 운영 마무리
+   - web generated output만 보여주는 현재 inventory 정책을 유지할지, CLI 산출물까지 통합할지 결정
+   - search / tracker / detail 화면의 세부 UX polish 범위 확정
+   - 포털 parser drift 발생 시 live smoke와 web build-from-url 흐름을 우선 점검
+3. 직군별 scorecard 2차 tuning
    - specialization margin 규칙 추가 정교화
    - mixed fixture를 더 늘려 phrasing variation 회귀 방지
    - realistic public-JD fixture를 더 늘려 synthetic 편향 줄이기
    - 아직 비어 있는 역할군 fixture 채우기
-3. resume tailoring 후속 흐름
+4. resume tailoring 후속 흐름
    - `tailoringGuidance`를 실제 template field에 더 반영할지 검토
    - role별 ko/en variant example을 더 늘릴지 검토
    - 경력기술서 EN variant를 둘지 검토
    - `fetch-job -> score-job -> build-tailored-resume`까지 확장할 상위 wrapper를 둘지 검토
-4. README와 실제 CLI 표면 동기화 유지
+5. README와 실제 CLI 표면 동기화 유지
    - 새 명령 추가나 경로 변경 시 초보자 가이드 예시도 함께 갱신
    - 일반 사용자 흐름과 운영자용 live smoke 기능 설명이 섞이지 않게 유지
 
