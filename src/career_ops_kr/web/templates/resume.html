@@ -139,6 +139,10 @@
       <button type="button" onclick="runBuildFromUrl()">HTML/PDF 생성</button>
     </div>
     <div id="build-output" class="notice result-panel">생성 결과가 여기에 표시됩니다.</div>
+    <div class="actions">
+      <a class="link" href="/artifacts">전체 산출물 보기</a>
+      <a class="link" href="/tracker">저장된 공고 보기</a>
+    </div>
   </section>
 </div>
 
@@ -165,36 +169,6 @@
 </div>
 
 <script>
-  function renderResumeBuildResult(targetId, payload, headline) {
-    const target = document.getElementById(targetId);
-    const htmlLink = payload.html_url
-      ? `<a class="link" href="${CareerOpsWeb.escapeHtml(payload.html_url)}" target="_blank" rel="noreferrer">HTML 열기</a>`
-      : '<span class="muted">HTML 없음</span>';
-    const pdfLink = payload.pdf_url
-      ? `<a class="link" href="${CareerOpsWeb.escapeHtml(payload.pdf_url)}" target="_blank" rel="noreferrer">PDF 열기</a>`
-      : '<span class="muted">PDF 없음</span>';
-    const rawPayload = CareerOpsWeb.escapeHtml(JSON.stringify(payload, null, 2));
-    target.className = "notice ok result-panel";
-    target.innerHTML = `
-      <div><strong>${CareerOpsWeb.escapeHtml(headline || "생성 완료")}</strong></div>
-      <div class="muted">맞춤 이력서 산출물이 생성되었습니다.</div>
-      <div class="link-stack">${htmlLink}${pdfLink}</div>
-      <div><strong>저장 경로</strong></div>
-      <div class="path-list">
-        <div class="muted">Job: ${CareerOpsWeb.escapeHtml(payload.job_path || "-")}</div>
-        <div class="muted">Report: ${CareerOpsWeb.escapeHtml(payload.report_path || "-")}</div>
-        <div class="muted">Tailoring: ${CareerOpsWeb.escapeHtml(payload.tailoring_path || "-")}</div>
-        <div class="muted">Context: ${CareerOpsWeb.escapeHtml(payload.context_path || "-")}</div>
-        <div class="muted">HTML: ${CareerOpsWeb.escapeHtml(payload.html_path || "-")}</div>
-        <div class="muted">PDF: ${CareerOpsWeb.escapeHtml(payload.pdf_path || "-")}</div>
-      </div>
-      <details>
-        <summary>원본 응답 보기</summary>
-        <pre>${rawPayload}</pre>
-      </details>
-    `;
-  }
-
   function valueOrNull(id) {
     const value = document.getElementById(id).value.trim();
     return value ? value : null;
@@ -317,7 +291,7 @@
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "생성 실패");
-      renderResumeBuildResult("build-output", data, "생성 완료");
+      CareerOpsWeb.renderBuildResult("build-output", data);
     } catch (error) {
       output.className = "notice error result-panel";
       output.textContent = error.message;

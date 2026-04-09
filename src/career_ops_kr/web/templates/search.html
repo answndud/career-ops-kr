@@ -38,7 +38,12 @@
       {% endif %}
       <li>트래커 저장: <code>POST /api/import</code></li>
       <li>맞춤 이력서 HTML/PDF 생성: <code>POST /api/resume/build-from-url</code></li>
+      <li>외부 공고 URL 복사 후 다른 곳에서 직접 검토</li>
     </ul>
+    <div class="actions">
+      <a class="link" href="/artifacts">산출물 inventory 보기</a>
+      <a class="link" href="/tracker">트래커 보기</a>
+    </div>
     <div class="field">
       <label for="resume-preset">맞춤 이력서 preset</label>
       <select id="resume-preset">
@@ -57,6 +62,25 @@
       <p>{{ results.error }}</p>
     {% else %}
       <p class="muted">총 {{ results.count }}건{% if results.translated_query %} · {{ results.translated_query }}{% endif %}</p>
+      {% if results.provider_statuses %}
+        <div class="mini-pills">
+          {% for provider in results.provider_statuses %}
+            <span class="status-chip {% if provider.status == 'ok' %}ok{% else %}warn{% endif %}">
+              {{ provider.label }} {{ provider.status }}{% if provider.count is not none %} · {{ provider.count }}{% endif %}
+            </span>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% if results.degraded %}
+        <div class="notice warn">
+          일부 검색 소스가 일시적으로 실패했습니다. 아래 결과는 정상 응답한 소스만 합친 것입니다.
+        </div>
+      {% endif %}
+      <div class="mini-pills">
+        {% for source_name, count in results.sources.items() %}
+          <span class="status-chip">{{ source_name }} {{ count }}</span>
+        {% endfor %}
+      </div>
       <div class="source-tabs">
         {% for source_name, count in results.sources.items() %}
           <a class="source-tab {% if source_name == active_source %}active{% endif %}" href="/search?q={{ query | urlencode }}&source={{ source_name | urlencode }}">
@@ -79,13 +103,33 @@
           <tbody>
             {% for item in visible_results %}
               <tr>
-                <td>{{ item.company }}</td>
-                <td>{{ item.title }}</td>
+                <td>
+                  <div>{{ item.company }}</div>
+                  {% if item.saved_job %}
+                    <div class="mini-pills">
+                      <span class="status-chip ok">저장됨</span>
+                      <span class="status-chip">{{ item.saved_job.status }}</span>
+                    </div>
+                  {% endif %}
+                </td>
+                <td>
+                  <div>{{ item.title }}</div>
+                  {% if item.saved_job %}
+                    <div class="meta">{{ item.saved_job.attention_summary }}</div>
+                    <div class="mini-pills">
+                      {% if item.saved_job.has_report %}<span class="status-chip">Report</span>{% endif %}
+                      {% if item.saved_job.has_resume %}<span class="status-chip ok">Resume</span>{% endif %}
+                    </div>
+                  {% endif %}
+                </td>
                 <td>{{ item.source }}</td>
                 <td>{{ item.location }}</td>
                 <td>
                   <div class="table-actions">
                     <a href="{{ item.url }}" target="_blank" rel="noreferrer">열기</a>
+                    {% if item.saved_job %}
+                      <a class="link" href="{{ item.saved_job.detail_url }}">저장된 공고</a>
+                    {% endif %}
                     {% if ai_enabled %}
                       <button
                         type="button"
@@ -99,6 +143,13 @@
                         분석
                       </button>
                     {% endif %}
+                    <button
+                      type="button"
+                      class="secondary"
+                      onclick="CareerOpsSearch.copyUrl({{ item.url | tojson }})"
+                    >
+                      URL 복사
+                    </button>
                     <button
                       type="button"
                       data-title="{{ item.title }}"
@@ -135,6 +186,10 @@
 {% endif %}
 
 <section class="grid two">
+  <section class="card section-stack">
+    <span class="pill">저장</span>
+    <div id="search-save-output" class="notice result-panel">아직 저장한 공고가 없습니다.</div>
+  </section>
   {% if ai_enabled %}
     <section class="card section-stack">
       <span class="pill">공고 분석</span>
@@ -154,36 +209,21 @@
 </div>
 
 <script>
-  function renderResumeBuildResult(targetId, payload) {
-    const target = document.getElementById(targetId);
-    const htmlLink = payload.html_url
-      ? `<a class="link" href="${CareerOpsWeb.escapeHtml(payload.html_url)}" target="_blank" rel="noreferrer">HTML 열기</a>`
-      : '<span class="muted">HTML 없음</span>';
-    const pdfLink = payload.pdf_url
-      ? `<a class="link" href="${CareerOpsWeb.escapeHtml(payload.pdf_url)}" target="_blank" rel="noreferrer">PDF 열기</a>`
-      : '<span class="muted">PDF 없음</span>';
-    const detailLink = payload.job_id
-      ? `<a class="link" href="/tracker/${payload.job_id}">저장된 공고 보기</a>`
-      : "";
-    const rawPayload = CareerOpsWeb.escapeHtml(JSON.stringify(payload, null, 2));
-    target.className = "notice ok result-panel";
-    target.innerHTML = `
-      <div><strong>생성 완료</strong></div>
-      <div class="muted">검색 결과에서 맞춤 이력서 산출물이 만들어졌습니다.</div>
-      <div class="link-stack">${htmlLink}${pdfLink}${detailLink}</div>
-      <div><strong>저장 경로</strong></div>
-      <div class="path-list">
-        <div class="muted">HTML: ${CareerOpsWeb.escapeHtml(payload.html_path || "-")}</div>
-        <div class="muted">PDF: ${CareerOpsWeb.escapeHtml(payload.pdf_path || "-")}</div>
-      </div>
-      <details>
-        <summary>원본 응답 보기</summary>
-        <pre>${rawPayload}</pre>
-      </details>
-    `;
-  }
-
   const CareerOpsSearch = {
+    async copyUrl(url) {
+      const output = document.getElementById("search-save-output");
+      try {
+        await CareerOpsWeb.copyText(url);
+        output.className = "notice ok result-panel";
+        output.innerHTML = `
+          <div><strong>URL 복사 완료</strong></div>
+          <div class="muted">${CareerOpsWeb.escapeHtml(url)}</div>
+        `;
+      } catch (error) {
+        output.className = "notice error result-panel";
+        output.textContent = error.message;
+      }
+    },
     async analyze(button) {
       const payload = {
         title: button.dataset.title,
@@ -211,13 +251,26 @@
         url: button.dataset.url,
         description: button.dataset.description,
       };
+      const output = document.getElementById("search-save-output");
+      output.className = "notice warn result-panel";
+      output.textContent = "저장 중...";
       const response = await fetch("/api/import", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(payload),
       });
       const data = await response.json();
-      alert(response.ok ? `저장 완료: #${data.id} ${data.company}` : (data.detail || "저장 실패"));
+      if (!response.ok) {
+        output.className = "notice error result-panel";
+        output.textContent = data.detail || "저장 실패";
+        return;
+      }
+      const messageMap = {
+        created: "새 공고를 저장했습니다",
+        updated: "기존 공고를 최신 정보로 보완했습니다",
+        existing: "이미 저장된 공고입니다",
+      };
+      CareerOpsWeb.renderSavedJobResult("search-save-output", data, messageMap[data.save_result] || "저장 완료");
     },
     async buildResume(button) {
       const output = document.getElementById("search-build-output");
@@ -244,7 +297,7 @@
         output.textContent = data.detail || "이력서 생성 실패";
         return;
       }
-      renderResumeBuildResult("search-build-output", data);
+      CareerOpsWeb.renderBuildResult("search-build-output", data);
     },
   };
 </script>

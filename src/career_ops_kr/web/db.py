@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Iterator
 
 from career_ops_kr.utils import ensure_dir
+from career_ops_kr.portals import canonicalize_job_url
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -89,6 +90,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
         """
     )
     _ensure_column(conn, "jobs", "source", "TEXT")
+    _ensure_column(conn, "jobs", "canonical_url", "TEXT")
     _ensure_column(conn, "jobs", "tracker_id", "INTEGER")
     _ensure_column(conn, "jobs", "job_path", "TEXT")
     _ensure_column(conn, "jobs", "report_path", "TEXT")
@@ -97,6 +99,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "jobs", "html_path", "TEXT")
     _ensure_column(conn, "jobs", "pdf_path", "TEXT")
     _delete_legacy_settings(conn)
+    _backfill_jobs_canonical_urls(conn)
     conn.commit()
 
 
@@ -116,6 +119,22 @@ def _delete_legacy_settings(conn: sqlite3.Connection) -> None:
         f"DELETE FROM settings WHERE key IN ({placeholders})",
         tuple(sorted(LEGACY_REMOVED_SETTING_KEYS)),
     )
+
+
+def _backfill_jobs_canonical_urls(conn: sqlite3.Connection) -> None:
+    rows = conn.execute("SELECT id, url, canonical_url FROM jobs").fetchall()
+    for row in rows:
+        url = str(row.get("url") or "").strip()
+        canonical_url = str(row.get("canonical_url") or "").strip()
+        if not url:
+            continue
+        normalized = canonicalize_job_url(url)
+        if canonical_url == normalized:
+            continue
+        conn.execute(
+            "UPDATE jobs SET canonical_url = ? WHERE id = ?",
+            (normalized, row["id"]),
+        )
 
 
 def get_connection(db_path: Path | None = None) -> sqlite3.Connection:

@@ -29,6 +29,18 @@
         <li class="muted">저장된 상태 집계가 없습니다.</li>
       {% endfor %}
     </ul>
+  <div class="mini-pills">
+      <span class="status-chip warn">리포트 없음 {{ attention_counts.missing_report }}</span>
+      <span class="status-chip warn">이력서 없음 {{ attention_counts.missing_resume }}</span>
+      <span class="status-chip {% if attention_counts.overdue_follow_up %}error{% else %}ok{% endif %}">
+        overdue {{ attention_counts.overdue_follow_up }}
+      </span>
+    </div>
+    <div class="actions">
+      {% for key, label in attention_filters %}
+        <button type="button" class="ghost" onclick="CareerOpsTracker.applyAttentionFilter('{{ key }}')">{{ label }}</button>
+      {% endfor %}
+    </div>
   </section>
 
   <section class="card section-stack">
@@ -42,6 +54,7 @@
     <div class="actions">
       <button type="button" onclick="CareerOpsTracker.syncTracker()">tracker 가져오기</button>
       <button type="button" class="secondary" onclick="CareerOpsTracker.refreshJobs()">목록 새로고침</button>
+      <a class="link" href="/artifacts">산출물 inventory</a>
     </div>
     <pre id="tracker-sync-output">아직 동기화하지 않았습니다.</pre>
   </section>
@@ -132,6 +145,15 @@
         <option value="date_applied:DESC">지원일</option>
       </select>
     </div>
+    <div class="field">
+      <label for="filter-attention">주의 preset</label>
+      <select id="filter-attention">
+        <option value="">전체</option>
+        {% for key, label in attention_filters %}
+          <option value="{{ key }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
   </div>
   <div class="actions">
     <button type="button" onclick="CareerOpsTracker.refreshJobs()">필터 적용</button>
@@ -155,6 +177,8 @@
           <th>회사 / 포지션</th>
           <th>상태</th>
           <th>출처 / 위치</th>
+          <th>산출물</th>
+          <th>다음 액션</th>
           <th>메모</th>
           <th>액션</th>
         </tr>
@@ -178,6 +202,29 @@
             <td>
               <input id="source-{{ row.id }}" value="{{ row.source or '' }}" placeholder="source">
               <input id="location-{{ row.id }}" value="{{ row.location or '' }}" placeholder="location">
+              {% if row.url %}
+                <div class="meta"><a class="link" href="{{ row.url }}" target="_blank" rel="noreferrer">원문 공고</a></div>
+              {% endif %}
+            </td>
+            <td>
+              <div class="mini-pills">
+                {% if row.artifact_summary.job %}<span class="status-chip">JD</span>{% endif %}
+                {% if row.artifact_summary.report %}<span class="status-chip">Report</span>{% endif %}
+                {% if row.artifact_summary.context %}<span class="status-chip">Context</span>{% endif %}
+                {% if row.artifact_summary.html %}<span class="status-chip ok">HTML</span>{% endif %}
+                {% if row.artifact_summary.pdf %}<span class="status-chip ok">PDF</span>{% endif %}
+                {% if not row.artifact_summary.job and not row.artifact_summary.report and not row.artifact_summary.context and not row.artifact_summary.html and not row.artifact_summary.pdf %}
+                  <span class="muted">없음</span>
+                {% endif %}
+              </div>
+            </td>
+            <td>
+              <div class="mini-pills">
+                {% for tag in row.attention.tags %}
+                  <span class="status-chip {% if tag.tone == 'error' %}error{% elif tag.tone == 'warn' %}warn{% endif %}">{{ tag.label }}</span>
+                {% endfor %}
+              </div>
+              <div class="meta">{{ row.attention.summary }}</div>
             </td>
             <td>
               <textarea id="notes-{{ row.id }}" rows="2">{{ row.notes or '' }}</textarea>
@@ -191,13 +238,15 @@
             </td>
           </tr>
         {% else %}
-          <tr><td colspan="6" class="muted">저장된 공고가 없습니다.</td></tr>
+          <tr><td colspan="7" class="muted">저장된 공고가 없습니다.</td></tr>
         {% endfor %}
       </tbody>
     </table>
     </div>
   </div>
 </section>
+
+<div id="tracker-action-output" class="notice">아직 실행한 작업이 없습니다.</div>
 </div>
 
 <script>
@@ -217,6 +266,7 @@
       return {
         q: document.getElementById("filter-q").value.trim(),
         status: document.getElementById("filter-status").value,
+        attention: document.getElementById("filter-attention").value,
         sort,
         order,
       };
@@ -225,12 +275,22 @@
     renderRows(jobs) {
       const body = document.getElementById("jobs-table-body");
       if (!jobs.length) {
-        body.innerHTML = '<tr><td colspan="6" class="muted">조건에 맞는 공고가 없습니다.</td></tr>';
+        body.innerHTML = '<tr><td colspan="8" class="muted">조건에 맞는 공고가 없습니다.</td></tr>';
         return;
       }
       body.innerHTML = jobs.map((row) => {
         const statusOptions = CareerOpsTracker.statuses
           .map((status) => `<option value="${CareerOpsTracker.escapeHtml(status)}" ${row.status === status ? "selected" : ""}>${CareerOpsTracker.escapeHtml(status)}</option>`)
+          .join("");
+        const artifactBadges = [
+          row.job_path ? '<span class="status-chip">JD</span>' : "",
+          row.report_path ? '<span class="status-chip">Report</span>' : "",
+          row.context_path ? '<span class="status-chip">Context</span>' : "",
+          row.html_path ? '<span class="status-chip ok">HTML</span>' : "",
+          row.pdf_path ? '<span class="status-chip ok">PDF</span>' : "",
+        ].filter(Boolean).join("");
+        const attentionTags = (row.attention?.tags || [])
+          .map((tag) => `<span class="status-chip ${tag.tone === "error" ? "error" : tag.tone === "warn" ? "warn" : ""}">${CareerOpsTracker.escapeHtml(tag.label)}</span>`)
           .join("");
         return `
           <tr>
@@ -243,7 +303,10 @@
             <td>
               <input id="source-${row.id}" value="${CareerOpsTracker.escapeHtml(row.source || "")}" placeholder="source">
               <input id="location-${row.id}" value="${CareerOpsTracker.escapeHtml(row.location || "")}" placeholder="location">
+              ${row.url ? `<div class="meta"><a class="link" href="${CareerOpsTracker.escapeHtml(row.url)}" target="_blank" rel="noreferrer">원문 공고</a></div>` : ""}
             </td>
+            <td>${artifactBadges ? `<div class="mini-pills">${artifactBadges}</div>` : '<span class="muted">없음</span>'}</td>
+            <td>${attentionTags ? `<div class="mini-pills">${attentionTags}</div>` : ""}<div class="meta">${CareerOpsTracker.escapeHtml(row.attention?.summary || "정상")}</div></td>
             <td><textarea id="notes-${row.id}" rows="2">${CareerOpsTracker.escapeHtml(row.notes || "")}</textarea></td>
             <td>
               <div class="table-actions">
@@ -262,6 +325,7 @@
       const params = new URLSearchParams();
       if (filters.q) params.set("q", filters.q);
       if (filters.status) params.set("status", filters.status);
+      if (filters.attention) params.set("attention", filters.attention);
       params.set("sort", filters.sort);
       params.set("order", filters.order);
       const response = await fetch(`/api/jobs?${params.toString()}`);
@@ -272,21 +336,36 @@
     resetFilters() {
       document.getElementById("filter-q").value = "";
       document.getElementById("filter-status").value = "";
+      document.getElementById("filter-attention").value = "";
       document.getElementById("filter-sort").value = "updated_at:DESC";
+      CareerOpsTracker.refreshJobs();
+    },
+
+    applyAttentionFilter(value) {
+      document.getElementById("filter-attention").value = value;
       CareerOpsTracker.refreshJobs();
     },
 
     async createJob(event) {
       event.preventDefault();
+      const output = document.getElementById("tracker-action-output");
       const form = new FormData(event.target);
       const payload = Object.fromEntries(form.entries());
+      output.className = "notice warn";
+      output.textContent = "추가 중...";
       const response = await fetch("/api/jobs", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(payload),
       });
       const data = await response.json();
-      alert(response.ok ? `추가 완료: #${data.id}` : (data.detail || "추가 실패"));
+      if (!response.ok) {
+        output.className = "notice error";
+        output.textContent = data.detail || "추가 실패";
+        return;
+      }
+      output.className = "notice ok";
+      output.innerHTML = `추가 완료: <a class="link" href="/tracker/${CareerOpsTracker.escapeHtml(data.id)}">#${CareerOpsTracker.escapeHtml(data.id)} ${CareerOpsTracker.escapeHtml(data.company)}</a>`;
       if (response.ok) {
         event.target.reset();
         event.target.querySelector('select[name="status"]').value = CareerOpsTracker.statuses[0] || "";
@@ -295,6 +374,7 @@
     },
 
     async saveJob(jobId) {
+      const output = document.getElementById("tracker-action-output");
       const payload = {
         status: document.getElementById(`status-${jobId}`).value,
         source: document.getElementById(`source-${jobId}`).value,
@@ -302,21 +382,38 @@
         follow_up: document.getElementById(`follow-up-${jobId}`).value,
         notes: document.getElementById(`notes-${jobId}`).value,
       };
+      output.className = "notice warn";
+      output.textContent = `#${jobId} 저장 중...`;
       const response = await fetch(`/api/jobs/${jobId}`, {
         method: "PUT",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(payload),
       });
       const data = await response.json();
-      alert(response.ok ? `저장 완료: #${data.id}` : (data.detail || "저장 실패"));
+      if (!response.ok) {
+        output.className = "notice error";
+        output.textContent = data.detail || "저장 실패";
+        return;
+      }
+      output.className = "notice ok";
+      output.innerHTML = `저장 완료: <a class="link" href="/tracker/${CareerOpsTracker.escapeHtml(data.id)}">#${CareerOpsTracker.escapeHtml(data.id)} ${CareerOpsTracker.escapeHtml(data.company)}</a>`;
       if (response.ok) await CareerOpsTracker.refreshJobs();
     },
 
     async deleteJob(jobId) {
       if (!confirm(`정말 #${jobId} 항목을 삭제할까요?`)) return;
+      const output = document.getElementById("tracker-action-output");
+      output.className = "notice warn";
+      output.textContent = `#${jobId} 삭제 중...`;
       const response = await fetch(`/api/jobs/${jobId}`, {method: "DELETE"});
       const data = await response.json();
-      alert(response.ok ? "삭제 완료" : (data.detail || "삭제 실패"));
+      if (!response.ok) {
+        output.className = "notice error";
+        output.textContent = data.detail || "삭제 실패";
+        return;
+      }
+      output.className = "notice ok";
+      output.textContent = `삭제 완료: #${jobId}`;
       if (response.ok) await CareerOpsTracker.refreshJobs();
     },
 

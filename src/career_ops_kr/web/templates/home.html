@@ -37,7 +37,7 @@
   <article class="stat">
     <div class="label">Generated</div>
     <div class="value">{{ dashboard.generatedResumeCount }}</div>
-    <div class="hint">웹에서 생성한 HTML 이력서 수</div>
+    <div class="hint">웹 {{ dashboard.generatedWebResumeCount }} · CLI {{ dashboard.generatedCliResumeCount }}</div>
   </article>
   {% if ai_enabled %}
     <article class="stat">
@@ -68,7 +68,7 @@
     </article>
     <article class="subcard">
       <h3>3. 공고 검색</h3>
-      <p class="muted">원티드, 사람인, eFinancialCareers를 한 번에 조회합니다.</p>
+      <p class="muted">원티드, 사람인, eFinancialCareers를 한 번에 조회하고 저장과 이력서 생성을 바로 이어갑니다.</p>
       <div class="actions"><a class="link" href="/search">검색 열기</a></div>
     </article>
     <article class="subcard">
@@ -83,7 +83,7 @@
   <strong>주의:</strong> 이 화면은 편한 진입점입니다.
   실제 source of truth는 여전히 CLI/file workflow와 <code>data/applications.md</code>입니다.
   웹에서는 로컬 SQLite sidecar가 함께 쓰이며, 최종 이력서 산출은 core pipeline을 그대로 호출합니다.
-  최근 생성 결과에는 <strong>웹에서 만든 HTML/PDF 산출물만</strong> 표시합니다.
+  최근 생성 결과에는 <strong>웹과 CLI에서 만든 HTML/PDF 산출물</strong>이 함께 표시됩니다.
 </section>
 
 <div class="grid two">
@@ -136,12 +136,19 @@
 
   <section class="card">
     <span class="pill">Generated Output</span>
-    <h2>최근 생성한 웹 HTML/PDF</h2>
+    <h2>최근 생성한 HTML/PDF</h2>
+    <div class="meta">web {{ dashboard.generatedWebResumeCount }} · cli {{ dashboard.generatedCliResumeCount }}</div>
     <ul class="list-compact">
       {% for item in dashboard.recentGeneratedResumes %}
         <li>
           <div class="title">{{ item.label }}</div>
           <div class="meta">{{ item.modified_at }}</div>
+          <div class="mini-pills">
+            <span class="status-chip">{{ item.source_label }}</span>
+            {% if item.company or item.position %}
+              <span class="status-chip">{{ item.company }}{% if item.position %} · {{ item.position }}{% endif %}</span>
+            {% endif %}
+          </div>
           <div class="actions">
             {% if item.html_url %}
               <a class="link" href="{{ item.html_url }}" target="_blank" rel="noreferrer">HTML</a>
@@ -149,7 +156,16 @@
             {% if item.pdf_url %}
               <a class="link" href="{{ item.pdf_url }}" target="_blank" rel="noreferrer">PDF</a>
             {% endif %}
+            {% if item.job_detail_url %}
+              <a class="link" href="{{ item.job_detail_url }}">저장된 공고</a>
+            {% endif %}
           </div>
+          {% if item.guidance and item.guidance.selection and item.guidance.selection.selected_role_profile %}
+            <div class="meta">
+              선택 프로필: {{ item.guidance.selection.selected_role_profile }}
+              {% if item.guidance.selection.selected_domain %} · domain: {{ item.guidance.selection.selected_domain }}{% endif %}
+            </div>
+          {% endif %}
           {% if item.job_path or item.report_path or item.context_path %}
             <div class="meta">
               {% if item.job_path %}<div>job: <code>{{ item.job_path }}</code></div>{% endif %}
@@ -157,15 +173,49 @@
               {% if item.context_path %}<div>context: <code>{{ item.context_path }}</code></div>{% endif %}
             </div>
           {% endif %}
+          {% if item.focus_preview.skills %}
+            <div class="meta">강조 기술: {{ item.focus_preview.skills | join(", ") }}</div>
+          {% endif %}
         </li>
       {% else %}
         <li class="muted">아직 생성된 HTML/PDF 이력서가 없습니다.</li>
       {% endfor %}
     </ul>
+    <div class="actions">
+      <a class="link" href="/artifacts">전체 산출물 보기</a>
+    </div>
   </section>
 </div>
 
 <div class="grid two">
+  <section class="card">
+    <span class="pill">Portal Health</span>
+    <h2>최근 live smoke 상태</h2>
+    {% if live_smoke.available %}
+      <div class="mini-pills">
+        <span class="status-chip ok">ok {{ live_smoke.counts.get("ok", 0) }}</span>
+        {% if live_smoke.counts.get("stale", 0) %}
+          <span class="status-chip warn">stale {{ live_smoke.counts.get("stale", 0) }}</span>
+        {% endif %}
+        {% if live_smoke.counts.get("failed", 0) %}
+          <span class="status-chip error">failed {{ live_smoke.counts.get("failed", 0) }}</span>
+        {% endif %}
+        {% if live_smoke.counts.get("missing", 0) %}
+          <span class="status-chip warn">missing {{ live_smoke.counts.get("missing", 0) }}</span>
+        {% endif %}
+      </div>
+      <div class="meta-pair">
+        <div class="meta">{{ live_smoke.summary }}</div>
+        <div class="meta">latest report: {{ live_smoke.latest_generated_at or "-" }}</div>
+      </div>
+      <div class="actions">
+        <a class="link" href="/settings">상세 상태 보기</a>
+      </div>
+    {% else %}
+      <div class="notice warn">{{ live_smoke.summary }}</div>
+    {% endif %}
+  </section>
+
   <section class="card">
     <span class="pill">Preset</span>
     <h2>바로 시작할 수 있는 이력서 preset</h2>

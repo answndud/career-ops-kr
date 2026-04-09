@@ -32,13 +32,19 @@
 - git hygiene 유지
   - 생성 산출물은 `.gitignore`와 `.gitkeep` 기준으로 버전 관리에서 제외
   - commit 전 smoke/demo 산출물이 남아 있지 않게 유지
-- optional web surface 유지
+  - optional web surface 유지
   - `career-ops-kr serve-web`
   - home dashboard / search / settings / resume upload / tracker / saved job detail / deterministic resume build-from-url
   - home dashboard는 최근 공고 / 최근 이력서 / 최근 생성 웹 HTML/PDF / preset 경로를 함께 보여주는 입구로 유지
+  - home dashboard는 웹과 CLI에서 만든 최근 HTML/PDF 산출물을 함께 보여주고, linked saved job이 있으면 detail entry로 이어지게 유지
+  - home은 최근 saved live smoke 상태를 compact summary로만 보여주고, settings는 detailed health/report metadata를 유지
   - saved job detail은 tracker 상태와 연결된 JD / report / context / HTML / PDF, related match activity를 다시 확인하고, 저장된 공고 URL이 있으면 같은 화면에서 resume build를 다시 시작하는 entry point로 유지
+  - saved job detail은 context에 저장된 tailoring guidance도 다시 확인할 수 있게 유지
+  - search는 provider runtime status strip과 canonical URL 기준 import dedupe를 유지
+  - tracker/detail은 `다음에 할 일`, attention preset, tracker/web drift 같은 read-only operational hint를 유지
   - AI surface는 기본 비활성화로 유지하고 필요할 때만 `serve-web --enable-ai`로 노출
   - settings 화면에서 web DB backup/export/import를 지원
+  - search / tracker 화면은 alert 대신 in-page result panel과 artifact badge 중심으로 유지
   - 국내 구직 기준으로 불필요한 Adzuna web search/provider 연동 제거 완료
   - legacy DB snapshot import/export에서도 Adzuna 설정이 복원되지 않도록 scrub 완료
   - `design-guidelines.md` 기준 grayscale-first admin dashboard 전면 개편 완료
@@ -110,10 +116,12 @@
   - EN 전용 render smoke 보강
 - 경력기술서 템플릿 1차 추가 완료
   - `templates/career-description-ko.html`
+  - `templates/career-description-en.html`
   - `examples/career-description-context.backend.ko.example.json`
   - `examples/career-description-context.data-platform.ko.example.json`
   - `examples/career-description-context.data-ai.ko.example.json`
   - `examples/career-description-context.platform.ko.example.json`
+  - `examples/career-description-context.platform.example.json`
   - 별도 전용 smoke test file 추가
 - Remember/structured-data extractor 보강 완료
   - `jobs.py`가 `JobPosting` JSON-LD / hydration JSON에서 title, company, description, qualifications를 우선 추출

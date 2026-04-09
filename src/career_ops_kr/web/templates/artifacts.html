@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}산출물 | Career Ops KR Web{% endblock %}
+{% block content %}
+<div class="page-stack">
+  <section class="card section-stack">
+    <div class="section-header">
+      <div>
+        <span class="pill">Artifacts</span>
+        <h1>생성된 이력서 산출물</h1>
+        <p class="muted">웹에서 만든 산출물과 CLI로 생성한 산출물을 한 화면에서 다시 확인합니다.</p>
+      </div>
+    </div>
+    <div class="grid four">
+      <article class="stat">
+        <div class="label">All</div>
+        <div class="value">{{ inventory_total }}</div>
+        <div class="hint">전체 HTML 기준</div>
+      </article>
+      <article class="stat">
+        <div class="label">Web</div>
+        <div class="value">{{ inventory_web_total }}</div>
+        <div class="hint">웹에서 생성한 산출물</div>
+      </article>
+      <article class="stat">
+        <div class="label">CLI</div>
+        <div class="value">{{ inventory_cli_total }}</div>
+        <div class="hint">CLI에서 생성한 산출물</div>
+      </article>
+      <article class="stat">
+        <div class="label">Live Smoke</div>
+        <div class="value">{{ live_smoke.counts.get("ok", 0) }}</div>
+        <div class="hint">최근 saved smoke 정상 target</div>
+      </article>
+    </div>
+    <form method="get" action="/artifacts" class="grid three">
+      <div class="field">
+        <label>검색</label>
+        <input type="text" name="q" value="{{ query }}" placeholder="파일명, 회사, 포지션">
+      </div>
+      <div class="field">
+        <label>출처</label>
+        <select name="source">
+          <option value="all" {% if source_filter == "all" %}selected{% endif %}>전체</option>
+          <option value="web" {% if source_filter == "web" %}selected{% endif %}>웹</option>
+          <option value="cli" {% if source_filter == "cli" %}selected{% endif %}>CLI</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>적용</label>
+        <button type="submit">보기</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card section-stack">
+    <div class="section-header">
+      <div>
+        <span class="pill">Inventory</span>
+        <h2>최근 생성 산출물</h2>
+      </div>
+    </div>
+    <ul class="list-compact">
+      {% for item in artifacts %}
+        <li>
+          <div class="title">{{ item.label }}</div>
+          <div class="meta">{{ item.modified_at }}</div>
+          <div class="mini-pills">
+            <span class="status-chip">{{ item.source_label }}</span>
+            {% if item.company %}
+              <span class="status-chip">{{ item.company }}</span>
+            {% endif %}
+            {% if item.position %}
+              <span class="status-chip">{{ item.position }}</span>
+            {% endif %}
+            {% if item.guidance and item.guidance.selection and item.guidance.selection.selected_role_profile %}
+              <span class="status-chip">{{ item.guidance.selection.selected_role_profile }}</span>
+            {% endif %}
+          </div>
+          <div class="actions">
+            <a class="link" href="{{ item.html_url }}" target="_blank" rel="noreferrer">HTML</a>
+            {% if item.pdf_url %}
+              <a class="link" href="{{ item.pdf_url }}" target="_blank" rel="noreferrer">PDF</a>
+            {% endif %}
+            {% if item.job_detail_url %}
+              <a class="link" href="{{ item.job_detail_url }}">연결된 공고</a>
+            {% endif %}
+          </div>
+          <div class="path-list meta">
+            <div>html: <code>{{ item.html_path }}</code></div>
+            {% if item.job_path %}<div>job: <code>{{ item.job_path }}</code></div>{% endif %}
+            {% if item.report_path %}<div>report: <code>{{ item.report_path }}</code></div>{% endif %}
+            {% if item.context_path %}<div>context: <code>{{ item.context_path }}</code></div>{% endif %}
+          </div>
+          {% if item.focus_preview.skills or item.focus_preview.notes %}
+            <div class="guidance-block">
+              {% if item.focus_preview.skills %}
+                <div><strong>강조 기술</strong></div>
+                <ul class="guidance-list">
+                  {% for skill in item.focus_preview.skills %}
+                    <li>{{ skill }}</li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+              {% if item.focus_preview.notes %}
+                <div><strong>메모</strong></div>
+                <ul class="guidance-list">
+                  {% for note in item.focus_preview.notes %}
+                    <li>{{ note }}</li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+            </div>
+          {% endif %}
+        </li>
+      {% else %}
+        <li class="muted">조건에 맞는 산출물이 없습니다.</li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+{% endblock %}

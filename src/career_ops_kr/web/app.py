@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import os
 import re
-from datetime import UTC, datetime
+import json
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +14,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from career_ops_kr.commands.intake import DEFAULT_PROFILE_PATH, DEFAULT_SCORECARD_PATH
-from career_ops_kr.commands.resume import build_tailored_resume_from_url as run_build_tailored_resume_from_url
+from career_ops_kr.commands.resume import (
+    build_tailored_resume_from_url as run_build_tailored_resume_from_url,
+    evaluate_live_smoke_report_health,
+)
+from career_ops_kr.portals import canonicalize_job_url
 from career_ops_kr.tracker import delete_tracker_row, parse_tracker_rows, upsert_tracker_row
 from career_ops_kr.utils import ensure_dir, load_yaml, slugify
 from career_ops_kr.web.ai import (
@@ -52,6 +57,9 @@ JD_DIR = Path(os.getenv("CAREER_OPS_WEB_JD_DIR", (REPO_ROOT / "jds").as_posix())
 REPORT_DIR = Path(os.getenv("CAREER_OPS_WEB_REPORT_DIR", (REPO_ROOT / "reports").as_posix()))
 WEB_RESUME_OUTPUT_DIR = Path(
     os.getenv("CAREER_OPS_WEB_RESUME_OUTPUT_DIR", (OUTPUT_DIR / "web-resumes").as_posix())
+)
+LIVE_SMOKE_REPORT_DIR = Path(
+    os.getenv("CAREER_OPS_WEB_LIVE_SMOKE_DIR", (OUTPUT_DIR / "live-smoke").as_posix())
 )
 DEFAULT_WEB_SCORECARD_PATH = (
     DEFAULT_SCORECARD_PATH if DEFAULT_SCORECARD_PATH.exists() else REPO_ROOT / "config" / "scorecard.kr.yml"
@@ -185,6 +193,8 @@ def _get_dashboard_snapshot() -> dict[str, Any]:
         "upcomingFollowUps": follow_ups,
         "recentResumes": recent_resumes,
         "generatedResumeCount": generated_outputs["total"],
+        "generatedWebResumeCount": generated_outputs["web_total"],
+        "generatedCliResumeCount": generated_outputs["cli_total"],
         "recentGeneratedResumes": generated_outputs["items"],
         "recentAiOutputs": [
             {
@@ -259,25 +269,71 @@ def _artifact_slug(company: str, position: str, role_key: str, language: str) ->
     return f"{timestamp}-{slugify(basis, fallback='web-resume')}"
 
 
-def _generated_resume_snapshot(*, limit: int = 6) -> dict[str, Any]:
-    if not WEB_RESUME_OUTPUT_DIR.exists():
+def _generated_resume_snapshot(*, limit: int | None = 6) -> dict[str, Any]:
+    if not OUTPUT_DIR.exists():
         return {"total": 0, "items": []}
 
     html_paths = sorted(
-        WEB_RESUME_OUTPUT_DIR.glob("*.html"),
+        [path for path in OUTPUT_DIR.rglob("*.html") if path.is_file()],
         key=lambda path: path.stat().st_mtime,
         reverse=True,
     )
+    linked_rows_by_path: dict[str, dict[str, Any]] = {}
+    with connection_scope() as conn:
+        job_rows = conn.execute(
+            """
+            SELECT id, company, position, job_path, report_path, context_path, html_path, pdf_path
+            FROM jobs
+            WHERE job_path IS NOT NULL OR report_path IS NOT NULL OR context_path IS NOT NULL
+               OR html_path IS NOT NULL OR pdf_path IS NOT NULL
+            """
+        ).fetchall()
+    for row in job_rows:
+        for field in ("job_path", "report_path", "context_path", "html_path", "pdf_path"):
+            path = _coerce_path(row.get(field))
+            if path is None:
+                continue
+            try:
+                linked_rows_by_path[path.resolve().as_posix()] = row
+            except FileNotFoundError:
+                continue
+
     items: list[dict[str, Any]] = []
-    for html_path in html_paths[:limit]:
+    seen_paths: set[str] = set()
+    cli_total = 0
+    web_total = 0
+    for html_path in html_paths:
+        resolved_html = html_path.resolve().as_posix()
+        if resolved_html in seen_paths:
+            continue
+        seen_paths.add(resolved_html)
         pdf_path = html_path.with_suffix(".pdf")
-        job_path = JD_DIR / f"{html_path.stem}.md"
-        report_path = REPORT_DIR / f"{html_path.stem}.md"
-        context_path = OUTPUT_DIR / "resume-contexts" / f"{html_path.stem}.json"
+        derived_job_path = JD_DIR / f"{html_path.stem}.md"
+        derived_report_path = REPORT_DIR / f"{html_path.stem}.md"
+        derived_context_path = OUTPUT_DIR / "resume-contexts" / f"{html_path.stem}.json"
+        linked_row = linked_rows_by_path.get(resolved_html)
+        if linked_row is None and pdf_path.exists():
+            linked_row = linked_rows_by_path.get(pdf_path.resolve().as_posix())
+        job_path = _coerce_path(linked_row.get("job_path")) if linked_row else None
+        report_path = _coerce_path(linked_row.get("report_path")) if linked_row else None
+        context_path = _coerce_path(linked_row.get("context_path")) if linked_row else None
+        if job_path is None:
+            job_path = derived_job_path
+        if report_path is None:
+            report_path = derived_report_path
+        if context_path is None:
+            context_path = derived_context_path
+        source_label = "web" if _safe_relative_to(html_path, WEB_RESUME_OUTPUT_DIR) else "cli"
+        if source_label == "web":
+            web_total += 1
+        else:
+            cli_total += 1
+        guidance = _load_tailoring_guidance(context_path)
         modified_at = datetime.fromtimestamp(html_path.stat().st_mtime, UTC).astimezone().strftime("%Y-%m-%d %H:%M")
         items.append(
             {
                 "label": html_path.name,
+                "source_label": source_label,
                 "html_path": html_path.as_posix(),
                 "html_url": _output_url(html_path),
                 "pdf_path": pdf_path.as_posix() if pdf_path.exists() else None,
@@ -285,10 +341,129 @@ def _generated_resume_snapshot(*, limit: int = 6) -> dict[str, Any]:
                 "job_path": job_path.as_posix() if job_path.exists() else None,
                 "report_path": report_path.as_posix() if report_path.exists() else None,
                 "context_path": context_path.as_posix() if context_path.exists() else None,
+                "job_id": int(linked_row["id"]) if linked_row else None,
+                "job_detail_url": f"/tracker/{int(linked_row['id'])}" if linked_row else None,
+                "company": _safe_text(linked_row.get("company")) if linked_row else "",
+                "position": _safe_text(linked_row.get("position")) if linked_row else "",
+                "guidance": guidance,
+                "focus_preview": _build_focus_preview(guidance),
                 "modified_at": modified_at,
             }
         )
-    return {"total": len(html_paths), "items": items}
+    return {
+        "total": len(items),
+        "web_total": web_total,
+        "cli_total": cli_total,
+        "items": items[:limit] if limit is not None else items,
+    }
+
+
+def _filter_generated_resume_items(
+    items: list[dict[str, Any]],
+    *,
+    source: str = "all",
+    query: str = "",
+) -> list[dict[str, Any]]:
+    normalized_source = source.strip().lower()
+    normalized_query = query.strip().lower()
+    filtered: list[dict[str, Any]] = []
+    for item in items:
+        if normalized_source in {"web", "cli"} and item.get("source_label") != normalized_source:
+            continue
+        if normalized_query:
+            haystack = " ".join(
+                [
+                    str(item.get("label") or ""),
+                    str(item.get("company") or ""),
+                    str(item.get("position") or ""),
+                    str(item.get("html_path") or ""),
+                    str(item.get("job_path") or ""),
+                    str(item.get("report_path") or ""),
+                ]
+            ).lower()
+            if normalized_query not in haystack:
+                continue
+        filtered.append(item)
+    return filtered
+
+
+def _load_tailoring_guidance(context_path: Path | None) -> dict[str, Any] | None:
+    if context_path is None or not context_path.exists():
+        return None
+    if not _safe_relative_to(context_path, OUTPUT_DIR / "resume-contexts"):
+        return None
+    try:
+        payload = json.loads(context_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    guidance = payload.get("tailoringGuidance")
+    return guidance if isinstance(guidance, dict) else None
+
+
+def _build_focus_preview(guidance: dict[str, Any] | None) -> dict[str, list[str]]:
+    if not guidance:
+        return {"skills": [], "experience": [], "notes": []}
+    focus = guidance.get("focus")
+    if not isinstance(focus, dict):
+        return {"skills": [], "experience": [], "notes": []}
+    return {
+        "skills": [str(item) for item in (focus.get("skills_to_emphasize") or [])[:4]],
+        "experience": [str(item) for item in (focus.get("experience_focus") or [])[:3]],
+        "notes": [str(item) for item in (focus.get("notes") or [])[:3]],
+    }
+
+
+def _get_live_smoke_status_snapshot(*, max_age_hours: float = 48.0) -> dict[str, Any]:
+    if not LIVE_SMOKE_REPORT_DIR.exists():
+        return {
+            "available": False,
+            "summary": "아직 저장된 live smoke report가 없습니다.",
+            "counts": {},
+            "problem_items": [],
+            "latest_generated_at": None,
+            "entries": [],
+            "directory": LIVE_SMOKE_REPORT_DIR.as_posix(),
+        }
+    try:
+        entries, scan_summary = evaluate_live_smoke_report_health(
+            LIVE_SMOKE_REPORT_DIR,
+            max_age_hours=max_age_hours,
+        )
+    except Exception as exc:
+        return {
+            "available": False,
+            "summary": f"Live smoke 상태를 읽지 못했습니다: {exc}",
+            "counts": {},
+            "problem_items": [],
+            "latest_generated_at": None,
+            "entries": [],
+            "directory": LIVE_SMOKE_REPORT_DIR.as_posix(),
+        }
+    counts: dict[str, int] = {}
+    latest_generated_at: str | None = None
+    for entry in entries:
+        counts[entry.status] = counts.get(entry.status, 0) + 1
+        if entry.generated_at and (latest_generated_at is None or entry.generated_at > latest_generated_at):
+            latest_generated_at = entry.generated_at
+    problem_items = [entry for entry in entries if entry.status != "ok"]
+    if not entries:
+        summary = "저장된 live smoke report는 있지만 target 상태가 없습니다."
+    elif problem_items:
+        summary = f"문제 target {len(problem_items)}개가 있습니다."
+    else:
+        summary = "모든 target의 최신 saved smoke 상태가 정상입니다."
+    return {
+        "available": bool(entries),
+        "summary": summary,
+        "counts": counts,
+        "problem_items": problem_items[:4],
+        "entries": entries[:6],
+        "latest_generated_at": latest_generated_at,
+        "recognized_report_count": scan_summary.get("recognized_count", 0),
+        "ignored_count": len(scan_summary.get("ignored", [])),
+        "max_age_hours": max_age_hours,
+        "directory": LIVE_SMOKE_REPORT_DIR.as_posix(),
+    }
 
 
 def _web_db_snapshot_dir() -> Path:
@@ -306,12 +481,154 @@ def _coerce_path(value: Any) -> Path | None:
     return Path(value)
 
 
+def _normalize_job_url(url: str | None) -> str | None:
+    normalized = _safe_text(url)
+    if not normalized:
+        return None
+    return canonicalize_job_url(normalized)
+
+
+def _path_exists(value: Any) -> bool:
+    path = _coerce_path(value)
+    return bool(path and path.exists())
+
+
 def _safe_relative_to(path: Path, root: Path) -> bool:
     try:
         path.resolve().relative_to(root.resolve())
     except ValueError:
         return False
     return True
+
+
+def _parse_tracker_date(value: str | None) -> date | None:
+    raw_value = _safe_text(value)
+    if not raw_value:
+        return None
+    try:
+        return date.fromisoformat(raw_value[:10])
+    except ValueError:
+        return None
+
+
+def _job_attention_snapshot(job_row: dict[str, Any], tracker_row: dict[str, str] | None = None) -> dict[str, Any]:
+    tags: list[dict[str, str]] = []
+    next_steps: list[str] = []
+
+    if not _path_exists(job_row.get("report_path")):
+        tags.append({"label": "리포트 없음", "tone": "warn"})
+        next_steps.append("공고 평가 리포트를 먼저 생성하세요.")
+    if not _path_exists(job_row.get("html_path")):
+        tags.append({"label": "이력서 없음", "tone": "warn"})
+        next_steps.append("맞춤 이력서 HTML/PDF를 생성하세요.")
+    if tracker_row is None:
+        tags.append({"label": "tracker 확인 필요", "tone": "warn"})
+        next_steps.append("Markdown tracker row 연결을 확인하세요.")
+
+    follow_up_date = _parse_tracker_date(_safe_text(job_row.get("follow_up")))
+    if follow_up_date and follow_up_date < datetime.now().date():
+        tags.insert(0, {"label": "팔로업 overdue", "tone": "error"})
+        next_steps.insert(0, "팔로업 날짜가 지났습니다. 상태와 메모를 갱신하세요.")
+    elif not follow_up_date and _safe_text(job_row.get("status")) in {"검토중", "지원예정"}:
+        tags.append({"label": "팔로업 미설정", "tone": "warn"})
+        next_steps.append("다음 액션을 잊지 않도록 팔로업 날짜를 지정하세요.")
+
+    if not next_steps:
+        next_steps.append("현재 저장 상태는 안정적입니다. 필요하면 최신 공고 기준으로 이력서를 다시 생성하세요.")
+
+    return {
+        "tags": tags,
+        "next_steps": next_steps,
+        "summary": next_steps[0],
+        "has_problem": any(tag["tone"] in {"warn", "error"} for tag in tags),
+    }
+
+
+def _job_row_with_ui_state(job_row: dict[str, Any]) -> dict[str, Any]:
+    row = dict(job_row)
+    tracker_row = _load_tracker_row_for_job(row)
+    attention = _job_attention_snapshot(row, tracker_row)
+    row["tracker_row"] = tracker_row
+    row["attention"] = attention
+    row["artifact_summary"] = {
+        "job": _path_exists(row.get("job_path")),
+        "report": _path_exists(row.get("report_path")),
+        "context": _path_exists(row.get("context_path")),
+        "html": _path_exists(row.get("html_path")),
+        "pdf": _path_exists(row.get("pdf_path")),
+    }
+    return row
+
+
+def _matches_attention_filter(row: dict[str, Any], attention: str | None) -> bool:
+    normalized = _safe_text(attention).lower()
+    if not normalized:
+        return True
+    if normalized == "missing-report":
+        return not row["artifact_summary"]["report"]
+    if normalized == "missing-resume":
+        return not row["artifact_summary"]["html"]
+    if normalized == "follow-up-overdue":
+        return any(tag["label"] == "팔로업 overdue" for tag in row["attention"]["tags"])
+    if normalized == "unlinked-tracker":
+        return row["tracker_row"] is None
+    return True
+
+
+def _job_tracker_sync_snapshot(job_row: dict[str, Any], tracker_row: dict[str, str] | None) -> list[str]:
+    if tracker_row is None:
+        return ["연결된 markdown tracker row가 없습니다."]
+    warnings: list[str] = []
+    if _safe_int(job_row.get("tracker_id")) is None:
+        warnings.append("web row에 tracker_id가 없습니다.")
+    if _safe_text(job_row.get("status")) != _safe_text(tracker_row.get("status")):
+        warnings.append("web 상태와 markdown tracker 상태가 다릅니다.")
+    if _safe_text(job_row.get("notes")) and _safe_text(job_row.get("notes")) != _safe_text(tracker_row.get("notes")):
+        warnings.append("web 메모와 markdown tracker 메모가 다릅니다.")
+    return warnings
+
+
+def _enrich_search_results(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    enriched: list[dict[str, Any]] = []
+    url_keys = {
+        canonical
+        for item in items
+        if (canonical := _normalize_job_url(item.get("url")))
+    }
+    rows_by_canonical: dict[str, dict[str, Any]] = {}
+    if url_keys:
+        with connection_scope() as conn:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM jobs
+                WHERE canonical_url IS NOT NULL OR url IS NOT NULL
+                ORDER BY updated_at DESC, created_at DESC
+                """
+            ).fetchall()
+        for row in rows:
+            canonical_url = _safe_text(row.get("canonical_url")) or _normalize_job_url(row.get("url"))
+            if canonical_url and canonical_url not in rows_by_canonical:
+                rows_by_canonical[canonical_url] = row
+    for item in items:
+        enriched_item = dict(item)
+        canonical_url = _normalize_job_url(item.get("url"))
+        saved_row = rows_by_canonical.get(canonical_url or "")
+        enriched_item["canonical_url"] = canonical_url
+        if saved_row:
+            ui_row = _job_row_with_ui_state(saved_row)
+            enriched_item["saved_job"] = {
+                "id": int(saved_row["id"]),
+                "status": _safe_text(saved_row.get("status")),
+                "detail_url": f"/tracker/{int(saved_row['id'])}",
+                "has_report": ui_row["artifact_summary"]["report"],
+                "has_resume": ui_row["artifact_summary"]["html"],
+                "attention_summary": ui_row["attention"]["summary"],
+            }
+        else:
+            enriched_item["saved_job"] = None
+        enriched.append(enriched_item)
+    return enriched
 
 
 def _job_artifact_specs(job_row: dict[str, Any]) -> list[dict[str, Any]]:
@@ -363,14 +680,20 @@ def _attach_resume_artifacts_to_job(
     company: str | None = None,
     position: str | None = None,
 ) -> int | None:
+    normalized_url = _normalize_job_url(url)
     with connection_scope() as conn:
         row = None
         if job_id is not None:
             row = conn.execute("SELECT id FROM jobs WHERE id = ?", (job_id,)).fetchone()
-        if row is None and url:
+        if row is None and normalized_url:
             row = conn.execute(
-                "SELECT id FROM jobs WHERE url = ? ORDER BY updated_at DESC, created_at DESC LIMIT 1",
-                (url,),
+                """
+                SELECT id FROM jobs
+                WHERE canonical_url = ? OR url = ?
+                ORDER BY updated_at DESC, created_at DESC
+                LIMIT 1
+                """,
+                (normalized_url, normalized_url),
             ).fetchone()
         if row is None and company and position:
             row = conn.execute(
@@ -388,11 +711,13 @@ def _attach_resume_artifacts_to_job(
         conn.execute(
             """
             UPDATE jobs
-            SET job_path = ?, report_path = ?, tailoring_path = ?, context_path = ?, html_path = ?, pdf_path = ?,
+            SET canonical_url = COALESCE(canonical_url, ?),
+                job_path = ?, report_path = ?, tailoring_path = ?, context_path = ?, html_path = ?, pdf_path = ?,
                 updated_at = datetime('now')
             WHERE id = ?
             """,
             (
+                normalized_url,
                 artifacts.job_path.as_posix(),
                 artifacts.report_path.as_posix(),
                 artifacts.tailoring_path.as_posix(),
@@ -434,10 +759,12 @@ def _normalize_job_payload(payload: dict[str, Any], *, default_status: str = "�
     position = _safe_text(payload.get("position") or payload.get("title"))
     if not company or not position:
         raise ValueError("Company and position are required")
+    canonical_url = _normalize_job_url(payload.get("url"))
     return {
         "company": company,
         "position": position,
-        "url": _safe_text(payload.get("url")) or None,
+        "url": canonical_url,
+        "canonical_url": canonical_url,
         "status": _safe_text(payload.get("status")) or default_status,
         "notes": _safe_text(payload.get("notes")) or None,
         "date_applied": _safe_text(payload.get("date_applied")) or None,
@@ -474,21 +801,87 @@ def _tracker_row_from_job_payload(
 
 def _save_job_record(payload: dict[str, Any]) -> dict[str, Any]:
     normalized = _normalize_job_payload(payload)
-    tracker_row = upsert_tracker_row(TRACKER_PATH, _tracker_row_from_job_payload(normalized))
-    tracker_id = int(tracker_row["id"])
     with connection_scope() as conn:
+        existing = None
+        canonical_url = normalized["canonical_url"]
+        if canonical_url:
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM jobs
+                WHERE canonical_url = ? OR url = ?
+                ORDER BY updated_at DESC, created_at DESC
+                """,
+                (canonical_url, canonical_url),
+            ).fetchall()
+            for row in rows:
+                existing = row
+                break
+
+        if existing:
+            merged_payload = dict(existing)
+            update_values: dict[str, Any] = {}
+            for field in (
+                "url",
+                "canonical_url",
+                "location",
+                "salary_min",
+                "salary_max",
+                "date_applied",
+                "follow_up",
+            ):
+                if not existing.get(field) and normalized.get(field):
+                    update_values[field] = normalized[field]
+            if normalized["notes"] and not _safe_text(existing.get("notes")):
+                update_values["notes"] = normalized["notes"]
+            if normalized["source"] and _safe_text(existing.get("source")) in {"", "web"}:
+                if _safe_text(existing.get("source")) != normalized["source"]:
+                    update_values["source"] = normalized["source"]
+            if normalized["status"] and _safe_text(existing.get("status")) in {"", "검토중"}:
+                if _safe_text(existing.get("status")) != normalized["status"]:
+                    update_values["status"] = normalized["status"]
+
+            merged_payload.update(update_values)
+            tracker_row = upsert_tracker_row(
+                TRACKER_PATH,
+                _tracker_row_from_job_payload(
+                    _normalize_job_payload(merged_payload, default_status=str(existing.get("status") or "검토중")),
+                    tracker_id=_safe_int(existing.get("tracker_id")),
+                    existing_row=_load_tracker_row_for_job(existing),
+                ),
+            )
+            update_values["tracker_id"] = int(tracker_row["id"])
+            if update_values:
+                fields = [f"{field} = ?" for field in update_values]
+                values = list(update_values.values())
+                values.append(existing["id"])
+                conn.execute(
+                    f"UPDATE jobs SET {', '.join(fields)}, updated_at = datetime('now') WHERE id = ?",
+                    values,
+                )
+                conn.commit()
+            row = conn.execute("SELECT * FROM jobs WHERE id = ?", (existing["id"],)).fetchone()
+            result = dict(row or {})
+            result["_save_result"] = "updated" if any(
+                key != "tracker_id" for key in update_values
+            ) else "existing"
+            return result
+
+        tracker_row = upsert_tracker_row(TRACKER_PATH, _tracker_row_from_job_payload(normalized))
+        tracker_id = int(tracker_row["id"])
         cursor = conn.execute(
             """
             INSERT INTO jobs(
-                company, position, url, status, notes, date_applied, follow_up,
+                company, position, url, canonical_url, status, notes, date_applied, follow_up,
                 salary_min, salary_max, location, remote, source, tracker_id
             )
-            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 normalized["company"],
                 normalized["position"],
                 normalized["url"],
+                normalized["canonical_url"],
                 normalized["status"],
                 normalized["notes"],
                 normalized["date_applied"],
@@ -503,7 +896,9 @@ def _save_job_record(payload: dict[str, Any]) -> dict[str, Any]:
         )
         conn.commit()
         row = conn.execute("SELECT * FROM jobs WHERE id = ?", (cursor.lastrowid,)).fetchone()
-    return row or {}
+    result = dict(row or {})
+    result["_save_result"] = "created"
+    return result
 
 
 def _update_job_record(job_id: int, payload: dict[str, Any]) -> dict[str, Any]:
@@ -528,6 +923,7 @@ def _update_job_record(job_id: int, payload: dict[str, Any]) -> dict[str, Any]:
             "company": normalized["company"],
             "position": normalized["position"],
             "url": normalized["url"],
+            "canonical_url": normalized["canonical_url"],
             "status": normalized["status"],
             "notes": normalized["notes"],
             "date_applied": normalized["date_applied"],
@@ -646,6 +1042,7 @@ def create_app() -> FastAPI:
             "home.html",
             _template_context(
                 dashboard=_get_dashboard_snapshot(),
+                live_smoke=_get_live_smoke_status_snapshot(),
                 provider=_safe_provider_name(),
                 resume_presets=_resume_preset_options(),
             ),
@@ -663,6 +1060,7 @@ def create_app() -> FastAPI:
         if q:
             try:
                 results = search_jobs(q)
+                results["results"] = _enrich_search_results(results.get("results", []))
                 source_counts = results.get("sources", {})
                 if active_source != "전체" and active_source not in source_counts:
                     active_source = "전체"
@@ -687,6 +1085,28 @@ def create_app() -> FastAPI:
             ),
         )
 
+    @app.get("/artifacts", response_class=HTMLResponse)
+    def artifacts_page(
+        request: Request,
+        source: str = "all",
+        q: str = "",
+    ) -> HTMLResponse:
+        inventory = _generated_resume_snapshot(limit=None)
+        filtered_items = _filter_generated_resume_items(inventory["items"], source=source, query=q)
+        return templates.TemplateResponse(
+            request,
+            "artifacts.html",
+            _template_context(
+                source_filter=source if source in {"all", "web", "cli"} else "all",
+                query=q,
+                artifacts=filtered_items,
+                inventory_total=inventory["total"],
+                inventory_web_total=inventory["web_total"],
+                inventory_cli_total=inventory["cli_total"],
+                live_smoke=_get_live_smoke_status_snapshot(),
+            ),
+        )
+
     @app.get("/settings", response_class=HTMLResponse)
     def settings_page(request: Request) -> HTMLResponse:
         return templates.TemplateResponse(
@@ -698,15 +1118,24 @@ def create_app() -> FastAPI:
                 allowed_search_keys=[key for key in SEARCH_SETTING_KEYS if key in ALLOWED_SETTING_KEYS],
                 active_provider=_safe_provider_name(),
                 db_path=resolve_db_path().as_posix(),
+                live_smoke=_get_live_smoke_status_snapshot(),
             ),
         )
 
     @app.get("/tracker", response_class=HTMLResponse)
     def tracker_page(request: Request) -> HTMLResponse:
         with connection_scope() as conn:
-            jobs = conn.execute(
+            rows = conn.execute(
                 "SELECT * FROM jobs ORDER BY updated_at DESC, created_at DESC"
             ).fetchall()
+        jobs = [_job_row_with_ui_state(row) for row in rows]
+        attention_counts = {
+            "missing_report": sum(1 for row in jobs if not row["artifact_summary"]["report"]),
+            "missing_resume": sum(1 for row in jobs if not row["artifact_summary"]["html"]),
+            "overdue_follow_up": sum(
+                1 for row in jobs if any(tag["label"] == "팔로업 overdue" for tag in row["attention"]["tags"])
+            ),
+        }
         return templates.TemplateResponse(
             request,
             "tracker.html",
@@ -714,6 +1143,13 @@ def create_app() -> FastAPI:
                 jobs=jobs,
                 dashboard=_get_dashboard_snapshot(),
                 statuses=_tracker_status_choices(),
+                attention_counts=attention_counts,
+                attention_filters=[
+                    ("missing-report", "리포트 없음"),
+                    ("missing-resume", "이력서 없음"),
+                    ("follow-up-overdue", "팔로업 overdue"),
+                    ("unlinked-tracker", "tracker 미연결"),
+                ],
             ),
         )
 
@@ -743,13 +1179,19 @@ def create_app() -> FastAPI:
             ).fetchall()
         if not row:
             raise HTTPException(status_code=404, detail="Not found")
+        tracker_row = _load_tracker_row_for_job(row)
+        tailoring_guidance = _load_tailoring_guidance(_coerce_path(row.get("context_path")))
         return templates.TemplateResponse(
             request,
             "job-detail.html",
             _template_context(
                 job=row,
-                tracker_row=_load_tracker_row_for_job(row),
+                tracker_row=tracker_row,
+                attention=_job_attention_snapshot(row, tracker_row),
+                tracker_sync=_job_tracker_sync_snapshot(row, tracker_row),
                 artifacts=_job_artifact_specs(row),
+                tailoring_guidance=tailoring_guidance,
+                focus_preview=_build_focus_preview(tailoring_guidance),
                 match_results=match_results,
                 ai_outputs=[
                     {
@@ -867,12 +1309,15 @@ def create_app() -> FastAPI:
 
     @app.get("/api/dashboard")
     def api_dashboard() -> dict[str, Any]:
-        return _get_dashboard_snapshot()
+        dashboard = _get_dashboard_snapshot()
+        dashboard["liveSmoke"] = _get_live_smoke_status_snapshot()
+        return dashboard
 
     @app.get("/api/jobs")
     def api_list_jobs(
         status: str | None = None,
         q: str | None = None,
+        attention: str | None = None,
         sort: str = "updated_at",
         order: str = "DESC",
     ) -> list[dict[str, Any]]:
@@ -898,7 +1343,9 @@ def create_app() -> FastAPI:
             params.extend([like, like, like])
         query += f" ORDER BY {sort_key} {order_key}"
         with connection_scope() as conn:
-            return conn.execute(query, params).fetchall()
+            rows = conn.execute(query, params).fetchall()
+        ui_rows = [_job_row_with_ui_state(row) for row in rows]
+        return [row for row in ui_rows if _matches_attention_filter(row, attention)]
 
     @app.post("/api/jobs", status_code=201)
     async def api_create_job(request: Request) -> dict[str, Any]:
@@ -909,7 +1356,7 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.post("/api/import", status_code=201)
-    async def api_import_job(request: Request) -> dict[str, Any]:
+    async def api_import_job(request: Request, response: Response) -> dict[str, Any]:
         payload = await request.json()
         import_payload = {
             "company": payload.get("company"),
@@ -923,9 +1370,13 @@ def create_app() -> FastAPI:
             "status": payload.get("status") or "검토중",
         }
         try:
-            return _save_job_record(import_payload)
+            saved = _save_job_record(import_payload)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        save_result = _safe_text(saved.pop("_save_result")) or "created"
+        response.status_code = 201 if save_result == "created" else 200
+        saved["save_result"] = save_result
+        return saved
 
     @app.get("/api/jobs/{job_id}")
     def api_get_job(job_id: int) -> dict[str, Any]:
@@ -958,7 +1409,9 @@ def create_app() -> FastAPI:
         if not q.strip():
             raise HTTPException(status_code=400, detail="Query required")
         try:
-            return search_jobs(q.strip())
+            payload = search_jobs(q.strip())
+            payload["results"] = _enrich_search_results(payload.get("results", []))
+            return payload
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -1110,6 +1563,7 @@ def create_app() -> FastAPI:
             "profile_path": profile_path.as_posix(),
             "base_context_path": base_context_path.as_posix(),
             "template_path": template_path.as_posix(),
+            "tailoring_guidance": _load_tailoring_guidance(artifacts.tailored_context_path),
         }
 
     @app.post("/api/ai/{mode}")

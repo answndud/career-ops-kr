@@ -40,10 +40,12 @@
     {% if job.url %}
       <div class="actions">
         <a class="link" href="{{ job.url }}" target="_blank" rel="noreferrer">원문 공고 열기</a>
+        <a class="link" href="/artifacts">전체 산출물 보기</a>
         <a class="link" href="/tracker">목록으로 돌아가기</a>
       </div>
     {% else %}
       <div class="actions">
+        <a class="link" href="/artifacts">전체 산출물 보기</a>
         <a class="link" href="/tracker">목록으로 돌아가기</a>
       </div>
     {% endif %}
@@ -52,17 +54,60 @@
   <section class="card section-stack">
     <div class="section-header">
       <div>
-        <span class="pill">Notes</span>
-        <h2>메모와 로컬 상태</h2>
+        <span class="pill">Next</span>
+        <h2>다음에 할 일</h2>
       </div>
     </div>
-    <div class="notice">
-      {% if job.notes %}
-        <pre>{{ job.notes }}</pre>
-      {% else %}
-        <div class="muted">아직 메모가 없습니다.</div>
-      {% endif %}
+    <div class="mini-pills">
+      {% for tag in attention.tags %}
+        <span class="status-chip {% if tag.tone == 'error' %}error{% elif tag.tone == 'warn' %}warn{% endif %}">{{ tag.label }}</span>
+      {% endfor %}
     </div>
+    <ul class="plain-list">
+      {% for item in attention.next_steps %}
+        <li>{{ item }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="card section-stack">
+    <div class="section-header">
+      <div>
+        <span class="pill">Edit</span>
+        <h2>상태와 메모 수정</h2>
+      </div>
+    </div>
+    <div class="grid two">
+      <div class="field">
+        <label for="job-detail-status">상태</label>
+        <select id="job-detail-status">
+          {% for status in statuses %}
+            <option value="{{ status }}" {% if job.status == status %}selected{% endif %}>{{ status }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="job-detail-follow-up">팔로업</label>
+        <input id="job-detail-follow-up" value="{{ job.follow_up or '' }}" placeholder="YYYY-MM-DD">
+      </div>
+      <div class="field">
+        <label for="job-detail-source">출처</label>
+        <input id="job-detail-source" value="{{ job.source or '' }}">
+      </div>
+      <div class="field">
+        <label for="job-detail-location">위치</label>
+        <input id="job-detail-location" value="{{ job.location or '' }}">
+      </div>
+      <div class="field span-full">
+        <label for="job-detail-notes">메모</label>
+        <textarea id="job-detail-notes" rows="6">{{ job.notes or '' }}</textarea>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="button" onclick="CareerOpsJobDetail.saveMeta()">상태 저장</button>
+      <a class="link" href="/tracker">트래커 목록</a>
+    </div>
+    <div id="job-detail-save-output" class="notice result-panel">아직 저장한 결과가 없습니다.</div>
     <div class="muted">created: {{ job.created_at }}</div>
     <div class="muted">updated: {{ job.updated_at }}</div>
   </section>
@@ -93,6 +138,70 @@
       <li class="muted">아직 연결된 산출물이 없습니다. 검색 또는 이력서 화면에서 이 공고 URL로 맞춤 이력서를 먼저 생성하세요.</li>
     {% endfor %}
   </ul>
+</section>
+
+<section class="card section-stack">
+  <div class="section-header">
+    <div>
+      <span class="pill">Guidance</span>
+      <h2>최근 tailoring guidance</h2>
+    </div>
+  </div>
+  {% if tailoring_guidance %}
+    <div class="mini-pills">
+      {% if tailoring_guidance.selection.selected_domain %}
+        <span class="status-chip">{{ tailoring_guidance.selection.selected_domain }}</span>
+      {% endif %}
+      {% if tailoring_guidance.selection.selected_role_profile %}
+        <span class="status-chip">{{ tailoring_guidance.selection.selected_role_profile }}</span>
+      {% endif %}
+      {% if tailoring_guidance.selection.total_score %}
+        <span class="status-chip ok">{{ tailoring_guidance.selection.total_score }}</span>
+      {% endif %}
+    </div>
+    <div class="kv-list">
+      <div class="kv-row">
+        <div class="kv-label">타깃 역할</div>
+        <div>{{ tailoring_guidance.selection.selected_target_role or "-" }}</div>
+      </div>
+      <div class="kv-row">
+        <div class="kv-label">권고</div>
+        <div>{{ tailoring_guidance.selection.recommendation or "-" }}</div>
+      </div>
+    </div>
+    {% if focus_preview.skills %}
+      <div>
+        <strong>강조 기술</strong>
+        <div class="mini-pills">
+          {% for item in focus_preview.skills %}
+            <span class="status-chip">{{ item }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+    {% if focus_preview.experience %}
+      <div>
+        <strong>경력 포인트</strong>
+        <ul class="plain-list">
+          {% for item in focus_preview.experience %}
+            <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+    {% if focus_preview.notes %}
+      <div>
+        <strong>메모</strong>
+        <ul class="plain-list">
+          {% for item in focus_preview.notes %}
+            <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="notice">아직 context 파일에 연결된 tailoring guidance가 없습니다. 먼저 맞춤 이력서를 한 번 생성하세요.</div>
+  {% endif %}
 </section>
 
 <section class="card section-stack">
@@ -152,6 +261,16 @@
   {% else %}
     <div class="muted">연결된 tracker row를 찾지 못했습니다.</div>
   {% endif %}
+  {% if tracker_sync %}
+    <div class="notice warn">
+      <strong>tracker/web drift</strong>
+      <ul class="plain-list">
+        {% for item in tracker_sync %}
+          <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
 </section>
 
 <div class="grid two">
@@ -198,9 +317,32 @@
 </div>
 </div>
 
-{% if job.url %}
-  <script>
-    const CareerOpsJobDetail = {
+<script>
+  const CareerOpsJobDetail = {
+      async saveMeta() {
+        const output = document.getElementById("job-detail-save-output");
+        output.className = "notice warn result-panel";
+        output.textContent = "저장 중...";
+        const response = await fetch("/api/jobs/{{ job.id }}", {
+          method: "PUT",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            status: document.getElementById("job-detail-status").value,
+            follow_up: document.getElementById("job-detail-follow-up").value,
+            source: document.getElementById("job-detail-source").value,
+            location: document.getElementById("job-detail-location").value,
+            notes: document.getElementById("job-detail-notes").value,
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          output.className = "notice error result-panel";
+          output.textContent = data.detail || "저장 실패";
+          return;
+        }
+        CareerOpsWeb.renderSavedJobResult("job-detail-save-output", data, "상태를 저장했습니다");
+      },
+      {% if job.url %}
       async buildResume() {
         const output = document.getElementById("detail-build-output");
         output.className = "notice warn result-panel";
@@ -233,7 +375,7 @@
           output.textContent = error.message;
         }
       },
+      {% endif %}
     };
-  </script>
-{% endif %}
+</script>
 {% endblock %}

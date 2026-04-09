@@ -15,7 +15,7 @@
 5. `prompts/`
    Codex가 일관된 방식으로 평가와 작성 작업을 수행하도록 돕는 운영 프롬프트입니다.
 6. `src/career_ops_kr/web/`
-   선택적으로 띄울 수 있는 FastAPI 기반 product surface입니다. 홈 대시보드, 검색, 설정, 이력서 업로드, tracker UI, 저장 공고 detail view를 제공합니다. 홈 대시보드는 최근 공고, 최근 업로드 이력서, 최근 생성 웹 HTML/PDF를 한 번에 보여주고, 저장 공고 detail view는 tracker row와 연결된 artifact를 다시 열거나 같은 공고 URL로 resume build를 재실행하는 entry point로 동작합니다. 이 계층은 local-only SQLite sidecar를 쓰지만, HTML/PDF resume 산출은 기존 CLI resume pipeline을 그대로 호출합니다. AI surface는 기본 비활성화이고, 필요할 때만 `serve-web --enable-ai`로 켭니다. 시각 규칙은 `/Users/alex/project/career-ops-kr/design-guidelines.md`를 기준으로 grayscale-first admin dashboard 패턴을 공유합니다.
+   선택적으로 띄울 수 있는 FastAPI 기반 product surface입니다. 홈 대시보드, 검색, 설정, 이력서 업로드, 산출물 inventory, tracker UI, 저장 공고 detail view를 제공합니다. 홈 대시보드는 최근 공고, 최근 업로드 이력서, 최근 생성 HTML/PDF를 web/CLI 구분과 함께 한 번에 보여주고, live smoke 상태는 짧은 요약만 노출합니다. 검색 화면은 provider health strip과 canonical URL 기준 import dedupe를 같이 보여줍니다. tracker/detail 화면은 raw 상태 조회만이 아니라 `다음에 할 일`, attention preset, tracker/web drift를 같이 보여주는 운영 화면입니다. detail view는 tracker row와 연결된 artifact를 다시 열거나 같은 공고 URL로 resume build를 재실행하는 entry point로 동작하며, context에 저장된 tailoring guidance도 다시 보여줍니다. 이 계층은 local-only SQLite sidecar를 쓰지만, HTML/PDF resume 산출은 기존 CLI resume pipeline을 그대로 호출합니다. AI surface는 기본 비활성화이고, 필요할 때만 `serve-web --enable-ai`로 켭니다. 시각 규칙은 `/Users/alex/project/career-ops-kr/design-guidelines.md`를 기준으로 grayscale-first admin dashboard 패턴을 공유합니다.
 
 ## Core Flow
 
@@ -87,6 +87,7 @@ browser
 - CLI/file workflow는 여전히 canonical core입니다.
 - web layer는 초보자용 product surface이므로 local DB를 써도 되지만, deterministic JD/report/resume 산출은 core helper를 재사용해야 합니다.
 - web DB는 settings/jobs/resumes와 운영용 backup/export/import를 위한 sidecar입니다. tracker canonical source는 여전히 `data/applications.md`입니다.
+- web import는 canonical detail URL 기준으로 idempotent하게 동작해야 합니다. 같은 공고를 다시 저장할 때 duplicate row를 만들기보다 기존 job row를 재사용하고, 필요한 경우만 missing metadata를 보완합니다.
 
 ## Why Codex-First
 

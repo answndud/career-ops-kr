@@ -331,6 +331,59 @@
       }
       .list-compact .title { font-weight: 700; }
       .list-compact .meta { color: var(--muted); font-size: 13px; margin-top: 4px; }
+      .mini-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+        margin-top: var(--space-2);
+      }
+      .status-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: var(--surface-muted);
+        border: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .status-chip.ok {
+        background: var(--ok-bg);
+        border-color: #cddacf;
+        color: var(--ok-ink);
+      }
+      .status-chip.warn {
+        background: var(--warn-bg);
+        border-color: #ddd1b8;
+        color: var(--warn-ink);
+      }
+      .status-chip.error {
+        background: var(--danger-bg);
+        border-color: #dec8c8;
+        color: var(--danger-ink);
+      }
+      .meta-pair {
+        display: grid;
+        gap: 2px;
+        margin-top: var(--space-2);
+      }
+      .kv-list {
+        display: grid;
+        gap: var(--space-2);
+      }
+      .kv-row {
+        display: grid;
+        gap: 2px;
+      }
+      .kv-label {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
       .callout {
         border-radius: var(--radius-md);
         border: 1px solid var(--line-strong);
@@ -442,6 +495,17 @@
         gap: var(--space-1);
         margin-top: var(--space-2);
       }
+      .result-panel .guidance-list {
+        margin: 0;
+        padding-left: 18px;
+        display: grid;
+        gap: 4px;
+      }
+      .result-panel .guidance-block {
+        display: grid;
+        gap: var(--space-2);
+        margin-top: var(--space-3);
+      }
       .table-note {
         color: var(--muted);
         font-size: 13px;
@@ -487,6 +551,7 @@
           <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">홈</a>
           <a href="/search" class="{% if request.url.path.startswith('/search') %}active{% endif %}">검색</a>
           <a href="/resume" class="{% if request.url.path.startswith('/resume') %}active{% endif %}">이력서</a>
+          <a href="/artifacts" class="{% if request.url.path.startswith('/artifacts') %}active{% endif %}">산출물</a>
           {% if ai_enabled %}
             <a href="/assistant" class="{% if request.url.path.startswith('/assistant') %}active{% endif %}">어시스턴트</a>
           {% endif %}
@@ -507,11 +572,48 @@
             .replaceAll(">", "&gt;")
             .replaceAll('"', "&quot;");
         },
+        async copyText(value) {
+          await navigator.clipboard.writeText(String(value || ""));
+        },
+        renderSavedJobResult(targetId, payload, message) {
+          const target = document.getElementById(targetId);
+          const detailUrl = payload.id ? `<a class="link" href="/tracker/${payload.id}">저장된 공고 보기</a>` : "";
+          const jobUrl = payload.url ? `<a class="link" href="${this.escapeHtml(payload.url)}" target="_blank" rel="noreferrer">원문 공고 열기</a>` : "";
+          target.className = "notice ok result-panel";
+          target.innerHTML = `
+            <div><strong>${this.escapeHtml(message || "저장 완료")}</strong></div>
+            <div class="muted">${this.escapeHtml(payload.company || "-")} · ${this.escapeHtml(payload.position || payload.title || "-")}</div>
+            <div class="link-stack">${detailUrl}${jobUrl}</div>
+            <div class="path-list">
+              <div class="muted">상태: ${this.escapeHtml(payload.status || "-")}</div>
+              <div class="muted">출처: ${this.escapeHtml(payload.source || "-")}</div>
+              <div class="muted">위치: ${this.escapeHtml(payload.location || "-")}</div>
+            </div>
+          `;
+        },
         renderBuildResult(targetId, payload) {
           const target = document.getElementById(targetId);
           const htmlUrl = payload.html_url ? `<a class="link" href="${this.escapeHtml(payload.html_url)}" target="_blank" rel="noreferrer">HTML 열기</a>` : "";
           const pdfUrl = payload.pdf_url ? `<a class="link" href="${this.escapeHtml(payload.pdf_url)}" target="_blank" rel="noreferrer">PDF 열기</a>` : "";
           const detailUrl = payload.job_id ? `<a class="link" href="/tracker/${payload.job_id}">저장된 공고 보기</a>` : "";
+          const guidance = payload.tailoring_guidance || {};
+          const selection = guidance.selection || {};
+          const focus = guidance.focus || {};
+          const guidanceHtml = [selection.selected_domain, selection.selected_role_profile, selection.selected_target_role].some(Boolean)
+            ? `
+              <div class="guidance-block">
+                <div><strong>Tailoring Guidance</strong></div>
+                <div class="mini-pills">
+                  ${selection.selected_domain ? `<span class="status-chip">${this.escapeHtml(selection.selected_domain)}</span>` : ""}
+                  ${selection.selected_role_profile ? `<span class="status-chip">${this.escapeHtml(selection.selected_role_profile)}</span>` : ""}
+                  ${selection.total_score ? `<span class="status-chip">${this.escapeHtml(String(selection.total_score))}</span>` : ""}
+                </div>
+                ${selection.selected_target_role ? `<div class="muted">타깃 역할: ${this.escapeHtml(selection.selected_target_role)}</div>` : ""}
+                ${(focus.skills_to_emphasize || []).length ? `<div><strong>강조 기술</strong><ul class="guidance-list">${focus.skills_to_emphasize.slice(0, 5).map((item) => `<li>${this.escapeHtml(item)}</li>`).join("")}</ul></div>` : ""}
+                ${(focus.notes || []).length ? `<div><strong>메모</strong><ul class="guidance-list">${focus.notes.slice(0, 3).map((item) => `<li>${this.escapeHtml(item)}</li>`).join("")}</ul></div>` : ""}
+              </div>
+            `
+            : "";
           target.className = "notice ok result-panel";
           target.innerHTML = `
             <div><strong>생성 완료</strong></div>
@@ -522,6 +624,7 @@
               <div class="muted">report: ${this.escapeHtml(payload.report_path || "-")}</div>
               <div class="muted">context: ${this.escapeHtml(payload.context_path || "-")}</div>
             </div>
+            ${guidanceHtml}
           `;
         },
       };

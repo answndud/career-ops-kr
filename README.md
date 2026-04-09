@@ -104,24 +104,34 @@ career-ops-kr serve-web
 - 업로드된 이력서 수
 - 저장된 공고 수
 - 최근 생성한 HTML/PDF 이력서 다시 열기
+- web/CLI 산출물 구분
 - resume preset 시작점
+- 최근 saved live smoke 상태 요약
 
 웹 화면에서 할 수 있는 일:
 
 - **설정**
   - 웹 DB 경로 확인
   - DB 백업 / JSON 내보내기 / JSON 가져오기
+  - 최근 live smoke 상태 요약 확인
   - 현재 기본 검색 소스는 별도 API 키 없이 사용
 - **이력서**
   - PDF/TXT/MD 업로드
   - URL에서 맞춤 이력서 HTML/PDF 생성
+- **산출물**
+  - 웹과 CLI에서 생성한 HTML/PDF 이력서 inventory 확인
+  - 연결된 공고가 있으면 바로 상세 화면으로 이동
 - **검색**
   - 사람인 / 원티드 / eFinancial 통합 검색
+  - 검색 source 상태 strip으로 어느 provider가 정상/실패했는지 바로 확인
   - 검색 결과 저장
+  - 같은 공고를 다시 저장해도 canonical URL 기준으로 기존 항목을 다시 열고 중복 row를 만들지 않음
   - 검색 결과에서 바로 맞춤 이력서 HTML/PDF 생성
 - **트래커**
   - 저장된 공고 목록 확인
+  - `리포트 없음 / 이력서 없음 / 팔로업 overdue / tracker 미연결` attention preset으로 바로 좁혀 보기
   - 저장된 공고 상세 화면에서 tracker 상태와 생성 산출물 확인
+  - 저장된 공고 상세 화면에서 다음에 할 일을 읽기 쉽게 확인
   - 저장된 공고 상세 화면에서 같은 URL로 맞춤 이력서 HTML/PDF 다시 생성
   - 수동 추가 / 상태 수정 / 삭제
   - `data/applications.md` 기준 tracker sync
@@ -143,7 +153,9 @@ career-ops-kr serve-web
 - `트래커`에서 저장된 공고 상세 화면으로 들어가면 JD/report/context/HTML/PDF 연결 상태를 다시 확인할 수 있고, 저장된 공고 URL이 있으면 그 자리에서 다시 맞춤 이력서를 생성할 수 있습니다.
 - 최종 HTML/PDF 이력서 산출은 기존 Python resume pipeline을 그대로 호출합니다.
 - 웹에서 방금 만든 HTML/PDF는 `홈` 화면의 최근 생성 결과에서 다시 열 수 있습니다.
-- `홈` 화면의 최근 생성 결과는 웹에서 만든 산출물만 보여줍니다.
+- `산출물` 화면에서는 웹에서 만든 결과와 CLI에서 만든 결과를 함께 다시 볼 수 있습니다.
+- `홈` 화면의 최근 생성 결과는 웹과 CLI에서 만든 HTML/PDF 산출물을 함께 보여줍니다.
+- `홈`은 live smoke 상태를 짧게 요약해서 보여주고, 자세한 target 상태와 report 정보는 `설정`에서 봅니다.
 
 ### 웹에서 AI 없이 쓰는 기본 루트
 
@@ -155,6 +167,7 @@ career-ops-kr serve-web
 4. `검색` 또는 `트래커 상세`에서 맞춤 이력서 HTML/PDF 생성
 
 즉, 처음에는 AI 기능을 신경 쓰지 않아도 됩니다.
+같은 공고를 저장 버튼으로 다시 눌러도 duplicate row를 만들지 않고, 이미 저장된 항목이면 기존 항목으로 연결됩니다.
 
 ## 3. 가장 먼저 해야 할 일
 
@@ -182,6 +195,14 @@ career-ops-kr serve-web
 - 데이터/AI: `examples/resume-context.data-ai.ko.example.json`
 
 영문 이력서가 필요하면 `.ko.`가 없는 파일을 사용하면 됩니다.
+
+경력기술서는 아래 예시를 시작점으로 쓰면 됩니다.
+
+- 백엔드: `examples/career-description-context.backend.ko.example.json`
+- 플랫폼: `examples/career-description-context.platform.ko.example.json`
+- 플랫폼 English: `examples/career-description-context.platform.example.json`
+- 데이터 플랫폼: `examples/career-description-context.data-platform.ko.example.json`
+- 데이터/AI: `examples/career-description-context.data-ai.ko.example.json`
 
 ## 4. 가장 쉬운 시작 방법: 공고 URL 하나로 이력서 만들기
 

@@ -68,6 +68,25 @@
     - landing-page 톤 hero와 ad hoc card 스타일을 내부 운영 화면 밀도로 재정렬
     - 기존 테스트가 묶인 홈 문구, nav 접근 이름, tracker/detail id는 유지
     - 카드와 배경이 겹쳐 보이던 문제를 줄이기 위해 page background를 한 단계 내리고 card/subcard/notice/table border 대비를 보강
+  - optional web surface productization 2차 완료
+    - home dashboard의 recent generated output이 web-generated만이 아니라 CLI-generated HTML/PDF도 함께 보여주도록 정리
+    - generated output snapshot에 `source_label`, linked saved job detail entry, web/cli count를 추가
+    - home / settings에서 최근 saved live smoke 상태를 저노이즈 요약으로 같이 보여주도록 정리
+    - `settings.html`에 live smoke 운영 상태 카드와 CLI 재실행 명령 안내 추가
+    - `job-detail.html`에서 context에 저장된 `tailoringGuidance`를 selection/focus 요약으로 다시 보이게 정리
+    - `search.html`에서 alert 기반 저장 UX를 result panel 기반으로 바꾸고 URL copy / saved job detail link를 추가
+    - `resume.html`과 `job-detail.html`의 build result가 `tailoringGuidance` 요약을 같이 보여주도록 공통 render helper를 재사용
+    - `tracker.html` 목록에 JD/report/context/HTML/PDF artifact badge와 원문 공고 quick link를 추가하고 create/save/delete를 page-local result panel로 정리
+    - `tests/test_web.py`에 unified generated output, live smoke summary, tailoring guidance, build response guidance 회귀 추가
+  - optional web surface productization 3차 완료
+    - `/artifacts` 페이지에서 web/CLI generated HTML/PDF inventory를 source filter와 query 기준으로 다시 볼 수 있게 정리
+    - generated output inventory에 `tailoringGuidance` 기반 role profile / focus preview를 같이 보여주도록 정리
+    - 검색 결과에서 provider runtime status strip과 degraded-source notice를 표시하고, canonical URL 기준으로 이미 저장된 공고 상태/다음 액션을 함께 노출
+    - `POST /api/import`가 canonical URL 기준으로 idempotent하게 동작하도록 바꾸고 `created / existing / updated` 결과를 응답하도록 정리
+    - tracker 목록에 attention preset(`리포트 없음 / 이력서 없음 / 팔로업 overdue / tracker 미연결`)과 row-level next-action 요약을 추가
+    - saved job detail에 `다음에 할 일`, 상태/메모 inline 수정, tracker/web drift 경고를 추가
+    - home은 live smoke compact summary만 보여주고 settings는 detailed health/report metadata를 유지하도록 분리
+    - `tests/test_web.py`에 canonical import dedupe, search provider status, search saved-job state, tracker attention filter, job-detail next-action 회귀 추가
   - settings 화면에 web DB backup/export/import 추가
     - SQLite backup 생성
     - JSON snapshot export/import
@@ -118,10 +137,12 @@
   - `tests/test_examples.py`에 EN 전용 section/contact/bullet smoke 추가
 - 경력기술서 템플릿 1차 추가
   - `templates/career-description-ko.html`
+  - `templates/career-description-en.html`
   - `examples/career-description-context.backend.ko.example.json`
   - `examples/career-description-context.data-platform.ko.example.json`
   - `examples/career-description-context.data-ai.ko.example.json`
   - `examples/career-description-context.platform.ko.example.json`
+  - `examples/career-description-context.platform.example.json`
   - `tests/test_career_description.py`로 전용 schema/render smoke 추가
 - Remember structured-data extractor 보강
   - `src/career_ops_kr/jobs.py`가 `JobPosting` JSON-LD / JSON hydration data에서 title, company, description, qualifications를 우선 추출
@@ -608,6 +629,7 @@
 
 ## 남은 문제
 
+- web generated artifact inventory는 현재 `output/**/*.html` filesystem scan 기반이다. web/CLI 결과를 한 화면에 모아 보여주긴 하지만, 장기적으로는 build manifest 기반 canonical inventory가 있으면 provenance가 더 강해진다.
 - `fetch-job`는 일부 로컬 Python 환경에서 TLS 인증서 검증 실패가 날 수 있다. 현재는 `--insecure` 옵션으로 우회 가능하다.
 - `discover-jobs`는 현재 Wanted / Jumpit / Remember / Saramin을 지원한다. Saramin은 `SARAMIN_ACCESS_KEY`가 있어야 한다.
 - `process-pipeline --score`는 score/report/addition까지 생성하지만, tracker 반영은 의도적으로 `finalize-tracker`를 별도 실행해야 한다.
@@ -640,7 +662,7 @@
    - 새 company research skill이 portal research와 잘 분리되는지 확인
    - builder / reviewer / tester handoff 품질 추가 점검
 2. optional web surface 운영 마무리
-   - web generated output만 보여주는 현재 inventory 정책을 유지할지, CLI 산출물까지 통합할지 결정
+   - generated artifact inventory를 filesystem scan으로 유지할지, build manifest 기반 canonical inventory로 바꿀지 결정
    - search / tracker / detail 화면의 세부 UX polish 범위 확정
    - 포털 parser drift 발생 시 live smoke와 web build-from-url 흐름을 우선 점검
 3. 직군별 scorecard 2차 tuning

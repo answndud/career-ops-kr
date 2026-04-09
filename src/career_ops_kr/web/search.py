@@ -33,6 +33,15 @@ class JobSearchResult:
     description: str
 
 
+@dataclass(slots=True)
+class SearchProviderStatus:
+    key: str
+    label: str
+    status: str
+    count: int
+    message: str | None = None
+
+
 def _strip_tags(value: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<[^>]*>", " ", value or "")).strip()
 
@@ -164,22 +173,42 @@ def _search_wanted(query: str) -> list[JobSearchResult]:
 def search_jobs(query: str) -> dict[str, Any]:
     korean_query, english_query, translated_query = _query_pair(query)
     all_results: list[JobSearchResult] = []
+    provider_statuses: list[SearchProviderStatus] = []
 
-    for call in (
-        lambda: _search_saramin(korean_query),
-        lambda: _search_wanted(korean_query),
-        lambda: _search_efinancial(english_query),
+    for key, label, call in (
+        ("saramin", "사람인", lambda: _search_saramin(korean_query)),
+        ("wanted", "원티드", lambda: _search_wanted(korean_query)),
+        ("efinancial", "eFinancial", lambda: _search_efinancial(english_query)),
     ):
         try:
-            all_results.extend(call())
-        except Exception:
-            continue
+            batch = call()
+            all_results.extend(batch)
+            provider_statuses.append(
+                SearchProviderStatus(
+                    key=key,
+                    label=label,
+                    status="ok",
+                    count=len(batch),
+                )
+            )
+        except Exception as exc:
+            provider_statuses.append(
+                SearchProviderStatus(
+                    key=key,
+                    label=label,
+                    status="error",
+                    count=0,
+                    message=str(exc),
+                )
+            )
 
     result_dicts = [asdict(result) for result in all_results]
     return {
         "results": result_dicts,
         "count": len(result_dicts),
         "translated_query": translated_query,
+        "provider_statuses": [asdict(item) for item in provider_statuses],
+        "degraded": any(item.status != "ok" for item in provider_statuses),
         "sources": {
             "전체": len(result_dicts),
             "사람인": sum(1 for item in result_dicts if item["source"] == "사람인"),

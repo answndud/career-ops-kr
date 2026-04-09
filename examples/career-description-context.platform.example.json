@@ -1,0 +1,56 @@
+{
+  "name": "Alex Kim",
+  "headline": "Senior Platform Engineer",
+  "contactLine": "Seoul, KR | alex@example.com | github.com/example | example.com",
+  "summary": "Platform engineer focused on deployment reliability, infrastructure standardization, and operational clarity. I help product teams ship faster and safer by turning shared infrastructure patterns, rollout guardrails, and observability practices into durable team defaults.",
+  "skills": [
+    "Terraform",
+    "Kubernetes",
+    "AWS",
+    "Docker",
+    "GitHub Actions",
+    "Prometheus",
+    "Grafana",
+    "Python"
+  ],
+  "experience": [
+    {
+      "role": "Senior Platform Engineer",
+      "company": "Infra Systems",
+      "period": "2021 - Present",
+      "location": "Seoul",
+      "bullets": [
+        "Reworked shared infrastructure provisioning around reusable Terraform modules to reduce environment drift and manual configuration.",
+        "Defined Kubernetes 운영 기준 and deployment guardrails that lowered launch risk for new services and improved incident response speed.",
+        "Documented platform adoption rationale and operating rules so engineering teams could treat infrastructure as self-service instead of request-driven work."
+      ]
+    },
+    {
+      "role": "DevOps Engineer",
+      "company": "Product Cloud",
+      "period": "2018 - 2021",
+      "location": "Remote",
+      "bullets": [
+        "Standardized CI/CD and observability settings so backend and data workloads ran against the same operational baseline.",
+        "Structured on-call playbooks, alert priorities, and incident response guidance for the teams that depended on the platform."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Service Bootstrap Platform",
+      "subtitle": "Golden path for internal engineering teams",
+      "bullets": [
+        "Packaged deployment, secret management, and observability setup so new services could start with the same operating model.",
+        "Combined documentation and checklists to reduce onboarding time and keep operational quality consistent across teams."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "school": "Example University",
+      "program": "B.S. in Computer Science",
+      "period": "2013 - 2017"
+    }
+  ]
+}

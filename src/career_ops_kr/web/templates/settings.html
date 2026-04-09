@@ -53,6 +53,46 @@
       </div>
     </section>
   </div>
+  <section class="subcard section-stack">
+    <h2>포털 상태 점검</h2>
+    {% if live_smoke.available %}
+      <div class="mini-pills">
+        <span class="status-chip ok">ok {{ live_smoke.counts.get("ok", 0) }}</span>
+        {% if live_smoke.counts.get("stale", 0) %}
+          <span class="status-chip warn">stale {{ live_smoke.counts.get("stale", 0) }}</span>
+        {% endif %}
+        {% if live_smoke.counts.get("failed", 0) %}
+          <span class="status-chip error">failed {{ live_smoke.counts.get("failed", 0) }}</span>
+        {% endif %}
+        {% if live_smoke.counts.get("missing", 0) %}
+          <span class="status-chip warn">missing {{ live_smoke.counts.get("missing", 0) }}</span>
+        {% endif %}
+      </div>
+      <div class="meta-pair">
+        <div class="meta">{{ live_smoke.summary }}</div>
+        <div class="meta">기준: 최근 {{ live_smoke.max_age_hours }}시간 내 saved report</div>
+        <div class="meta">latest report: {{ live_smoke.latest_generated_at or "-" }}</div>
+        <div class="meta">saved report dir: <code>{{ live_smoke.directory }}</code></div>
+        <div class="meta">recognized reports: {{ live_smoke.recognized_report_count }} · ignored: {{ live_smoke.ignored_count }}</div>
+      </div>
+      {% if live_smoke.problem_items %}
+        <ul class="list-compact">
+          {% for item in live_smoke.problem_items %}
+            <li>
+              <div class="title">{{ item.target }}</div>
+              <div class="meta">{{ item.status }}{% if item.message %} · {{ item.message }}{% endif %}</div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% else %}
+      <div class="notice warn">{{ live_smoke.summary }}</div>
+    {% endif %}
+    <div class="muted">
+      실제 갱신은 CLI에서 <code>career-ops-kr smoke-live-resume-batch --report-out output/live-smoke/&lt;file&gt;.json</code>과
+      <code>career-ops-kr validate-live-smoke-reports output/live-smoke --max-age-hours 24</code>를 사용합니다.
+    </div>
+  </section>
   {% if ai_enabled %}
     <section class="subcard section-stack">
       <h2>AI 키</h2>
