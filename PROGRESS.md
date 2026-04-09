@@ -83,10 +83,12 @@
     - generated output inventory에 `tailoringGuidance` 기반 role profile / focus preview를 같이 보여주도록 정리
     - 검색 결과에서 provider runtime status strip과 degraded-source notice를 표시하고, canonical URL 기준으로 이미 저장된 공고 상태/다음 액션을 함께 노출
     - `POST /api/import`가 canonical URL 기준으로 idempotent하게 동작하도록 바꾸고 `created / existing / updated` 결과를 응답하도록 정리
+    - search provider status를 `정상 / 결과 없음 / 실패`와 실제 사용 검색어까지 보이도록 고신호화
+    - search 저장 panel과 결과 row에서 `새 저장 / 기존 항목 보완 / 기존 항목 재사용`과 duplicate-save guard를 바로 보이도록 정리
     - tracker 목록에 attention preset(`리포트 없음 / 이력서 없음 / 팔로업 overdue / tracker 미연결`)과 row-level next-action 요약을 추가
     - saved job detail에 `다음에 할 일`, 상태/메모 inline 수정, tracker/web drift 경고를 추가
     - home은 live smoke compact summary만 보여주고 settings는 detailed health/report metadata를 유지하도록 분리
-    - `tests/test_web.py`에 canonical import dedupe, search provider status, search saved-job state, tracker attention filter, job-detail next-action 회귀 추가
+    - `tests/test_web.py`에 canonical import dedupe, high-signal search provider status, search saved-job state, tracker attention filter, job-detail next-action 회귀 추가
   - settings 화면에 web DB backup/export/import 추가
     - SQLite backup 생성
     - JSON snapshot export/import
@@ -139,8 +141,11 @@
   - `templates/career-description-ko.html`
   - `templates/career-description-en.html`
   - `examples/career-description-context.backend.ko.example.json`
+  - `examples/career-description-context.backend.example.json`
   - `examples/career-description-context.data-platform.ko.example.json`
+  - `examples/career-description-context.data-platform.example.json`
   - `examples/career-description-context.data-ai.ko.example.json`
+  - `examples/career-description-context.data-ai.example.json`
   - `examples/career-description-context.platform.ko.example.json`
   - `examples/career-description-context.platform.example.json`
   - `tests/test_career_description.py`로 전용 schema/render smoke 추가
@@ -629,7 +634,7 @@
 
 ## 남은 문제
 
-- web generated artifact inventory는 현재 `output/**/*.html` filesystem scan 기반이다. web/CLI 결과를 한 화면에 모아 보여주긴 하지만, 장기적으로는 build manifest 기반 canonical inventory가 있으면 provenance가 더 강해진다.
+- web generated artifact inventory는 이제 sibling `.manifest.json`을 우선 읽는 manifest-backed inventory다. manifest가 없는 예전 HTML은 legacy fallback으로 계속 보이므로, 오래된 산출물을 점진적으로 새 build 경로로 교체해야 provenance가 균일해진다.
 - `fetch-job`는 일부 로컬 Python 환경에서 TLS 인증서 검증 실패가 날 수 있다. 현재는 `--insecure` 옵션으로 우회 가능하다.
 - `discover-jobs`는 현재 Wanted / Jumpit / Remember / Saramin을 지원한다. Saramin은 `SARAMIN_ACCESS_KEY`가 있어야 한다.
 - `process-pipeline --score`는 score/report/addition까지 생성하지만, tracker 반영은 의도적으로 `finalize-tracker`를 별도 실행해야 한다.
@@ -662,7 +667,7 @@
    - 새 company research skill이 portal research와 잘 분리되는지 확인
    - builder / reviewer / tester handoff 품질 추가 점검
 2. optional web surface 운영 마무리
-   - generated artifact inventory를 filesystem scan으로 유지할지, build manifest 기반 canonical inventory로 바꿀지 결정
+   - manifest-backed artifact inventory의 legacy fallback 정리 정책 결정
    - search / tracker / detail 화면의 세부 UX polish 범위 확정
    - 포털 parser drift 발생 시 live smoke와 web build-from-url 흐름을 우선 점검
 3. 직군별 scorecard 2차 tuning

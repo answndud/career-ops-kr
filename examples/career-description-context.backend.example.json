@@ -1,0 +1,56 @@
+{
+  "name": "Hong Gil-dong",
+  "headline": "Senior Backend Engineer",
+  "contactLine": "Seoul, KR | hong@example.com | github.com/example | example.com",
+  "summary": "Backend engineer who has operated critical transaction flows for customer-facing products with a focus on API design, data integrity, operational automation, and incident response. I work best where product teams need durable service foundations that let feature delivery and production reliability improve together.",
+  "skills": [
+    "Python",
+    "TypeScript",
+    "FastAPI",
+    "Django",
+    "PostgreSQL",
+    "Redis",
+    "Kafka",
+    "AWS"
+  ],
+  "experience": [
+    {
+      "role": "Senior Backend Engineer",
+      "company": "Commerce Stack",
+      "period": "2022 - Present",
+      "location": "Seoul",
+      "bullets": [
+        "Designed and operated order, settlement, and partner integration APIs that reduced bottlenecks and failure modes in core transaction flows.",
+        "Tightened monitoring, alert routing, and runbook quality to shorten incident response time and lower manual coordination during service outages.",
+        "Improved schema design and query paths on payment and order services so data consistency and response performance could hold under higher load."
+      ]
+    },
+    {
+      "role": "Backend Engineer",
+      "company": "Growth SaaS",
+      "period": "2019 - 2022",
+      "location": "Remote",
+      "bullets": [
+        "Built internal workflow services and admin tools used by operations and customer success teams to reduce repetitive coordination work.",
+        "Introduced queue-based retry policies and asynchronous processing for external integrations, which simplified recovery from transient failures."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Partner Sync Platform",
+      "subtitle": "Integration and reconciliation tooling",
+      "bullets": [
+        "Implemented a partner data synchronization service with retryable ingestion flows and reconciliation reporting.",
+        "Added audit trails and operator controls so partner incidents could be recovered with less manual investigation."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "school": "Example University",
+      "program": "B.S. in Computer Science",
+      "period": "2014 - 2018"
+    }
+  ]
+}

@@ -8,11 +8,13 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import httpx
 from fastapi.testclient import TestClient
 
 from career_ops_kr.tracker import parse_tracker_rows
 from career_ops_kr.web import app as web_app
 from career_ops_kr.web import resume_tools
+from career_ops_kr.web import search as web_search
 from career_ops_kr.web.db import connection_scope
 
 
@@ -151,6 +153,44 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(len(resumes), 1)
         self.assertEqual(resumes[0]["filename"], "resume.txt")
 
+    def test_search_jobs_builds_high_signal_provider_statuses(self) -> None:
+        wanted_result = web_search.JobSearchResult(
+            id="wanted-1",
+            title="Backend Engineer",
+            company="Acme",
+            location="Seoul",
+            source="원티드",
+            url="https://www.wanted.co.kr/wd/12345",
+            type="-",
+            experience="-",
+            salary="-",
+            deadline="-",
+            description="",
+        )
+        with (
+            patch(
+                "career_ops_kr.web.search.translate_query",
+                side_effect=lambda query, target_language: "backend" if target_language == "en" else "백엔드",
+            ),
+            patch("career_ops_kr.web.search._search_saramin", return_value=[]),
+            patch("career_ops_kr.web.search._search_wanted", return_value=[wanted_result]),
+            patch("career_ops_kr.web.search._search_efinancial", side_effect=httpx.ReadTimeout("timed out")),
+        ):
+            payload = web_search.search_jobs("백엔드")
+
+        self.assertEqual(payload["provider_summary"]["ok"], 1)
+        self.assertEqual(payload["provider_summary"]["empty"], 1)
+        self.assertEqual(payload["provider_summary"]["error"], 1)
+        self.assertIn("결과 없음 1개", payload["provider_summary"]["summary"])
+        saramin_status = next(item for item in payload["provider_statuses"] if item["key"] == "saramin")
+        self.assertEqual(saramin_status["status"], "empty")
+        self.assertEqual(saramin_status["state_label"], "결과 없음")
+        self.assertEqual(saramin_status["query_label"], "입력어")
+        efinancial_status = next(item for item in payload["provider_statuses"] if item["key"] == "efinancial")
+        self.assertEqual(efinancial_status["status"], "error")
+        self.assertEqual(efinancial_status["query_label"], "영문 번역")
+        self.assertEqual(efinancial_status["detail"], "요청 시간 초과")
+
     def test_search_import_and_build_from_url_endpoint(self) -> None:
         import_response = self.client.post(
             "/api/import",
@@ -166,6 +206,8 @@ class WebAppTests(unittest.TestCase):
         imported = import_response.json()
         self.assertEqual(imported["company"], "Imported Inc")
         self.assertEqual(imported["save_result"], "created")
+        self.assertEqual(imported["save_result_label"], "새 공고를 저장했습니다")
+        self.assertFalse(imported["duplicate_guard_triggered"])
 
         fake_run_dir = self.output_dir / "web-resumes"
         fake_run_dir.mkdir(parents=True, exist_ok=True)
@@ -194,6 +236,20 @@ class WebAppTests(unittest.TestCase):
             tailored_context_path=fake_artifacts_context,
             html_path=fake_run_dir / "resume.html",
             pdf_path=fake_run_dir / "resume.pdf",
+            manifest_path=fake_run_dir / "resume.manifest.json",
+        )
+        fake_artifacts.manifest_path.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "pipeline": "build_tailored_resume_from_url",
+                    "paths": {
+                        "html_path": fake_artifacts.html_path.as_posix(),
+                    },
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
         )
 
         with patch.object(web_app, "run_build_tailored_resume_from_url", return_value=fake_artifacts):
@@ -216,6 +272,7 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(payload["job_id"], imported["id"])
         self.assertEqual(payload["html_url"], "/output/web-resumes/resume.html")
         self.assertEqual(payload["pdf_url"], "/output/web-resumes/resume.pdf")
+        self.assertEqual(payload["manifest_url"], "/output/web-resumes/resume.manifest.json")
         self.assertEqual(payload["tailoring_guidance"]["selection"]["selected_role_profile"], "Platform")
 
         saved_job = self.client.get(f"/api/jobs/{imported['id']}").json()
@@ -254,6 +311,11 @@ class WebAppTests(unittest.TestCase):
         second_payload = second.json()
         self.assertEqual(second_payload["id"], first_payload["id"])
         self.assertIn(second_payload["save_result"], {"existing", "updated"})
+        self.assertIn(second_payload["save_result_label"], {"기존 공고를 최신 정보로 보완했습니다", "이미 저장된 공고입니다"})
+        self.assertIn("duplicate row는 만들지 않았습니다.", second_payload["save_detail"])
+        self.assertTrue(second_payload["duplicate_guard_triggered"])
+        self.assertEqual(second_payload["detail_url"], f"/tracker/{first_payload['id']}")
+        self.assertIn("같은 canonical URL로 다시 저장해도 기존 항목을 재사용합니다.", second_payload["duplicate_guard_note"])
 
         jobs = self.client.get("/api/jobs").json()
         self.assertEqual(len(jobs), 1)
@@ -282,9 +344,41 @@ class WebAppTests(unittest.TestCase):
             "count": 1,
             "translated_query": None,
             "provider_statuses": [
-                {"key": "wanted", "label": "원티드", "status": "ok", "count": 1, "message": None},
-                {"key": "saramin", "label": "사람인", "status": "error", "count": 0, "message": "timeout"},
+                {
+                    "key": "wanted",
+                    "label": "원티드",
+                    "status": "ok",
+                    "tone": "ok",
+                    "count": 1,
+                    "state_label": "정상",
+                    "detail": "1건 확인",
+                    "query": "backend",
+                    "query_label": "입력어",
+                    "message": None,
+                },
+                {
+                    "key": "saramin",
+                    "label": "사람인",
+                    "status": "error",
+                    "tone": "error",
+                    "count": 0,
+                    "state_label": "오류",
+                    "detail": "요청 시간 초과",
+                    "query": "backend",
+                    "query_label": "입력어",
+                    "message": "요청 시간 초과",
+                },
             ],
+            "provider_summary": {
+                "total": 2,
+                "responded": 1,
+                "ok": 1,
+                "empty": 0,
+                "error": 1,
+                "failed_labels": ["사람인"],
+                "empty_labels": [],
+                "summary": "정상 1개 · 결과 없음 0개 · 실패 1개",
+            },
             "degraded": True,
             "sources": {"전체": 1, "원티드": 1},
         }
@@ -294,6 +388,7 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(response.json()["count"], 1)
         self.assertTrue(response.json()["degraded"])
         self.assertEqual(response.json()["provider_statuses"][1]["status"], "error")
+        self.assertEqual(response.json()["provider_summary"]["error"], 1)
 
     def test_search_page_surfaces_provider_health_and_saved_job_state(self) -> None:
         created = self.client.post(
@@ -325,17 +420,53 @@ class WebAppTests(unittest.TestCase):
             "count": 1,
             "translated_query": None,
             "provider_statuses": [
-                {"key": "wanted", "label": "원티드", "status": "ok", "count": 1, "message": None},
-                {"key": "saramin", "label": "사람인", "status": "error", "count": 0, "message": "timeout"},
+                {
+                    "key": "wanted",
+                    "label": "원티드",
+                    "status": "ok",
+                    "tone": "ok",
+                    "count": 1,
+                    "state_label": "정상",
+                    "detail": "1건 확인",
+                    "query": "backend",
+                    "query_label": "입력어",
+                    "message": None,
+                },
+                {
+                    "key": "saramin",
+                    "label": "사람인",
+                    "status": "error",
+                    "tone": "error",
+                    "count": 0,
+                    "state_label": "오류",
+                    "detail": "요청 시간 초과",
+                    "query": "backend",
+                    "query_label": "입력어",
+                    "message": "요청 시간 초과",
+                },
             ],
+            "provider_summary": {
+                "total": 2,
+                "responded": 1,
+                "ok": 1,
+                "empty": 0,
+                "error": 1,
+                "failed_labels": ["사람인"],
+                "empty_labels": [],
+                "summary": "정상 1개 · 결과 없음 0개 · 실패 1개",
+            },
             "degraded": True,
             "sources": {"전체": 1, "원티드": 1},
         }
         with patch("career_ops_kr.web.app.search_jobs", return_value=mocked):
             response = self.client.get("/search", params={"q": "backend"})
         self.assertEqual(response.status_code, 200)
+        self.assertIn("검색 source 상태", response.text)
+        self.assertIn("정상 1개 · 결과 없음 0개 · 실패 1개", response.text)
         self.assertIn("일부 검색 소스가 일시적으로 실패했습니다.", response.text)
         self.assertIn("저장됨", response.text)
+        self.assertIn("중복 저장 방지", response.text)
+        self.assertIn("canonical URL 기준으로 이미 저장된 항목입니다.", response.text)
         self.assertIn(f"/tracker/{created['id']}", response.text)
 
     def test_home_dashboard_surfaces_recent_outputs(self) -> None:
@@ -404,6 +535,24 @@ class WebAppTests(unittest.TestCase):
         generated_dir.mkdir(parents=True, exist_ok=True)
         (generated_dir / "demo-resume.html").write_text("<html></html>", encoding="utf-8")
         (generated_dir / "demo-resume.pdf").write_bytes(b"%PDF-1.4")
+        (generated_dir / "demo-resume.manifest.json").write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "pipeline": "build_tailored_resume_from_url",
+                    "job": {"company": "Manifest Co", "title": "Platform Engineer"},
+                    "selection": {"selected_role_profile": "Platform", "selected_domain": "platform"},
+                    "focus": {"skills_to_emphasize": ["Terraform"]},
+                    "paths": {
+                        "html_path": (generated_dir / "demo-resume.html").as_posix(),
+                        "pdf_path": (generated_dir / "demo-resume.pdf").as_posix(),
+                        "context_path": (self.output_dir / "resume-contexts" / "demo-resume.json").as_posix(),
+                    },
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
         (self.output_dir / "cli-resume.html").write_text("<html></html>", encoding="utf-8")
         (self.output_dir / "cli-resume.pdf").write_bytes(b"%PDF-1.4")
         (self.output_dir / "resume-contexts").mkdir(parents=True, exist_ok=True)
@@ -436,10 +585,16 @@ class WebAppTests(unittest.TestCase):
             "/output/web-resumes/demo-resume.pdf",
         )
         self.assertEqual(
+            generated_by_url["/output/web-resumes/demo-resume.html"]["manifest_url"],
+            "/output/web-resumes/demo-resume.manifest.json",
+        )
+        self.assertEqual(
             generated_by_url["/output/web-resumes/demo-resume.html"]["context_path"],
             (self.output_dir / "resume-contexts" / "demo-resume.json").as_posix(),
         )
+        self.assertEqual(generated_by_url["/output/web-resumes/demo-resume.html"]["provenance"], "manifest")
         self.assertEqual(generated_by_url["/output/cli-resume.html"]["source_label"], "cli")
+        self.assertEqual(generated_by_url["/output/cli-resume.html"]["provenance"], "legacy")
         self.assertEqual(payload["recentAiOutputs"][0]["type"], "resume_rewrite")
         self.assertIn("Tailored summary output", payload["recentAiOutputs"][0]["preview"])
 
@@ -648,6 +803,24 @@ class WebAppTests(unittest.TestCase):
         generated_dir.mkdir(parents=True, exist_ok=True)
         (generated_dir / "web-platform.html").write_text("<html></html>", encoding="utf-8")
         (generated_dir / "web-platform.pdf").write_bytes(b"%PDF-1.4")
+        (generated_dir / "web-platform.manifest.json").write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "pipeline": "build_tailored_resume_from_url",
+                    "job": {"company": "Manifest Platform", "title": "Platform Engineer"},
+                    "selection": {"selected_role_profile": "Platform", "selected_domain": "platform"},
+                    "focus": {"skills_to_emphasize": ["Kubernetes", "Terraform"]},
+                    "paths": {
+                        "html_path": (generated_dir / "web-platform.html").as_posix(),
+                        "pdf_path": (generated_dir / "web-platform.pdf").as_posix(),
+                        "context_path": (self.output_dir / "resume-contexts" / "web-platform.json").as_posix(),
+                    },
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
         (self.output_dir / "cli-backend.html").write_text("<html></html>", encoding="utf-8")
         context_dir = self.output_dir / "resume-contexts"
         context_dir.mkdir(parents=True, exist_ok=True)
@@ -669,6 +842,7 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("web-platform.html", response.text)
         self.assertIn("cli-backend.html", response.text)
         self.assertIn("Platform", response.text)
+        self.assertIn("manifest", response.text)
         self.assertIn("생성된 이력서 산출물", response.text)
 
         filtered = self.client.get("/artifacts", params={"source": "cli"})

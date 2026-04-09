@@ -27,9 +27,14 @@
         <div class="hint">CLI에서 생성한 산출물</div>
       </article>
       <article class="stat">
-        <div class="label">Live Smoke</div>
-        <div class="value">{{ live_smoke.counts.get("ok", 0) }}</div>
-        <div class="hint">최근 saved smoke 정상 target</div>
+        <div class="label">Manifest</div>
+        <div class="value">{{ inventory_manifest_total }}</div>
+        <div class="hint">provenance가 기록된 산출물</div>
+      </article>
+      <article class="stat">
+        <div class="label">Legacy</div>
+        <div class="value">{{ inventory_legacy_total }}</div>
+        <div class="hint">manifest 없이 발견된 HTML</div>
       </article>
     </div>
     <form method="get" action="/artifacts" class="grid three">
@@ -66,6 +71,7 @@
           <div class="meta">{{ item.modified_at }}</div>
           <div class="mini-pills">
             <span class="status-chip">{{ item.source_label }}</span>
+            <span class="status-chip">{{ item.provenance_label }}</span>
             {% if item.company %}
               <span class="status-chip">{{ item.company }}</span>
             {% endif %}
@@ -81,12 +87,16 @@
             {% if item.pdf_url %}
               <a class="link" href="{{ item.pdf_url }}" target="_blank" rel="noreferrer">PDF</a>
             {% endif %}
+            {% if item.manifest_url %}
+              <a class="link" href="{{ item.manifest_url }}" target="_blank" rel="noreferrer">Manifest</a>
+            {% endif %}
             {% if item.job_detail_url %}
               <a class="link" href="{{ item.job_detail_url }}">연결된 공고</a>
             {% endif %}
           </div>
           <div class="path-list meta">
             <div>html: <code>{{ item.html_path }}</code></div>
+            {% if item.manifest_path %}<div>manifest: <code>{{ item.manifest_path }}</code></div>{% endif %}
             {% if item.job_path %}<div>job: <code>{{ item.job_path }}</code></div>{% endif %}
             {% if item.report_path %}<div>report: <code>{{ item.report_path }}</code></div>{% endif %}
             {% if item.context_path %}<div>context: <code>{{ item.context_path }}</code></div>{% endif %}

@@ -460,11 +460,17 @@ class ResumeTailoringTest(unittest.TestCase):
             self.assertEqual(context_path, artifacts.tailored_context_path)
             self.assertEqual(html_path, artifacts.html_path)
             self.assertIsNone(artifacts.pdf_path)
+            self.assertEqual(html_path.with_suffix(".manifest.json"), artifacts.manifest_path)
             self.assertTrue(html_path.exists())
+            self.assertTrue(artifacts.manifest_path.exists())
 
             packet = json.loads(tailoring_path.read_text(encoding="utf-8"))
+            manifest = json.loads(artifacts.manifest_path.read_text(encoding="utf-8"))
             rendered = html_path.read_text(encoding="utf-8")
             self.assertEqual("Platform", packet["selection"]["selected_role_profile"])
+            self.assertEqual("build_tailored_resume", manifest["pipeline"])
+            self.assertEqual(html_path.as_posix(), manifest["paths"]["html_path"])
+            self.assertEqual("(주)어피닛", manifest["job"]["company"])
             self.assertIn("홍길동", rendered)
             self.assertIn("Platform Engineer", rendered)
 
@@ -628,7 +634,15 @@ class ResumeTailoringTest(unittest.TestCase):
             self.assertEqual(tailoring_out, artifacts.tailoring_path)
             self.assertEqual(context_out, artifacts.tailored_context_path)
             self.assertEqual(html_out, artifacts.html_path)
+            self.assertEqual(html_out.with_suffix(".manifest.json"), artifacts.manifest_path)
             self.assertTrue(html_out.exists())
+            self.assertTrue(artifacts.manifest_path.exists())
+            manifest = json.loads(artifacts.manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual("build_tailored_resume_from_url", manifest["pipeline"])
+            self.assertEqual(
+                (ROOT / "config" / "profile.example.yml").as_posix(),
+                manifest["paths"]["profile_path"],
+            )
 
     def test_build_tailored_resume_from_url_preserves_fetched_job_when_scoring_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

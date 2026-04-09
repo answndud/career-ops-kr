@@ -1,0 +1,56 @@
+{
+  "name": "Hong Gil-dong",
+  "headline": "Senior Data Platform Engineer",
+  "contactLine": "Seoul, KR | hong@example.com | github.com/example | example.com",
+  "summary": "Data platform engineer who builds reliable ingestion, orchestration, warehouse, and data quality foundations for analytics and ML teams. I focus on creating standards and operating practices that let multiple teams work from the same trustworthy data model without losing delivery speed.",
+  "skills": [
+    "Python",
+    "SQL",
+    "Airflow",
+    "Spark",
+    "Kafka",
+    "dbt",
+    "BigQuery",
+    "Terraform"
+  ],
+  "experience": [
+    {
+      "role": "Senior Data Platform Engineer",
+      "company": "Insight Data",
+      "period": "2022 - Present",
+      "location": "Seoul",
+      "bullets": [
+        "Designed orchestration and data quality checks for batch and streaming pipelines so analytics teams could rely on shared reference data.",
+        "Introduced dbt modeling standards and reusable validation workflows that raised the safety of warehouse changes across teams.",
+        "Partnered with ML teams on feature pipeline reliability and freshness monitoring to keep downstream model inputs stable."
+      ]
+    },
+    {
+      "role": "Data Engineer",
+      "company": "Growth Analytics",
+      "period": "2019 - 2022",
+      "location": "Remote",
+      "bullets": [
+        "Built product event ingestion paths and warehouse marts used for business and product reporting.",
+        "Maintained Airflow DAGs, Spark jobs, and schema change operating procedures with multiple stakeholder teams."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Warehouse Quality Guardrails",
+      "subtitle": "Automated checks for ingestion and marts",
+      "bullets": [
+        "Added freshness alerts and lineage-aware validation for critical marts so data quality issues surfaced earlier.",
+        "Caught schema drift before scheduled transformations ran, which reduced broken downstream dashboards and ad hoc recovery work."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "school": "Example University",
+      "program": "B.S. in Statistics",
+      "period": "2012 - 2016"
+    }
+  ]
+}

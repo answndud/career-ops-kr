@@ -56,6 +56,7 @@ class BuildTailoredResumeArtifacts:
     tailored_context_path: Path
     html_path: Path
     pdf_path: Path | None = None
+    manifest_path: Path | None = None
 
 
 @dataclass(slots=True)
@@ -67,6 +68,7 @@ class BuildTailoredResumeFromUrlArtifacts:
     tailored_context_path: Path
     html_path: Path
     pdf_path: Path | None = None
+    manifest_path: Path | None = None
 
 
 @dataclass(slots=True)
@@ -118,6 +120,95 @@ class LiveSmokeReportHealthEntry:
     selected_url: str | None = None
     used_fallback: bool = False
     message: str | None = None
+
+
+def _default_resume_artifact_manifest_path(html_path: Path) -> Path:
+    return html_path.with_suffix(".manifest.json")
+
+
+def _load_resume_guidance_from_context(context_path: Path) -> dict[str, Any] | None:
+    if not context_path.exists():
+        return None
+    try:
+        payload = json.loads(context_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    guidance = payload.get("tailoringGuidance")
+    return guidance if isinstance(guidance, dict) else None
+
+
+def _load_resume_job_metadata(job_path: Path) -> dict[str, str | None]:
+    try:
+        front_matter, _ = parse_front_matter(job_path)
+    except OSError:
+        return {
+            "company": None,
+            "title": None,
+            "url": None,
+            "source": None,
+        }
+    return {
+        "company": str(front_matter.get("company") or "").strip() or None,
+        "title": str(front_matter.get("title") or "").strip() or None,
+        "url": str(front_matter.get("url") or "").strip() or None,
+        "source": str(front_matter.get("source") or "").strip() or None,
+    }
+
+
+def load_resume_artifact_manifest(path: Path) -> dict[str, Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"Invalid artifact manifest payload: {path.as_posix()}")
+    if payload.get("version") != 1:
+        raise ValueError(f"Unsupported artifact manifest version: {path.as_posix()}")
+    if not isinstance(payload.get("paths"), dict):
+        raise ValueError(f"Artifact manifest is missing paths: {path.as_posix()}")
+    return payload
+
+
+def _write_resume_artifact_manifest(
+    *,
+    manifest_path: Path,
+    pipeline: str,
+    job_path: Path,
+    report_path: Path,
+    tailoring_path: Path,
+    context_path: Path,
+    html_path: Path,
+    pdf_path: Path | None,
+    base_context_path: Path,
+    template_path: Path,
+    scorecard_path: Path,
+    profile_path: Path | None = None,
+) -> Path:
+    job = _load_resume_job_metadata(job_path)
+    guidance = _load_resume_guidance_from_context(context_path) or {}
+    payload = {
+        "version": 1,
+        "generated_at": datetime.now(UTC).isoformat(),
+        "pipeline": pipeline,
+        "job": job,
+        "selection": guidance.get("selection") or {},
+        "focus": guidance.get("focus") or {},
+        "paths": {
+            "job_path": job_path.as_posix(),
+            "report_path": report_path.as_posix(),
+            "tailoring_path": tailoring_path.as_posix(),
+            "context_path": context_path.as_posix(),
+            "html_path": html_path.as_posix(),
+            "pdf_path": pdf_path.as_posix() if pdf_path else None,
+            "base_context_path": base_context_path.as_posix(),
+            "template_path": template_path.as_posix(),
+            "profile_path": profile_path.as_posix() if profile_path else None,
+            "scorecard_path": scorecard_path.as_posix(),
+        },
+    }
+    ensure_dir(manifest_path.parent)
+    manifest_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return manifest_path
 
 
 def live_smoke_report_metadata(report_path: Path) -> dict[str, Any]:
@@ -1319,11 +1410,13 @@ def build_tailored_resume(
     resolved_tailoring_out = tailoring_out or Path("output") / "resume-tailoring" / f"{date}-{slug}.json"
     resolved_context_out = tailored_context_out or Path("output") / "resume-contexts" / f"{date}-{slug}.json"
     resolved_html_out = html_out or Path("output") / "rendered-resumes" / f"{date}-{slug}.html"
+    resolved_manifest_out = _default_resume_artifact_manifest_path(resolved_html_out)
 
     protected_outputs = [
         resolved_tailoring_out,
         resolved_context_out,
         resolved_html_out,
+        resolved_manifest_out,
     ]
     if pdf_out:
         protected_outputs.append(pdf_out)
@@ -1351,12 +1444,26 @@ def build_tailored_resume(
     resolved_pdf_out: Path | None = None
     if pdf_out:
         resolved_pdf_out = generate_pdf_file(resolved_html_out, pdf_out, pdf_format)
+    manifest_path = _write_resume_artifact_manifest(
+        manifest_path=resolved_manifest_out,
+        pipeline="build_tailored_resume",
+        job_path=job_path,
+        report_path=report_path,
+        tailoring_path=tailoring.output_path,
+        context_path=tailored_context.output_path,
+        html_path=resolved_html_out,
+        pdf_path=resolved_pdf_out,
+        base_context_path=base_context_path,
+        template_path=template_path,
+        scorecard_path=scorecard_path,
+    )
 
     return BuildTailoredResumeArtifacts(
         tailoring_path=tailoring.output_path,
         tailored_context_path=tailored_context.output_path,
         html_path=resolved_html_out,
         pdf_path=resolved_pdf_out,
+        manifest_path=manifest_path,
     )
 
 
@@ -1400,6 +1507,7 @@ def build_tailored_resume_from_url(
     resolved_tailoring_out = tailoring_out or Path("output") / "resume-tailoring" / f"{date}-{slug}.json"
     resolved_context_out = tailored_context_out or Path("output") / "resume-contexts" / f"{date}-{slug}.json"
     resolved_html_out = html_out or Path("output") / "rendered-resumes" / f"{date}-{slug}.html"
+    resolved_manifest_out = _default_resume_artifact_manifest_path(resolved_html_out)
 
     protected_outputs = [
         resolved_job_out,
@@ -1407,6 +1515,7 @@ def build_tailored_resume_from_url(
         resolved_tailoring_out,
         resolved_context_out,
         resolved_html_out,
+        resolved_manifest_out,
     ]
     if tracker_out:
         protected_outputs.append(tracker_out)
@@ -1450,6 +1559,21 @@ def build_tailored_resume_from_url(
         overwrite=overwrite,
         pdf_format=pdf_format,
     )
+    manifest_path = _write_resume_artifact_manifest(
+        manifest_path=resume_artifacts.manifest_path
+        or _default_resume_artifact_manifest_path(resume_artifacts.html_path),
+        pipeline="build_tailored_resume_from_url",
+        job_path=saved_job_path,
+        report_path=score_artifacts.report_path,
+        tailoring_path=resume_artifacts.tailoring_path,
+        context_path=resume_artifacts.tailored_context_path,
+        html_path=resume_artifacts.html_path,
+        pdf_path=resume_artifacts.pdf_path,
+        base_context_path=base_context_path,
+        template_path=template_path,
+        scorecard_path=scorecard_path,
+        profile_path=profile_path,
+    )
 
     return BuildTailoredResumeFromUrlArtifacts(
         job_path=saved_job_path,
@@ -1459,6 +1583,7 @@ def build_tailored_resume_from_url(
         tailored_context_path=resume_artifacts.tailored_context_path,
         html_path=resume_artifacts.html_path,
         pdf_path=resume_artifacts.pdf_path,
+        manifest_path=manifest_path,
     )
 
 

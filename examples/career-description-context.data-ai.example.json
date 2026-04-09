@@ -1,0 +1,56 @@
+{
+  "name": "Hong Gil-dong",
+  "headline": "Applied AI Engineer",
+  "contactLine": "Seoul, KR | hong@example.com | github.com/example | example.com",
+  "summary": "Applied AI engineer working across LLM product integration, evaluation, serving, and production data flows. I am strongest when early-stage model capabilities need to become measurable product behavior with clear quality bars, operational safeguards, and feedback loops for iteration.",
+  "skills": [
+    "Python",
+    "PyTorch",
+    "LLM Evaluation",
+    "RAG",
+    "Vector Search",
+    "FastAPI",
+    "Docker",
+    "AWS"
+  ],
+  "experience": [
+    {
+      "role": "Applied AI Engineer",
+      "company": "AI Product Lab",
+      "period": "2023 - Present",
+      "location": "Seoul",
+      "bullets": [
+        "Built LLM-backed product features with retrieval, prompt iteration, and evaluation loops that could run inside real service workflows.",
+        "Implemented model serving APIs and experiment scaffolding for prompt and model version comparisons so teams could assess behavior changes quickly.",
+        "Worked with product teams to turn ambiguous AI requests into measurable service behavior, failure criteria, and rollout expectations."
+      ]
+    },
+    {
+      "role": "Machine Learning Engineer",
+      "company": "Search Systems",
+      "period": "2020 - 2023",
+      "location": "Seoul",
+      "bullets": [
+        "Operated inference services and offline evaluation jobs for ranking and recommendation systems in production.",
+        "Improved experiment reproducibility with dataset version tracking and baseline comparison workflows."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "LLM Support Assistant",
+      "subtitle": "RAG and evaluation workflow",
+      "bullets": [
+        "Built a retrieval-augmented support assistant with citation checks and failure-case review workflows.",
+        "Defined offline evaluation slices and regression checks for prompt and model updates before release."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "school": "Example University",
+      "program": "M.S. in Artificial Intelligence",
+      "period": "2018 - 2020"
+    }
+  ]
+}

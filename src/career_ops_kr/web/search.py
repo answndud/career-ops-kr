@@ -38,7 +38,12 @@ class SearchProviderStatus:
     key: str
     label: str
     status: str
+    tone: str
     count: int
+    state_label: str
+    detail: str
+    query: str
+    query_label: str
     message: str | None = None
 
 
@@ -56,6 +61,45 @@ def _query_pair(query: str) -> tuple[str, str, str | None]:
         return query, english, f"EN: {english}" if english != query else None
     korean = translate_query(query, target_language="ko")
     return korean, query, f"KR: {korean}" if korean != query else None
+
+
+def _provider_query_label(original_query: str, provider_query: str) -> str:
+    normalized_original = original_query.strip()
+    normalized_provider = provider_query.strip()
+    if normalized_provider == normalized_original:
+        return "입력어"
+    if has_korean(normalized_original) and not has_korean(normalized_provider):
+        return "영문 번역"
+    if not has_korean(normalized_original) and has_korean(normalized_provider):
+        return "한글 번역"
+    return "정규화 검색어"
+
+
+def _provider_error_message(exc: Exception) -> str:
+    if isinstance(exc, httpx.TimeoutException):
+        return "요청 시간 초과"
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"HTTP {exc.response.status_code}"
+    if isinstance(exc, httpx.RequestError):
+        return "연결 실패"
+    raw_message = str(exc).strip()
+    return raw_message[:160] if raw_message else exc.__class__.__name__
+
+
+def _provider_summary(provider_statuses: list[SearchProviderStatus]) -> dict[str, Any]:
+    ok_count = sum(1 for item in provider_statuses if item.status == "ok")
+    empty_count = sum(1 for item in provider_statuses if item.status == "empty")
+    error_count = sum(1 for item in provider_statuses if item.status == "error")
+    return {
+        "total": len(provider_statuses),
+        "responded": ok_count + empty_count,
+        "ok": ok_count,
+        "empty": empty_count,
+        "error": error_count,
+        "failed_labels": [item.label for item in provider_statuses if item.status == "error"],
+        "empty_labels": [item.label for item in provider_statuses if item.status == "empty"],
+        "summary": f"정상 {ok_count}개 · 결과 없음 {empty_count}개 · 실패 {error_count}개",
+    }
 
 
 def _search_efinancial(query: str) -> list[JobSearchResult]:
@@ -175,11 +219,12 @@ def search_jobs(query: str) -> dict[str, Any]:
     all_results: list[JobSearchResult] = []
     provider_statuses: list[SearchProviderStatus] = []
 
-    for key, label, call in (
-        ("saramin", "사람인", lambda: _search_saramin(korean_query)),
-        ("wanted", "원티드", lambda: _search_wanted(korean_query)),
-        ("efinancial", "eFinancial", lambda: _search_efinancial(english_query)),
+    for key, label, provider_query, call in (
+        ("saramin", "사람인", korean_query, lambda: _search_saramin(korean_query)),
+        ("wanted", "원티드", korean_query, lambda: _search_wanted(korean_query)),
+        ("efinancial", "eFinancial", english_query, lambda: _search_efinancial(english_query)),
     ):
+        query_label = _provider_query_label(query, provider_query)
         try:
             batch = call()
             all_results.extend(batch)
@@ -187,28 +232,41 @@ def search_jobs(query: str) -> dict[str, Any]:
                 SearchProviderStatus(
                     key=key,
                     label=label,
-                    status="ok",
+                    status="ok" if batch else "empty",
+                    tone="ok" if batch else "warn",
                     count=len(batch),
+                    state_label="정상" if batch else "결과 없음",
+                    detail=f"{len(batch)}건 확인" if batch else "정상 응답, 결과 없음",
+                    query=provider_query,
+                    query_label=query_label,
                 )
             )
         except Exception as exc:
+            message = _provider_error_message(exc)
             provider_statuses.append(
                 SearchProviderStatus(
                     key=key,
                     label=label,
                     status="error",
+                    tone="error",
                     count=0,
-                    message=str(exc),
+                    state_label="오류",
+                    detail=message,
+                    query=provider_query,
+                    query_label=query_label,
+                    message=message,
                 )
             )
 
     result_dicts = [asdict(result) for result in all_results]
+    provider_summary = _provider_summary(provider_statuses)
     return {
         "results": result_dicts,
         "count": len(result_dicts),
         "translated_query": translated_query,
         "provider_statuses": [asdict(item) for item in provider_statuses],
-        "degraded": any(item.status != "ok" for item in provider_statuses),
+        "provider_summary": provider_summary,
+        "degraded": provider_summary["error"] > 0,
         "sources": {
             "전체": len(result_dicts),
             "사람인": sum(1 for item in result_dicts if item["source"] == "사람인"),

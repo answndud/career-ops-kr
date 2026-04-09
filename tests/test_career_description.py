@@ -16,7 +16,17 @@ EXAMPLES_DIR = ROOT / "examples"
 class CareerDescriptionTemplateTest(unittest.TestCase):
     def test_career_description_examples_have_resume_compatible_schema(self) -> None:
         example_paths = sorted(EXAMPLES_DIR.glob("career-description-context*.example.json"))
-        self.assertGreaterEqual(len(example_paths), 5)
+        expected_names = {
+            "career-description-context.backend.example.json",
+            "career-description-context.backend.ko.example.json",
+            "career-description-context.data-ai.example.json",
+            "career-description-context.data-ai.ko.example.json",
+            "career-description-context.data-platform.example.json",
+            "career-description-context.data-platform.ko.example.json",
+            "career-description-context.platform.example.json",
+            "career-description-context.platform.ko.example.json",
+        }
+        self.assertEqual({path.name for path in example_paths}, expected_names)
         required_keys = {
             "name",
             "headline",

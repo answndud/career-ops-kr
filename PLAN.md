@@ -41,6 +41,7 @@
   - saved job detail은 tracker 상태와 연결된 JD / report / context / HTML / PDF, related match activity를 다시 확인하고, 저장된 공고 URL이 있으면 같은 화면에서 resume build를 다시 시작하는 entry point로 유지
   - saved job detail은 context에 저장된 tailoring guidance도 다시 확인할 수 있게 유지
   - search는 provider runtime status strip과 canonical URL 기준 import dedupe를 유지
+  - search provider status는 `정상 / 결과 없음 / 실패`를 구분하고, duplicate-save 결과는 새 row 생성 여부를 in-page에서 바로 설명하도록 유지
   - tracker/detail은 `다음에 할 일`, attention preset, tracker/web drift 같은 read-only operational hint를 유지
   - AI surface는 기본 비활성화로 유지하고 필요할 때만 `serve-web --enable-ai`로 노출
   - settings 화면에서 web DB backup/export/import를 지원
@@ -118,8 +119,11 @@
   - `templates/career-description-ko.html`
   - `templates/career-description-en.html`
   - `examples/career-description-context.backend.ko.example.json`
+  - `examples/career-description-context.backend.example.json`
   - `examples/career-description-context.data-platform.ko.example.json`
+  - `examples/career-description-context.data-platform.example.json`
   - `examples/career-description-context.data-ai.ko.example.json`
+  - `examples/career-description-context.data-ai.example.json`
   - `examples/career-description-context.platform.ko.example.json`
   - `examples/career-description-context.platform.example.json`
   - 별도 전용 smoke test file 추가
@@ -287,9 +291,10 @@
    - 이후 weight/signals 정교화
 5. 부가 자동화 기능
 6. optional web surface 운영 안정화
-   - 디자인 시스템은 `design-guidelines.md` 기준으로 정리 완료
-   - 카드/배경 구분감을 위해 page background와 surface border 대비 조정 완료
-   - 이후에는 산출물 inventory 정책, 화면별 UX polish, 포털 drift 대응에 집중
+  - 디자인 시스템은 `design-guidelines.md` 기준으로 정리 완료
+  - 카드/배경 구분감을 위해 page background와 surface border 대비 조정 완료
+   - 산출물 inventory는 sibling `.manifest.json` 기반 provenance 경로로 정리 완료
+   - 이후에는 legacy artifact 정리 정책, 화면별 UX polish, 포털 drift 대응에 집중
 
 ## 의존 관계
 

@@ -17,6 +17,7 @@ from career_ops_kr.commands.intake import DEFAULT_PROFILE_PATH, DEFAULT_SCORECAR
 from career_ops_kr.commands.resume import (
     build_tailored_resume_from_url as run_build_tailored_resume_from_url,
     evaluate_live_smoke_report_health,
+    load_resume_artifact_manifest,
 )
 from career_ops_kr.portals import canonicalize_job_url
 from career_ops_kr.tracker import delete_tracker_row, parse_tracker_rows, upsert_tracker_row
@@ -273,11 +274,6 @@ def _generated_resume_snapshot(*, limit: int | None = 6) -> dict[str, Any]:
     if not OUTPUT_DIR.exists():
         return {"total": 0, "items": []}
 
-    html_paths = sorted(
-        [path for path in OUTPUT_DIR.rglob("*.html") if path.is_file()],
-        key=lambda path: path.stat().st_mtime,
-        reverse=True,
-    )
     linked_rows_by_path: dict[str, dict[str, Any]] = {}
     with connection_scope() as conn:
         job_rows = conn.execute(
@@ -302,6 +298,87 @@ def _generated_resume_snapshot(*, limit: int | None = 6) -> dict[str, Any]:
     seen_paths: set[str] = set()
     cli_total = 0
     web_total = 0
+    manifest_total = 0
+    legacy_total = 0
+
+    manifest_paths = sorted(
+        [path for path in OUTPUT_DIR.rglob("*.manifest.json") if path.is_file()],
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    for manifest_path in manifest_paths:
+        manifest = _load_artifact_manifest(manifest_path)
+        if manifest is None:
+            continue
+        manifest_paths_payload = manifest.get("paths") or {}
+        if not isinstance(manifest_paths_payload, dict):
+            continue
+        html_path = _coerce_path(manifest_paths_payload.get("html_path"))
+        if html_path is None or not html_path.exists() or not _safe_relative_to(html_path, OUTPUT_DIR):
+            continue
+        resolved_html = html_path.resolve().as_posix()
+        if resolved_html in seen_paths:
+            continue
+        seen_paths.add(resolved_html)
+
+        pdf_path = _coerce_path(manifest_paths_payload.get("pdf_path"))
+        report_path = _coerce_path(manifest_paths_payload.get("report_path"))
+        job_path = _coerce_path(manifest_paths_payload.get("job_path"))
+        context_path = _coerce_path(manifest_paths_payload.get("context_path"))
+        linked_row = None
+        for candidate_path in (html_path, pdf_path, job_path, report_path, context_path):
+            if candidate_path is None:
+                continue
+            try:
+                linked_row = linked_rows_by_path.get(candidate_path.resolve().as_posix())
+            except FileNotFoundError:
+                linked_row = None
+            if linked_row is not None:
+                break
+
+        source_label = "web" if _safe_relative_to(html_path, WEB_RESUME_OUTPUT_DIR) else "cli"
+        if source_label == "web":
+            web_total += 1
+        else:
+            cli_total += 1
+        manifest_total += 1
+
+        guidance = _guidance_from_artifact_manifest(manifest) or _load_tailoring_guidance(context_path)
+        modified_at = datetime.fromtimestamp(html_path.stat().st_mtime, UTC).astimezone().strftime("%Y-%m-%d %H:%M")
+        manifest_job = manifest.get("job") if isinstance(manifest.get("job"), dict) else {}
+        selection = manifest.get("selection") if isinstance(manifest.get("selection"), dict) else {}
+        items.append(
+            {
+                "label": html_path.name,
+                "source_label": source_label,
+                "provenance": "manifest",
+                "provenance_label": "manifest",
+                "build_pipeline": _safe_text(manifest.get("pipeline")),
+                "manifest_path": manifest_path.as_posix(),
+                "manifest_url": _output_url(manifest_path),
+                "html_path": html_path.as_posix(),
+                "html_url": _output_url(html_path),
+                "pdf_path": pdf_path.as_posix() if pdf_path and pdf_path.exists() else None,
+                "pdf_url": _output_url(pdf_path) if pdf_path and pdf_path.exists() else None,
+                "job_path": job_path.as_posix() if job_path and job_path.exists() else None,
+                "report_path": report_path.as_posix() if report_path and report_path.exists() else None,
+                "context_path": context_path.as_posix() if context_path and context_path.exists() else None,
+                "job_id": int(linked_row["id"]) if linked_row else None,
+                "job_detail_url": f"/tracker/{int(linked_row['id'])}" if linked_row else None,
+                "company": _safe_text(linked_row.get("company")) if linked_row else _safe_text(manifest_job.get("company")),
+                "position": _safe_text(linked_row.get("position")) if linked_row else _safe_text(manifest_job.get("title")),
+                "guidance": guidance,
+                "focus_preview": _build_focus_preview(guidance),
+                "modified_at": modified_at,
+                "selected_role_profile": _safe_text(selection.get("selected_role_profile")),
+            }
+        )
+
+    html_paths = sorted(
+        [path for path in OUTPUT_DIR.rglob("*.html") if path.is_file()],
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
     for html_path in html_paths:
         resolved_html = html_path.resolve().as_posix()
         if resolved_html in seen_paths:
@@ -328,12 +405,18 @@ def _generated_resume_snapshot(*, limit: int | None = 6) -> dict[str, Any]:
             web_total += 1
         else:
             cli_total += 1
+        legacy_total += 1
         guidance = _load_tailoring_guidance(context_path)
         modified_at = datetime.fromtimestamp(html_path.stat().st_mtime, UTC).astimezone().strftime("%Y-%m-%d %H:%M")
         items.append(
             {
                 "label": html_path.name,
                 "source_label": source_label,
+                "provenance": "legacy",
+                "provenance_label": "legacy",
+                "build_pipeline": "",
+                "manifest_path": None,
+                "manifest_url": None,
                 "html_path": html_path.as_posix(),
                 "html_url": _output_url(html_path),
                 "pdf_path": pdf_path.as_posix() if pdf_path.exists() else None,
@@ -354,6 +437,8 @@ def _generated_resume_snapshot(*, limit: int | None = 6) -> dict[str, Any]:
         "total": len(items),
         "web_total": web_total,
         "cli_total": cli_total,
+        "manifest_total": manifest_total,
+        "legacy_total": legacy_total,
         "items": items[:limit] if limit is not None else items,
     }
 
@@ -379,6 +464,8 @@ def _filter_generated_resume_items(
                     str(item.get("html_path") or ""),
                     str(item.get("job_path") or ""),
                     str(item.get("report_path") or ""),
+                    str(item.get("manifest_path") or ""),
+                    str(item.get("build_pipeline") or ""),
                 ]
             ).lower()
             if normalized_query not in haystack:
@@ -478,7 +565,43 @@ def _new_db_export_path() -> Path:
 def _coerce_path(value: Any) -> Path | None:
     if not isinstance(value, str) or not value.strip():
         return None
-    return Path(value)
+    path = Path(value)
+    if path.is_absolute():
+        return path
+    return REPO_ROOT / path
+
+
+def _artifact_manifest_path_for_html(html_path: Path | None) -> Path | None:
+    if html_path is None:
+        return None
+    manifest_path = html_path.with_suffix(".manifest.json")
+    if not manifest_path.exists():
+        return None
+    return manifest_path
+
+
+def _load_artifact_manifest(path: Path | None) -> dict[str, Any] | None:
+    if path is None or not path.exists() or not _safe_relative_to(path, OUTPUT_DIR):
+        return None
+    try:
+        return load_resume_artifact_manifest(path)
+    except (ValueError, json.JSONDecodeError, OSError):
+        return None
+
+
+def _guidance_from_artifact_manifest(manifest: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not manifest:
+        return None
+    selection = manifest.get("selection")
+    focus = manifest.get("focus")
+    normalized_selection = selection if isinstance(selection, dict) else {}
+    normalized_focus = focus if isinstance(focus, dict) else {}
+    if not normalized_selection and not normalized_focus:
+        return None
+    return {
+        "selection": normalized_selection,
+        "focus": normalized_focus,
+    }
 
 
 def _normalize_job_url(url: str | None) -> str | None:
@@ -560,6 +683,44 @@ def _job_row_with_ui_state(job_row: dict[str, Any]) -> dict[str, Any]:
     return row
 
 
+def _saved_job_search_state(
+    job_row: dict[str, Any],
+    *,
+    match_note: str = "canonical URL 기준으로 이미 저장된 항목입니다.",
+) -> dict[str, Any]:
+    ui_row = _job_row_with_ui_state(job_row)
+    return {
+        "id": int(job_row["id"]),
+        "status": _safe_text(job_row.get("status")),
+        "detail_url": f"/tracker/{int(job_row['id'])}",
+        "has_report": ui_row["artifact_summary"]["report"],
+        "has_resume": ui_row["artifact_summary"]["html"],
+        "attention_summary": ui_row["attention"]["summary"],
+        "match_note": match_note,
+        "duplicate_guard_note": "같은 canonical URL로 다시 저장해도 기존 항목을 재사용합니다.",
+    }
+
+
+def _describe_save_result(save_result: str) -> tuple[str, str, str]:
+    if save_result == "updated":
+        return (
+            "기존 공고를 최신 정보로 보완했습니다",
+            "같은 canonical URL의 기존 항목을 재사용하고 비어 있던 정보를 보완했습니다. 새 duplicate row는 만들지 않았습니다.",
+            "ok",
+        )
+    if save_result == "existing":
+        return (
+            "이미 저장된 공고입니다",
+            "같은 canonical URL과 일치해서 기존 항목을 그대로 다시 사용했습니다. 새 duplicate row는 만들지 않았습니다.",
+            "warn",
+        )
+    return (
+        "새 공고를 저장했습니다",
+        "새 tracker 항목을 만들었습니다. 이후 같은 canonical URL을 다시 저장하면 기존 항목을 재사용합니다.",
+        "ok",
+    )
+
+
 def _matches_attention_filter(row: dict[str, Any], attention: str | None) -> bool:
     normalized = _safe_text(attention).lower()
     if not normalized:
@@ -616,15 +777,7 @@ def _enrich_search_results(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         saved_row = rows_by_canonical.get(canonical_url or "")
         enriched_item["canonical_url"] = canonical_url
         if saved_row:
-            ui_row = _job_row_with_ui_state(saved_row)
-            enriched_item["saved_job"] = {
-                "id": int(saved_row["id"]),
-                "status": _safe_text(saved_row.get("status")),
-                "detail_url": f"/tracker/{int(saved_row['id'])}",
-                "has_report": ui_row["artifact_summary"]["report"],
-                "has_resume": ui_row["artifact_summary"]["html"],
-                "attention_summary": ui_row["attention"]["summary"],
-            }
+            enriched_item["saved_job"] = _saved_job_search_state(saved_row)
         else:
             enriched_item["saved_job"] = None
         enriched.append(enriched_item)
@@ -653,6 +806,17 @@ def _job_artifact_specs(job_row: dict[str, Any]) -> list[dict[str, Any]]:
             "view_url": f"/tracker/{job_row['id']}/artifacts/{view_key}" if view_key else None,
         }
         items.append(item)
+    manifest_path = _artifact_manifest_path_for_html(_coerce_path(job_row.get("html_path")))
+    if manifest_path and _safe_relative_to(manifest_path, OUTPUT_DIR):
+        items.append(
+            {
+                "field": "manifest_path",
+                "label": "Build Manifest",
+                "path": manifest_path.as_posix(),
+                "output_url": _output_url(manifest_path),
+                "view_url": None,
+            }
+        )
     return items
 
 
@@ -1103,6 +1267,8 @@ def create_app() -> FastAPI:
                 inventory_total=inventory["total"],
                 inventory_web_total=inventory["web_total"],
                 inventory_cli_total=inventory["cli_total"],
+                inventory_manifest_total=inventory["manifest_total"],
+                inventory_legacy_total=inventory["legacy_total"],
                 live_smoke=_get_live_smoke_status_snapshot(),
             ),
         )
@@ -1374,8 +1540,22 @@ def create_app() -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         save_result = _safe_text(saved.pop("_save_result")) or "created"
+        save_result_label, save_detail, save_tone = _describe_save_result(save_result)
+        saved_state = _saved_job_search_state(
+            saved,
+            match_note="canonical URL 기준으로 저장 상태를 다시 확인했습니다.",
+        )
         response.status_code = 201 if save_result == "created" else 200
         saved["save_result"] = save_result
+        saved["save_result_label"] = save_result_label
+        saved["save_detail"] = save_detail
+        saved["save_tone"] = save_tone
+        saved["detail_url"] = saved_state["detail_url"]
+        saved["has_report"] = saved_state["has_report"]
+        saved["has_resume"] = saved_state["has_resume"]
+        saved["attention_summary"] = saved_state["attention_summary"]
+        saved["duplicate_guard_note"] = saved_state["duplicate_guard_note"]
+        saved["duplicate_guard_triggered"] = save_result in {"updated", "existing"}
         return saved
 
     @app.get("/api/jobs/{job_id}")
@@ -1560,6 +1740,8 @@ def create_app() -> FastAPI:
             "html_url": _output_url(artifacts.html_path),
             "pdf_path": artifacts.pdf_path.as_posix() if artifacts.pdf_path else None,
             "pdf_url": _output_url(artifacts.pdf_path) if artifacts.pdf_path else None,
+            "manifest_path": artifacts.manifest_path.as_posix() if artifacts.manifest_path else None,
+            "manifest_url": _output_url(artifacts.manifest_path) if artifacts.manifest_path else None,
             "profile_path": profile_path.as_posix(),
             "base_context_path": base_context_path.as_posix(),
             "template_path": template_path.as_posix(),

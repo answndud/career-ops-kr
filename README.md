@@ -120,12 +120,15 @@ career-ops-kr serve-web
   - URL에서 맞춤 이력서 HTML/PDF 생성
 - **산출물**
   - 웹과 CLI에서 생성한 HTML/PDF 이력서 inventory 확인
+  - 새 산출물은 HTML 옆 `.manifest.json`까지 같이 남겨 provenance를 추적
+  - manifest가 없는 예전 HTML도 legacy fallback으로 계속 보임
   - 연결된 공고가 있으면 바로 상세 화면으로 이동
 - **검색**
   - 사람인 / 원티드 / eFinancial 통합 검색
-  - 검색 source 상태 strip으로 어느 provider가 정상/실패했는지 바로 확인
+  - 검색 source 상태 strip에서 provider별 `정상 / 결과 없음 / 실패`와 실제 사용 검색어를 바로 확인
   - 검색 결과 저장
   - 같은 공고를 다시 저장해도 canonical URL 기준으로 기존 항목을 다시 열고 중복 row를 만들지 않음
+  - 저장 결과 panel에서 `새 저장 / 기존 항목 보완 / 기존 항목 재사용`을 바로 확인
   - 검색 결과에서 바로 맞춤 이력서 HTML/PDF 생성
 - **트래커**
   - 저장된 공고 목록 확인
@@ -199,10 +202,13 @@ career-ops-kr serve-web
 경력기술서는 아래 예시를 시작점으로 쓰면 됩니다.
 
 - 백엔드: `examples/career-description-context.backend.ko.example.json`
+- 백엔드 English: `examples/career-description-context.backend.example.json`
 - 플랫폼: `examples/career-description-context.platform.ko.example.json`
 - 플랫폼 English: `examples/career-description-context.platform.example.json`
 - 데이터 플랫폼: `examples/career-description-context.data-platform.ko.example.json`
+- 데이터 플랫폼 English: `examples/career-description-context.data-platform.example.json`
 - 데이터/AI: `examples/career-description-context.data-ai.ko.example.json`
+- 데이터/AI English: `examples/career-description-context.data-ai.example.json`
 
 ## 4. 가장 쉬운 시작 방법: 공고 URL 하나로 이력서 만들기
 

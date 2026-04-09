@@ -62,12 +62,28 @@
       <p>{{ results.error }}</p>
     {% else %}
       <p class="muted">총 {{ results.count }}건{% if results.translated_query %} · {{ results.translated_query }}{% endif %}</p>
+      {% if results.provider_summary %}
+        <div class="notice {% if results.provider_summary.error %}warn{% elif results.provider_summary.empty %}warn{% else %}ok{% endif %}">
+          <div><strong>검색 source 상태</strong></div>
+          <div class="muted">{{ results.provider_summary.summary }}</div>
+          {% if results.provider_summary.failed_labels %}
+            <div class="muted">실패: {{ results.provider_summary.failed_labels | join(", ") }}</div>
+          {% elif results.provider_summary.empty_labels %}
+            <div class="muted">결과 없음: {{ results.provider_summary.empty_labels | join(", ") }}</div>
+          {% endif %}
+        </div>
+      {% endif %}
       {% if results.provider_statuses %}
-        <div class="mini-pills">
+        <div class="grid three">
           {% for provider in results.provider_statuses %}
-            <span class="status-chip {% if provider.status == 'ok' %}ok{% else %}warn{% endif %}">
-              {{ provider.label }} {{ provider.status }}{% if provider.count is not none %} · {{ provider.count }}{% endif %}
-            </span>
+            <article class="notice {% if provider.tone == 'error' %}error{% elif provider.tone == 'warn' %}warn{% else %}ok{% endif %}">
+              <div class="mini-pills">
+                <span class="status-chip">{{ provider.label }}</span>
+                <span class="status-chip {% if provider.tone == 'error' %}error{% elif provider.tone == 'warn' %}warn{% else %}ok{% endif %}">{{ provider.state_label }}</span>
+              </div>
+              <div class="muted">{{ provider.detail }}</div>
+              <div class="meta">{{ provider.query_label }}: {{ provider.query }}</div>
+            </article>
           {% endfor %}
         </div>
       {% endif %}
@@ -105,31 +121,39 @@
               <tr>
                 <td>
                   <div>{{ item.company }}</div>
-                  {% if item.saved_job %}
-                    <div class="mini-pills">
-                      <span class="status-chip ok">저장됨</span>
-                      <span class="status-chip">{{ item.saved_job.status }}</span>
-                    </div>
-                  {% endif %}
+                  <div id="search-saved-state-{{ item.id }}">
+                    {% if item.saved_job %}
+                      <div class="mini-pills">
+                        <span class="status-chip ok">저장됨</span>
+                        <span class="status-chip">{{ item.saved_job.status }}</span>
+                        <span class="status-chip">중복 저장 방지</span>
+                      </div>
+                      <div class="meta">{{ item.saved_job.match_note }}</div>
+                    {% endif %}
+                  </div>
                 </td>
                 <td>
                   <div>{{ item.title }}</div>
-                  {% if item.saved_job %}
-                    <div class="meta">{{ item.saved_job.attention_summary }}</div>
-                    <div class="mini-pills">
-                      {% if item.saved_job.has_report %}<span class="status-chip">Report</span>{% endif %}
-                      {% if item.saved_job.has_resume %}<span class="status-chip ok">Resume</span>{% endif %}
-                    </div>
-                  {% endif %}
+                  <div id="search-saved-summary-{{ item.id }}">
+                    {% if item.saved_job %}
+                      <div class="meta">{{ item.saved_job.attention_summary }}</div>
+                      <div class="mini-pills">
+                        {% if item.saved_job.has_report %}<span class="status-chip">Report</span>{% endif %}
+                        {% if item.saved_job.has_resume %}<span class="status-chip ok">Resume</span>{% endif %}
+                      </div>
+                    {% endif %}
+                  </div>
                 </td>
                 <td>{{ item.source }}</td>
                 <td>{{ item.location }}</td>
                 <td>
                   <div class="table-actions">
                     <a href="{{ item.url }}" target="_blank" rel="noreferrer">열기</a>
-                    {% if item.saved_job %}
-                      <a class="link" href="{{ item.saved_job.detail_url }}">저장된 공고</a>
-                    {% endif %}
+                    <span id="search-saved-link-{{ item.id }}">
+                      {% if item.saved_job %}
+                        <a class="link" href="{{ item.saved_job.detail_url }}">저장된 공고</a>
+                      {% endif %}
+                    </span>
                     {% if ai_enabled %}
                       <button
                         type="button"
@@ -158,6 +182,7 @@
                       data-source="{{ item.source }}"
                       data-url="{{ item.url }}"
                       data-description="{{ item.description }}"
+                      data-row-key="{{ item.id }}"
                       onclick="CareerOpsSearch.save(this)"
                     >
                       저장
@@ -210,6 +235,59 @@
 
 <script>
   const CareerOpsSearch = {
+    renderSaveResult(payload) {
+      const output = document.getElementById("search-save-output");
+      const detailUrl = payload.detail_url
+        ? `<a class="link" href="${CareerOpsWeb.escapeHtml(payload.detail_url)}">저장된 공고 보기</a>`
+        : "";
+      const jobUrl = payload.url
+        ? `<a class="link" href="${CareerOpsWeb.escapeHtml(payload.url)}" target="_blank" rel="noreferrer">원문 공고 열기</a>`
+        : "";
+      const statusChip = payload.status ? `<span class="status-chip">${CareerOpsWeb.escapeHtml(payload.status)}</span>` : "";
+      const duplicateChip = payload.duplicate_guard_triggered
+        ? '<span class="status-chip warn">기존 항목 재사용</span>'
+        : '<span class="status-chip ok">새 항목</span>';
+      const reportChip = payload.has_report ? '<span class="status-chip">Report</span>' : "";
+      const resumeChip = payload.has_resume ? '<span class="status-chip ok">Resume</span>' : "";
+      output.className = `notice ${payload.save_tone === "warn" ? "warn" : "ok"} result-panel`;
+      output.innerHTML = `
+        <div><strong>${CareerOpsWeb.escapeHtml(payload.save_result_label || "저장 완료")}</strong></div>
+        <div class="muted">${CareerOpsWeb.escapeHtml(payload.company || "-")} · ${CareerOpsWeb.escapeHtml(payload.position || payload.title || "-")}</div>
+        <div class="mini-pills">${duplicateChip}${statusChip}${reportChip}${resumeChip}</div>
+        <div class="muted">${CareerOpsWeb.escapeHtml(payload.save_detail || "")}</div>
+        ${payload.attention_summary ? `<div class="muted">다음 확인: ${CareerOpsWeb.escapeHtml(payload.attention_summary)}</div>` : ""}
+        ${payload.duplicate_guard_note ? `<div class="muted">${CareerOpsWeb.escapeHtml(payload.duplicate_guard_note)}</div>` : ""}
+        <div class="link-stack">${detailUrl}${jobUrl}</div>
+      `;
+    },
+    syncSavedRow(rowKey, payload) {
+      if (!rowKey) return;
+      const state = document.getElementById(`search-saved-state-${rowKey}`);
+      const summary = document.getElementById(`search-saved-summary-${rowKey}`);
+      const detailLink = document.getElementById(`search-saved-link-${rowKey}`);
+      if (state) {
+        state.innerHTML = `
+          <div class="mini-pills">
+            <span class="status-chip ok">저장됨</span>
+            <span class="status-chip">${CareerOpsWeb.escapeHtml(payload.status || "-")}</span>
+            <span class="status-chip">${payload.duplicate_guard_triggered ? "기존 항목 재사용" : "새 항목"}</span>
+          </div>
+          ${payload.duplicate_guard_note ? `<div class="meta">${CareerOpsWeb.escapeHtml(payload.duplicate_guard_note)}</div>` : ""}
+        `;
+      }
+      if (summary) {
+        summary.innerHTML = `
+          ${payload.attention_summary ? `<div class="meta">${CareerOpsWeb.escapeHtml(payload.attention_summary)}</div>` : ""}
+          <div class="mini-pills">
+            ${payload.has_report ? '<span class="status-chip">Report</span>' : ""}
+            ${payload.has_resume ? '<span class="status-chip ok">Resume</span>' : ""}
+          </div>
+        `;
+      }
+      if (detailLink && payload.detail_url) {
+        detailLink.innerHTML = `<a class="link" href="${CareerOpsWeb.escapeHtml(payload.detail_url)}">저장된 공고</a>`;
+      }
+    },
     async copyUrl(url) {
       const output = document.getElementById("search-save-output");
       try {
@@ -265,12 +343,8 @@
         output.textContent = data.detail || "저장 실패";
         return;
       }
-      const messageMap = {
-        created: "새 공고를 저장했습니다",
-        updated: "기존 공고를 최신 정보로 보완했습니다",
-        existing: "이미 저장된 공고입니다",
-      };
-      CareerOpsWeb.renderSavedJobResult("search-save-output", data, messageMap[data.save_result] || "저장 완료");
+      CareerOpsSearch.renderSaveResult(data);
+      CareerOpsSearch.syncSavedRow(button.dataset.rowKey, data);
     },
     async buildResume(button) {
       const output = document.getElementById("search-build-output");
