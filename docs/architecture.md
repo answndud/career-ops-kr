@@ -15,7 +15,7 @@
 5. `prompts/`
    Codex가 일관된 방식으로 평가와 작성 작업을 수행하도록 돕는 운영 프롬프트입니다.
 6. `src/career_ops_kr/web/`
-   선택적으로 띄울 수 있는 FastAPI 기반 product surface입니다. 홈 대시보드, 검색, 설정, 이력서 업로드, 산출물 inventory, tracker UI, 저장 공고 detail view를 제공합니다. 홈 대시보드는 최근 공고, 최근 업로드 이력서, 최근 생성 HTML/PDF를 web/CLI 구분과 함께 한 번에 보여주고, live smoke 상태는 짧은 요약만 노출합니다. 검색 화면은 provider health 요약, source별 query 상태, canonical URL 기준 import dedupe를 같이 보여줍니다. tracker/detail 화면은 raw 상태 조회만이 아니라 `다음에 할 일`, attention preset, tracker/web drift를 같이 보여주는 운영 화면입니다. detail view는 tracker row와 연결된 artifact를 다시 열거나 같은 공고 URL로 resume build를 재실행하는 entry point로 동작하며, context에 저장된 tailoring guidance도 다시 보여줍니다. 산출물 inventory는 sibling `.manifest.json`을 우선 읽고, manifest가 없는 예전 HTML은 legacy fallback으로 계속 보여줍니다. 이 계층은 local-only SQLite sidecar를 쓰지만, HTML/PDF resume 산출은 기존 CLI resume pipeline을 그대로 호출합니다. AI surface는 기본 비활성화이고, 필요할 때만 `serve-web --enable-ai`로 켭니다. 시각 규칙은 `/Users/alex/project/career-ops-kr/design-guidelines.md`를 기준으로 grayscale-first admin dashboard 패턴을 공유합니다.
+   선택적으로 띄울 수 있는 FastAPI 기반 product surface입니다. 홈 대시보드, 검색, 설정, 이력서 업로드, 산출물 inventory, tracker UI, 저장 공고 detail view를 제공합니다. 홈 대시보드는 최근 공고, 최근 업로드 이력서, 최근 생성 HTML/PDF를 web/CLI 구분과 함께 한 번에 보여주고, live smoke 상태는 짧은 요약만 노출합니다. 검색 화면은 provider health 요약, source별 query 상태, canonical URL 기준 import dedupe를 같이 보여줍니다. tracker/detail 화면은 raw 상태 조회만이 아니라 `다음에 할 일`, attention preset, tracker/web drift를 같이 보여주는 운영 화면입니다. tracker 목록은 보이는 항목 선택 후 `상태 / 팔로업 / 출처`를 일괄 변경하는 bulk update도 지원합니다. 여기서 `상태 / 출처`는 markdown tracker와 같이 맞춰지고, `팔로업`은 web sidecar에서만 관리합니다. 선택한 row에 `notes/location` 미저장 draft가 있으면 bulk update를 먼저 막아서 다른 draft를 잃지 않게 유지합니다. 단일 row 저장은 `/api/jobs` 재조회 없이 해당 row만 부분 갱신하고, create/delete/sync처럼 목록 집합이 바뀌는 동작만 전체 목록 refresh를 유지합니다. tracker-linked field bulk update는 `tracker_id`가 없는 row를 먼저 막아서 company/position fallback 매칭으로 잘못된 markdown row를 건드리지 않게 유지합니다. detail view는 tracker row와 연결된 artifact를 다시 열거나 같은 공고 URL로 resume build를 재실행하는 entry point로 동작하며, context에 저장된 tailoring guidance도 다시 보여줍니다. 산출물 inventory는 sibling `.manifest.json`을 우선 읽고, manifest가 없는 예전 HTML은 legacy fallback으로 계속 보여줍니다. manifest에는 `build_run_id`와 `inventory_key`를 같이 기록하고, 같은 output root 아래 `artifact-index.json` derived cache를 같이 유지합니다. 오래된 HTML을 최신 provenance 규칙으로 맞추고 싶으면 `career-ops-kr backfill-artifact-manifests`를 사용합니다. 이 계층은 local-only SQLite sidecar를 쓰지만, HTML/PDF resume 산출은 기존 CLI resume pipeline을 그대로 호출합니다. AI surface는 기본 비활성화이고, 필요할 때만 `serve-web --enable-ai`로 켭니다. 시각 규칙은 `/Users/alex/project/career-ops-kr/design-guidelines.md`를 기준으로 grayscale-first admin dashboard 패턴을 공유합니다.
 
 ## Core Flow
 
@@ -57,7 +57,7 @@ saved JD + score report
 
 `apply-resume-tailoring`는 packet을 base resume context에 반영하되, 없는 기술을 임의로 추가하지 않는다. 기본적으로 `headline`, `summary`, `skills` 순서, `experience/projects` 정렬만 바꾸고, 나머지 guidance는 `tailoringGuidance` metadata로 남긴다.
 
-`build-tailored-resume`와 `build-tailored-resume-from-url`는 HTML 옆에 sibling `.manifest.json`도 같이 남긴다. web inventory는 이 manifest를 우선 읽어 provenance와 selection/focus metadata를 보여주고, manifest가 없는 예전 HTML만 legacy fallback으로 취급한다.
+`build-tailored-resume`와 `build-tailored-resume-from-url`는 HTML 옆에 sibling `.manifest.json`도 같이 남긴다. manifest에는 `build_run_id`와 `inventory_key`도 같이 기록되고, 같은 output root에는 `artifact-index.json` derived cache를 같이 갱신한다. web inventory는 여전히 manifest를 primary source로 읽어 provenance와 selection/focus metadata를 보여주고, manifest가 없는 예전 HTML만 legacy fallback으로 취급한다. 오래된 산출물을 새 기준에 맞출 때는 `career-ops-kr backfill-artifact-manifests`로 sibling manifest를 일괄 생성한다.
 
 회사 조사는 별도 흐름입니다.
 

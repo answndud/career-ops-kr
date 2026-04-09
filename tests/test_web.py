@@ -78,6 +78,9 @@ class WebAppTests(unittest.TestCase):
         self.assertNotIn("Adzuna", search.text)
         self.assertNotIn("ADZUNA_API_KEY", settings.text)
         self.assertIn("별도 API 키가 필요하지 않습니다.", settings.text)
+        tracker = self.client.get("/tracker")
+        self.assertIn("선택 항목 일괄 변경", tracker.text)
+        self.assertIn("보이는 항목 전체 선택", tracker.text)
 
     def test_settings_roundtrip(self) -> None:
         response = self.client.post("/api/settings", json={"key": "AI_PROVIDER", "value": "gemini"})
@@ -127,6 +130,11 @@ class WebAppTests(unittest.TestCase):
             json={"status": "지원예정", "notes": "Need portfolio refresh"},
         )
         self.assertEqual(update_response.status_code, 200)
+        update_payload = update_response.json()
+        self.assertEqual(update_payload["status"], "지원예정")
+        self.assertIn("attention", update_payload)
+        self.assertIn("artifact_summary", update_payload)
+        self.assertIn("tracker_row", update_payload)
         updated = self.client.get(f"/api/jobs/{created['id']}").json()
         self.assertEqual(updated["status"], "지원예정")
         self.assertEqual(updated["notes"], "Need portfolio refresh")
@@ -140,6 +148,106 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/jobs").json(), [])
         rows = parse_tracker_rows(self.tracker_path.read_text(encoding="utf-8"))
         self.assertEqual(rows, [])
+
+    def test_jobs_bulk_update_updates_tracker_rows(self) -> None:
+        first = self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Bulk One",
+                "position": "Backend Engineer",
+                "status": "검토중",
+                "location": "Seoul",
+                "source": "web",
+            },
+        ).json()
+        second = self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Bulk Two",
+                "position": "Platform Engineer",
+                "status": "검토중",
+                "location": "Busan",
+                "source": "web",
+            },
+        ).json()
+
+        response = self.client.post(
+            "/api/jobs/bulk-update",
+            json={
+                "ids": [first["id"], second["id"]],
+                "status": "지원예정",
+                "follow_up": "2026-04-15",
+                "source": "wanted",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["updated_count"], 2)
+        self.assertEqual(payload["updated_ids"], [first["id"], second["id"]])
+        self.assertEqual(payload["fields"], ["follow_up", "source", "status"])
+        self.assertEqual(
+            payload["field_values"],
+            {"status": "지원예정", "follow_up": "2026-04-15", "source": "wanted"},
+        )
+        self.assertEqual(payload["job_labels"], ["#1 Bulk One", "#2 Bulk Two"])
+        self.assertEqual(payload["jobs"][0]["attention"]["summary"], "공고 평가 리포트를 먼저 생성하세요.")
+
+        jobs = self.client.get("/api/jobs").json()
+        for job in jobs:
+            self.assertEqual(job["status"], "지원예정")
+            self.assertEqual(job["follow_up"], "2026-04-15")
+            self.assertEqual(job["source"], "wanted")
+
+        rows = parse_tracker_rows(self.tracker_path.read_text(encoding="utf-8"))
+        self.assertEqual(["지원예정", "지원예정"], [row["status"] for row in rows])
+        self.assertEqual(["wanted", "wanted"], [row["source"] for row in rows])
+
+    def test_jobs_bulk_update_rejects_missing_ids_and_fields(self) -> None:
+        response = self.client.post("/api/jobs/bulk-update", json={"ids": [], "status": "지원예정"})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "No job ids selected")
+
+        created = self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Bulk Guard",
+                "position": "Backend Engineer",
+                "status": "검토중",
+                "source": "web",
+            },
+        ).json()
+        response = self.client.post("/api/jobs/bulk-update", json={"ids": [created["id"]]})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "No bulk fields to update")
+
+        response = self.client.post(
+            "/api/jobs/bulk-update",
+            json={"ids": [created["id"], created["id"] + 999], "status": "지원예정"},
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertIn("Missing job ids", response.json()["detail"])
+
+    def test_jobs_bulk_update_rejects_tracker_synced_fields_for_trackerless_rows(self) -> None:
+        created = self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Trackerless Bulk",
+                "position": "Backend Engineer",
+                "status": "검토중",
+                "source": "web",
+            },
+        ).json()
+
+        with connection_scope() as conn:
+            conn.execute("UPDATE jobs SET tracker_id = NULL WHERE id = ?", (created["id"],))
+            conn.commit()
+
+        response = self.client.post(
+            "/api/jobs/bulk-update",
+            json={"ids": [created["id"]], "status": "지원예정"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Tracker-linked fields require tracker_id", response.json()["detail"])
 
     def test_resume_upload_and_list(self) -> None:
         response = self.client.post(
@@ -598,6 +706,65 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(payload["recentAiOutputs"][0]["type"], "resume_rewrite")
         self.assertIn("Tailored summary output", payload["recentAiOutputs"][0]["preview"])
 
+    def test_dashboard_api_sorts_manifest_artifacts_by_generated_at_not_manifest_mtime(self) -> None:
+        generated_dir = self.output_dir / "web-resumes"
+        generated_dir.mkdir(parents=True, exist_ok=True)
+
+        recent_html = generated_dir / "recent-resume.html"
+        recent_pdf = generated_dir / "recent-resume.pdf"
+        recent_manifest = generated_dir / "recent-resume.manifest.json"
+        recent_html.write_text("<html></html>", encoding="utf-8")
+        recent_pdf.write_bytes(b"%PDF-1.4")
+        recent_manifest.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "generated_at": "2026-04-09T03:00:00+00:00",
+                    "pipeline": "build_tailored_resume_from_url",
+                    "job": {"company": "Recent Co", "title": "Platform Engineer"},
+                    "selection": {"selected_role_profile": "Platform"},
+                    "focus": {},
+                    "paths": {
+                        "html_path": recent_html.as_posix(),
+                        "pdf_path": recent_pdf.as_posix(),
+                    },
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+        legacy_html = generated_dir / "legacy-resume.html"
+        legacy_pdf = generated_dir / "legacy-resume.pdf"
+        legacy_manifest = generated_dir / "legacy-resume.manifest.json"
+        legacy_html.write_text("<html></html>", encoding="utf-8")
+        legacy_pdf.write_bytes(b"%PDF-1.4")
+        legacy_manifest.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "generated_at": "2024-01-01T00:00:00+00:00",
+                    "pipeline": "legacy_backfill",
+                    "job": {"company": "Legacy Co", "title": "Platform Engineer"},
+                    "selection": {"selected_role_profile": "Platform"},
+                    "focus": {},
+                    "paths": {
+                        "html_path": legacy_html.as_posix(),
+                        "pdf_path": legacy_pdf.as_posix(),
+                    },
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+
+        response = self.client.get("/api/dashboard")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        labels = [item["label"] for item in payload["recentGeneratedResumes"]]
+        self.assertEqual("recent-resume.html", labels[0])
+        self.assertIn("legacy-resume.html", labels)
+
     def test_job_detail_page_and_artifact_views(self) -> None:
         create_response = self.client.post(
             "/api/jobs",
@@ -693,6 +860,28 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("Backend role", job_artifact.text)
         self.assertIn("Strong fit", report_artifact.text)
         self.assertIn("Backend Engineer", context_artifact.text)
+
+    def test_job_detail_page_shows_source_drift_warning(self) -> None:
+        create_response = self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Drift Co",
+                "position": "Platform Engineer",
+                "status": "검토중",
+                "source": "web",
+                "url": "https://example.com/jobs/drift-co",
+            },
+        )
+        self.assertEqual(create_response.status_code, 201)
+        job_id = create_response.json()["id"]
+
+        with connection_scope() as conn:
+            conn.execute("UPDATE jobs SET source = ? WHERE id = ?", ("wanted", job_id))
+            conn.commit()
+
+        detail_response = self.client.get(f"/tracker/{job_id}")
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertIn("web 출처와 markdown tracker 출처가 다릅니다.", detail_response.text)
 
     def test_job_detail_and_tracker_surface_next_actions(self) -> None:
         create_response = self.client.post(
@@ -807,6 +996,8 @@ class WebAppTests(unittest.TestCase):
             json.dumps(
                 {
                     "version": 1,
+                    "build_run_id": "br_20260409T023000Z_demo1234",
+                    "inventory_key": "web-resumes/web-platform.html",
                     "pipeline": "build_tailored_resume_from_url",
                     "job": {"company": "Manifest Platform", "title": "Platform Engineer"},
                     "selection": {"selected_role_profile": "Platform", "selected_domain": "platform"},
@@ -842,6 +1033,8 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("web-platform.html", response.text)
         self.assertIn("cli-backend.html", response.text)
         self.assertIn("Platform", response.text)
+        self.assertIn("br_20260409T023000Z_demo1234", response.text)
+        self.assertIn("web-resumes/web-platform.html", response.text)
         self.assertIn("manifest", response.text)
         self.assertIn("생성된 이력서 산출물", response.text)
 

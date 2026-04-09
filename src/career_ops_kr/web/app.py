@@ -270,6 +270,53 @@ def _artifact_slug(company: str, position: str, role_key: str, language: str) ->
     return f"{timestamp}-{slugify(basis, fallback='web-resume')}"
 
 
+def _artifact_manifest_sort_key(manifest_path: Path) -> float:
+    manifest = _load_artifact_manifest(manifest_path)
+    if manifest is not None:
+        generated_at = _safe_text(manifest.get("generated_at"))
+        if generated_at:
+            try:
+                normalized = generated_at.replace("Z", "+00:00")
+                return datetime.fromisoformat(normalized).timestamp()
+            except ValueError:
+                pass
+        manifest_paths_payload = manifest.get("paths") or {}
+        if isinstance(manifest_paths_payload, dict):
+            html_path = _coerce_path(manifest_paths_payload.get("html_path"))
+            if html_path is not None and html_path.exists():
+                return html_path.stat().st_mtime
+    return manifest_path.stat().st_mtime
+
+
+def _artifact_inventory_key_for_html(html_path: Path) -> str:
+    try:
+        return html_path.resolve().relative_to(OUTPUT_DIR.resolve()).as_posix()
+    except ValueError:
+        return html_path.resolve().as_posix()
+
+
+def _artifact_index_path() -> Path:
+    return OUTPUT_DIR / "artifact-index.json"
+
+
+def _load_artifact_index() -> dict[str, Any] | None:
+    index_path = _artifact_index_path()
+    if not index_path.exists():
+        return None
+    try:
+        payload = json.loads(index_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("version") != 1:
+        return None
+    entries = payload.get("entries")
+    if not isinstance(entries, dict):
+        return None
+    return payload
+
+
 def _generated_resume_snapshot(*, limit: int | None = 6) -> dict[str, Any]:
     if not OUTPUT_DIR.exists():
         return {"total": 0, "items": []}
@@ -300,10 +347,14 @@ def _generated_resume_snapshot(*, limit: int | None = 6) -> dict[str, Any]:
     web_total = 0
     manifest_total = 0
     legacy_total = 0
+    artifact_index = _load_artifact_index() or {}
+    artifact_index_entries = (
+        artifact_index.get("entries") if isinstance(artifact_index.get("entries"), dict) else {}
+    )
 
     manifest_paths = sorted(
         [path for path in OUTPUT_DIR.rglob("*.manifest.json") if path.is_file()],
-        key=lambda path: path.stat().st_mtime,
+        key=_artifact_manifest_sort_key,
         reverse=True,
     )
     for manifest_path in manifest_paths:
@@ -347,6 +398,9 @@ def _generated_resume_snapshot(*, limit: int | None = 6) -> dict[str, Any]:
         modified_at = datetime.fromtimestamp(html_path.stat().st_mtime, UTC).astimezone().strftime("%Y-%m-%d %H:%M")
         manifest_job = manifest.get("job") if isinstance(manifest.get("job"), dict) else {}
         selection = manifest.get("selection") if isinstance(manifest.get("selection"), dict) else {}
+        index_entry = artifact_index_entries.get(_artifact_inventory_key_for_html(html_path))
+        if not isinstance(index_entry, dict):
+            index_entry = None
         items.append(
             {
                 "label": html_path.name,
@@ -354,6 +408,8 @@ def _generated_resume_snapshot(*, limit: int | None = 6) -> dict[str, Any]:
                 "provenance": "manifest",
                 "provenance_label": "manifest",
                 "build_pipeline": _safe_text(manifest.get("pipeline")),
+                "build_run_id": _safe_text(manifest.get("build_run_id")) or _safe_text((index_entry or {}).get("build_run_id")),
+                "inventory_key": _safe_text(manifest.get("inventory_key")) or _safe_text((index_entry or {}).get("inventory_key")) or _artifact_inventory_key_for_html(html_path),
                 "manifest_path": manifest_path.as_posix(),
                 "manifest_url": _output_url(manifest_path),
                 "html_path": html_path.as_posix(),
@@ -415,6 +471,8 @@ def _generated_resume_snapshot(*, limit: int | None = 6) -> dict[str, Any]:
                 "provenance": "legacy",
                 "provenance_label": "legacy",
                 "build_pipeline": "",
+                "build_run_id": None,
+                "inventory_key": _artifact_inventory_key_for_html(html_path),
                 "manifest_path": None,
                 "manifest_url": None,
                 "html_path": html_path.as_posix(),
@@ -683,6 +741,10 @@ def _job_row_with_ui_state(job_row: dict[str, Any]) -> dict[str, Any]:
     return row
 
 
+def _job_row_api_payload(job_row: Any) -> dict[str, Any]:
+    return _job_row_with_ui_state(dict(job_row or {}))
+
+
 def _saved_job_search_state(
     job_row: dict[str, Any],
     *,
@@ -744,6 +806,8 @@ def _job_tracker_sync_snapshot(job_row: dict[str, Any], tracker_row: dict[str, s
         warnings.append("web row에 tracker_id가 없습니다.")
     if _safe_text(job_row.get("status")) != _safe_text(tracker_row.get("status")):
         warnings.append("web 상태와 markdown tracker 상태가 다릅니다.")
+    if _safe_text(job_row.get("source")) != _safe_text(tracker_row.get("source")):
+        warnings.append("web 출처와 markdown tracker 출처가 다릅니다.")
     if _safe_text(job_row.get("notes")) and _safe_text(job_row.get("notes")) != _safe_text(tracker_row.get("notes")):
         warnings.append("web 메모와 markdown tracker 메모가 다릅니다.")
     return warnings
@@ -1116,7 +1180,7 @@ def _update_job_record(job_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         conn.execute(f"UPDATE jobs SET {', '.join(fields)} WHERE id = ?", values)
         conn.commit()
         row = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
-    return row or {}
+    return _job_row_api_payload(row)
 
 
 def _delete_job_record(job_id: int) -> bool:
@@ -1130,6 +1194,63 @@ def _delete_job_record(job_id: int) -> bool:
         conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
         conn.commit()
     return True
+
+
+def _bulk_update_job_records(job_ids: list[Any], payload: dict[str, Any]) -> dict[str, Any]:
+    normalized_ids = sorted({_safe_int(value) for value in job_ids if _safe_int(value) is not None})
+    if not normalized_ids:
+        raise HTTPException(status_code=400, detail="No job ids selected")
+
+    updates: dict[str, Any] = {}
+    for field in ("status", "source", "follow_up"):
+        raw_value = payload.get(field)
+        if raw_value is None:
+            continue
+        normalized_value = _safe_text(raw_value)
+        if not normalized_value:
+            continue
+        updates[field] = normalized_value
+
+    if not updates:
+        raise HTTPException(status_code=400, detail="No bulk fields to update")
+
+    placeholders = ", ".join("?" for _ in normalized_ids)
+    with connection_scope() as conn:
+        rows = conn.execute(
+            f"SELECT id FROM jobs WHERE id IN ({placeholders})",
+            normalized_ids,
+        ).fetchall()
+    existing_ids = sorted(int(row["id"]) for row in rows)
+    missing_ids = [job_id for job_id in normalized_ids if job_id not in existing_ids]
+    if missing_ids:
+        raise HTTPException(status_code=404, detail=f"Missing job ids: {', '.join(str(job_id) for job_id in missing_ids)}")
+
+    tracker_synced_fields = {"status", "source"}
+    if tracker_synced_fields.intersection(updates):
+        with connection_scope() as conn:
+            tracker_rows = conn.execute(
+                f"SELECT id, tracker_id FROM jobs WHERE id IN ({placeholders})",
+                normalized_ids,
+            ).fetchall()
+        trackerless_ids = sorted(int(row["id"]) for row in tracker_rows if _safe_int(row.get("tracker_id")) is None)
+        if trackerless_ids:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Tracker-linked fields require tracker_id. "
+                    f"Sync or repair these jobs first: {', '.join(str(job_id) for job_id in trackerless_ids)}"
+                ),
+            )
+
+    updated_jobs = [_update_job_record(job_id, updates) for job_id in normalized_ids]
+    return {
+        "updated_ids": normalized_ids,
+        "updated_count": len(updated_jobs),
+        "fields": sorted(updates.keys()),
+        "field_values": updates,
+        "job_labels": [f"#{job['id']} {job['company']}" for job in updated_jobs],
+        "jobs": updated_jobs,
+    }
 
 
 def _sync_tracker_rows_to_jobs() -> dict[str, int]:
@@ -1571,6 +1692,14 @@ def create_app() -> FastAPI:
         payload = await request.json()
         try:
             return _update_job_record(job_id, payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/jobs/bulk-update")
+    async def api_bulk_update_jobs(request: Request) -> dict[str, Any]:
+        payload = await request.json()
+        try:
+            return _bulk_update_job_records(payload.get("ids") or [], payload)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

@@ -1807,5 +1807,50 @@ class ResumeCliTest(unittest.TestCase):
         self.assertIn("Batch live smoke summary: 0 passed, 0 failed.", result.output)
 
 
+class ArtifactManifestCliTest(unittest.TestCase):
+    def test_backfill_artifact_manifests_dry_run_reports_create_and_overwrite(self) -> None:
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            output_dir = temp_path / "output"
+            jd_dir = temp_path / "jds"
+            report_dir = temp_path / "reports"
+            html_dir = output_dir / "rendered"
+            html_dir.mkdir(parents=True, exist_ok=True)
+            jd_dir.mkdir(parents=True, exist_ok=True)
+            report_dir.mkdir(parents=True, exist_ok=True)
+
+            new_html = html_dir / "new-role.html"
+            existing_html = html_dir / "existing-role.html"
+            new_html.write_text("<html></html>", encoding="utf-8")
+            existing_html.write_text("<html></html>", encoding="utf-8")
+            existing_manifest = existing_html.with_suffix(".manifest.json")
+            existing_manifest.write_text('{"version":1,"paths":{}}\n', encoding="utf-8")
+
+            result = runner.invoke(
+                app,
+                [
+                    "backfill-artifact-manifests",
+                    "--output-dir",
+                    output_dir.as_posix(),
+                    "--jd-dir",
+                    jd_dir.as_posix(),
+                    "--report-dir",
+                    report_dir.as_posix(),
+                    "--overwrite",
+                    "--dry-run",
+                ],
+            )
+
+            self.assertEqual(0, result.exit_code, msg=result.output)
+            self.assertIn("Scanned HTML artifacts: 2", result.output)
+            self.assertIn("Created: 1", result.output)
+            self.assertIn("Overwritten: 1", result.output)
+            self.assertIn("Skipped: 0", result.output)
+            self.assertIn(new_html.with_suffix(".manifest.json").as_posix(), result.output)
+            self.assertIn(existing_manifest.as_posix(), result.output)
+            self.assertEqual('{"version":1,"paths":{}}\n', existing_manifest.read_text(encoding="utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()

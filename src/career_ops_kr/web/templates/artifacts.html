@@ -72,6 +72,9 @@
           <div class="mini-pills">
             <span class="status-chip">{{ item.source_label }}</span>
             <span class="status-chip">{{ item.provenance_label }}</span>
+            {% if item.build_run_id %}
+              <span class="status-chip">run {{ item.build_run_id }}</span>
+            {% endif %}
             {% if item.company %}
               <span class="status-chip">{{ item.company }}</span>
             {% endif %}
@@ -95,6 +98,7 @@
             {% endif %}
           </div>
           <div class="path-list meta">
+            {% if item.inventory_key %}<div>inventory: <code>{{ item.inventory_key }}</code></div>{% endif %}
             <div>html: <code>{{ item.html_path }}</code></div>
             {% if item.manifest_path %}<div>manifest: <code>{{ item.manifest_path }}</code></div>{% endif %}
             {% if item.job_path %}<div>job: <code>{{ item.job_path }}</code></div>{% endif %}

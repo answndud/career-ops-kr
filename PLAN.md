@@ -42,6 +42,10 @@
   - saved job detail은 context에 저장된 tailoring guidance도 다시 확인할 수 있게 유지
   - search는 provider runtime status strip과 canonical URL 기준 import dedupe를 유지
   - search provider status는 `정상 / 결과 없음 / 실패`를 구분하고, duplicate-save 결과는 새 row 생성 여부를 in-page에서 바로 설명하도록 유지
+  - tracker 목록에서 선택한 항목에 대한 bulk status/source/follow-up 변경을 지원하고, status/source는 markdown tracker sync를 유지
+  - tracker-linked bulk update는 `tracker_id`가 없는 row를 먼저 막아 잘못된 markdown fallback 매칭을 피함
+  - job detail drift 경고는 status뿐 아니라 source mismatch도 포함
+  - tracker 단일 row 저장은 full table refetch 없이 부분 갱신하고, bulk update는 메모/위치 미저장 draft가 있으면 먼저 막아 입력 손실을 피함
   - tracker/detail은 `다음에 할 일`, attention preset, tracker/web drift 같은 read-only operational hint를 유지
   - AI surface는 기본 비활성화로 유지하고 필요할 때만 `serve-web --enable-ai`로 노출
   - settings 화면에서 web DB backup/export/import를 지원
@@ -58,6 +62,7 @@
 - optional web surface browser E2E는 선택 검증으로 유지
   - Python Playwright 기반 `tests/test_web_e2e.py`
   - 홈 -> resume upload -> tracker 생성 -> saved job detail -> resume build 기본 흐름을 필요할 때만 실제 브라우저에서 점검
+  - resume manifest는 `build_run_id`, `inventory_key`, derived `artifact-index.json`까지 같이 유지
 
 ### P0.5
 
@@ -293,8 +298,11 @@
 6. optional web surface 운영 안정화
   - 디자인 시스템은 `design-guidelines.md` 기준으로 정리 완료
   - 카드/배경 구분감을 위해 page background와 surface border 대비 조정 완료
-   - 산출물 inventory는 sibling `.manifest.json` 기반 provenance 경로로 정리 완료
-   - 이후에는 legacy artifact 정리 정책, 화면별 UX polish, 포털 drift 대응에 집중
+  - 산출물 inventory는 sibling `.manifest.json` 기반 provenance 경로로 정리 완료
+  - 예전 HTML 산출물은 `career-ops-kr backfill-artifact-manifests`로 sibling manifest를 일괄 생성하는 정리 경로를 확보 완료
+  - browser E2E 선택 검증은 현재 in-page result panel 흐름 기준으로 다시 통과하는 상태를 유지
+  - 2026-04-09 live smoke batch와 `validate-live-smoke-reports --max-age-hours 24` 재검증 완료
+  - 이후에는 화면별 UX polish, legacy 산출물의 점진적 재생성, 포털 drift 대응에 집중
 
 ## 의존 관계
 

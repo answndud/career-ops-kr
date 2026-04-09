@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
@@ -8,6 +9,7 @@ from pathlib import Path
 
 from career_ops_kr.commands.resume import (
     BatchLiveResumeSmokeResult,
+    backfill_artifact_manifests,
     compare_live_smoke_reports,
     DEFAULT_LIVE_SMOKE_TARGETS_PATH,
     BuildTailoredResumeFromUrlArtifacts,
@@ -471,6 +473,15 @@ class ResumeTailoringTest(unittest.TestCase):
             self.assertEqual("build_tailored_resume", manifest["pipeline"])
             self.assertEqual(html_path.as_posix(), manifest["paths"]["html_path"])
             self.assertEqual("(주)어피닛", manifest["job"]["company"])
+            self.assertTrue(manifest["build_run_id"].startswith("br_"))
+            self.assertEqual("resume.html", manifest["inventory_key"])
+            index_path = html_path.parent / "artifact-index.json"
+            self.assertTrue(index_path.exists())
+            index_payload = json.loads(index_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                manifest["build_run_id"],
+                index_payload["entries"][manifest["inventory_key"]]["build_run_id"],
+            )
             self.assertIn("홍길동", rendered)
             self.assertIn("Platform Engineer", rendered)
 
@@ -643,6 +654,11 @@ class ResumeTailoringTest(unittest.TestCase):
                 (ROOT / "config" / "profile.example.yml").as_posix(),
                 manifest["paths"]["profile_path"],
             )
+            self.assertTrue(manifest["build_run_id"].startswith("br_"))
+            self.assertEqual("resume.html", manifest["inventory_key"])
+            index_path = html_out.parent / "artifact-index.json"
+            index_payload = json.loads(index_path.read_text(encoding="utf-8"))
+            self.assertIn(manifest["inventory_key"], index_payload["entries"])
 
     def test_build_tailored_resume_from_url_preserves_fetched_job_when_scoring_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -685,6 +701,110 @@ class ResumeTailoringTest(unittest.TestCase):
             self.assertEqual("fetched", job_out.read_text(encoding="utf-8"))
             self.assertFalse(report_out.exists())
             self.assertFalse(html_out.exists())
+
+    def test_backfill_artifact_manifests_creates_manifest_for_legacy_html(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            output_dir = temp_path / "output"
+            jd_dir = temp_path / "jds"
+            report_dir = temp_path / "reports"
+            context_dir = output_dir / "resume-contexts"
+            html_path = output_dir / "rendered-resumes" / "legacy-platform.html"
+            pdf_path = html_path.with_suffix(".pdf")
+            context_path = context_dir / "legacy-platform.json"
+            job_path = jd_dir / "legacy-platform.md"
+            report_path = report_dir / "legacy-platform.md"
+
+            html_path.parent.mkdir(parents=True, exist_ok=True)
+            context_dir.mkdir(parents=True, exist_ok=True)
+            jd_dir.mkdir(parents=True, exist_ok=True)
+            report_dir.mkdir(parents=True, exist_ok=True)
+
+            html_path.write_text("<html></html>", encoding="utf-8")
+            pdf_path.write_bytes(b"%PDF-1.4")
+            context_path.write_text(
+                json.dumps(
+                    {
+                        "tailoringGuidance": {
+                            "job": {
+                                "company": "Legacy Co",
+                                "title": "Platform Engineer",
+                                "url": "https://example.com/jobs/legacy-platform",
+                                "source": "manual",
+                            },
+                            "selection": {"selected_role_profile": "Platform"},
+                            "focus": {"skills_to_emphasize": ["Terraform"]},
+                        }
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            job_path.write_text(
+                "---\ncompany: Legacy Co\ntitle: Platform Engineer\nurl: https://example.com/jobs/legacy-platform\nsource: manual\n---\n\n# JD\n",
+                encoding="utf-8",
+            )
+            report_path.write_text("# Report\n", encoding="utf-8")
+
+            result = backfill_artifact_manifests(
+                output_dir=output_dir,
+                jd_dir=jd_dir,
+                report_dir=report_dir,
+            )
+
+            manifest_path = html_path.with_suffix(".manifest.json")
+            self.assertEqual(1, result.scanned)
+            self.assertEqual(1, result.created)
+            self.assertEqual(0, result.overwritten)
+            self.assertEqual(0, result.skipped)
+            self.assertEqual([manifest_path], result.manifests)
+            self.assertTrue(manifest_path.exists())
+
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual("legacy_backfill", manifest["pipeline"])
+            self.assertEqual("Legacy Co", manifest["job"]["company"])
+            self.assertEqual("Platform", manifest["selection"]["selected_role_profile"])
+            self.assertEqual(job_path.as_posix(), manifest["paths"]["job_path"])
+            self.assertEqual(report_path.as_posix(), manifest["paths"]["report_path"])
+            self.assertEqual(context_path.as_posix(), manifest["paths"]["context_path"])
+            self.assertEqual(pdf_path.as_posix(), manifest["paths"]["pdf_path"])
+            self.assertTrue(manifest["build_run_id"].startswith("backfill_"))
+            self.assertEqual("rendered-resumes/legacy-platform.html", manifest["inventory_key"])
+            index_path = output_dir / "artifact-index.json"
+            index_payload = json.loads(index_path.read_text(encoding="utf-8"))
+            self.assertIn("rendered-resumes/legacy-platform.html", index_payload["entries"])
+
+    def test_backfill_artifact_manifests_keeps_deterministic_build_run_id(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            output_dir = temp_path / "output"
+            jd_dir = temp_path / "jds"
+            report_dir = temp_path / "reports"
+            html_path = output_dir / "rendered-resumes" / "legacy-platform.html"
+
+            html_path.parent.mkdir(parents=True, exist_ok=True)
+            jd_dir.mkdir(parents=True, exist_ok=True)
+            report_dir.mkdir(parents=True, exist_ok=True)
+
+            html_path.write_text("<html></html>", encoding="utf-8")
+            fixed_mtime = datetime(2026, 4, 9, 4, 0, tzinfo=UTC).timestamp()
+            html_path.touch()
+            os.utime(html_path, (fixed_mtime, fixed_mtime))
+
+            first = backfill_artifact_manifests(output_dir=output_dir, jd_dir=jd_dir, report_dir=report_dir)
+            self.assertEqual(1, first.created)
+            manifest_path = html_path.with_suffix(".manifest.json")
+            first_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+            second = backfill_artifact_manifests(
+                output_dir=output_dir,
+                jd_dir=jd_dir,
+                report_dir=report_dir,
+                overwrite=True,
+            )
+            self.assertEqual(1, second.overwritten)
+            second_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(first_manifest["build_run_id"], second_manifest["build_run_id"])
 
     def test_build_tailored_resume_from_url_stops_before_scoring_when_fetch_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

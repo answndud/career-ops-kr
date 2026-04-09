@@ -164,6 +164,42 @@
 <section class="card section-stack">
   <div class="section-header">
     <div>
+      <span class="pill">Bulk</span>
+      <h2>선택 항목 일괄 변경</h2>
+      <p class="muted">보이는 항목 중 필요한 row만 선택해서 상태, 팔로업, 출처를 한 번에 바꿉니다.</p>
+    </div>
+  </div>
+  <div class="grid three">
+    <div class="field">
+      <label for="bulk-status">상태</label>
+      <select id="bulk-status">
+        <option value="">변경 안 함</option>
+        {% for status in statuses %}
+          <option value="{{ status }}">{{ status }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="bulk-follow-up">팔로업</label>
+      <input id="bulk-follow-up" placeholder="YYYY-MM-DD">
+    </div>
+    <div class="field">
+      <label for="bulk-source">출처</label>
+      <input id="bulk-source" placeholder="예: wanted">
+    </div>
+  </div>
+  <div class="actions">
+    <button type="button" class="secondary" onclick="CareerOpsTracker.selectVisible(true)">보이는 항목 전체 선택</button>
+    <button type="button" class="ghost" onclick="CareerOpsTracker.clearSelection()">선택 해제</button>
+    <button type="button" onclick="CareerOpsTracker.applyBulkUpdate()">선택 항목 적용</button>
+    <span id="bulk-selection-summary" class="muted">선택 0개</span>
+  </div>
+  <div class="muted">빈 값은 그대로 둡니다. 상태와 출처는 tracker markdown에도 같이 반영되고, 팔로업은 web sidecar에서만 관리합니다.</div>
+</section>
+
+<section class="card section-stack">
+  <div class="section-header">
+    <div>
       <span class="pill">Jobs</span>
       <h2>Jobs</h2>
     </div>
@@ -173,6 +209,12 @@
     <table>
       <thead>
         <tr>
+          <th>
+            <label class="checkbox-inline">
+              <input id="select-all-visible" type="checkbox" onchange="CareerOpsTracker.toggleVisibleSelection(this.checked)">
+              선택
+            </label>
+          </th>
           <th>ID</th>
           <th>회사 / 포지션</th>
           <th>상태</th>
@@ -185,7 +227,8 @@
       </thead>
       <tbody id="jobs-table-body">
         {% for row in jobs %}
-          <tr>
+          <tr data-job-id="{{ row.id }}">
+            <td><input class="job-select" type="checkbox" data-job-id="{{ row.id }}" onchange="CareerOpsTracker.toggleSelection({{ row.id }}, this.checked)"></td>
             <td>#{{ row.id }}</td>
             <td>
               <strong>{{ row.company }}</strong><br>
@@ -238,7 +281,7 @@
             </td>
           </tr>
         {% else %}
-          <tr><td colspan="7" class="muted">저장된 공고가 없습니다.</td></tr>
+          <tr><td colspan="9" class="muted">저장된 공고가 없습니다.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -252,6 +295,8 @@
 <script>
   const CareerOpsTracker = {
     statuses: {{ statuses | tojson }},
+    selectedIds: new Set(),
+    currentJobs: {{ jobs | tojson }},
 
     escapeHtml(value) {
       return String(value || "")
@@ -259,6 +304,10 @@
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;");
+    },
+
+    normalizeText(value) {
+      return String(value || "").trim().toLowerCase();
     },
 
     filters() {
@@ -272,52 +321,220 @@
       };
     },
 
-    renderRows(jobs) {
+    renderRow(row) {
+      const statusOptions = CareerOpsTracker.statuses
+        .map((status) => `<option value="${CareerOpsTracker.escapeHtml(status)}" ${row.status === status ? "selected" : ""}>${CareerOpsTracker.escapeHtml(status)}</option>`)
+        .join("");
+      const artifactBadges = [
+        row.job_path ? '<span class="status-chip">JD</span>' : "",
+        row.report_path ? '<span class="status-chip">Report</span>' : "",
+        row.context_path ? '<span class="status-chip">Context</span>' : "",
+        row.html_path ? '<span class="status-chip ok">HTML</span>' : "",
+        row.pdf_path ? '<span class="status-chip ok">PDF</span>' : "",
+      ].filter(Boolean).join("");
+      const attentionTags = (row.attention?.tags || [])
+        .map((tag) => `<span class="status-chip ${tag.tone === "error" ? "error" : tag.tone === "warn" ? "warn" : ""}">${CareerOpsTracker.escapeHtml(tag.label)}</span>`)
+        .join("");
+      const isSelected = CareerOpsTracker.selectedIds.has(Number(row.id));
+      return `
+        <tr data-job-id="${row.id}">
+          <td><input class="job-select" type="checkbox" data-job-id="${row.id}" ${isSelected ? "checked" : ""} onchange="CareerOpsTracker.toggleSelection(${row.id}, this.checked)"></td>
+          <td>#${row.id}</td>
+          <td><strong>${CareerOpsTracker.escapeHtml(row.company)}</strong><br><span class="muted">${CareerOpsTracker.escapeHtml(row.position)}</span></td>
+          <td>
+            <select id="status-${row.id}">${statusOptions}</select>
+            <input id="follow-up-${row.id}" value="${CareerOpsTracker.escapeHtml(row.follow_up || "")}" placeholder="Follow-up">
+          </td>
+          <td>
+            <input id="source-${row.id}" value="${CareerOpsTracker.escapeHtml(row.source || "")}" placeholder="source">
+            <input id="location-${row.id}" value="${CareerOpsTracker.escapeHtml(row.location || "")}" placeholder="location">
+            ${row.url ? `<div class="meta"><a class="link" href="${CareerOpsTracker.escapeHtml(row.url)}" target="_blank" rel="noreferrer">원문 공고</a></div>` : ""}
+          </td>
+          <td>${artifactBadges ? `<div class="mini-pills">${artifactBadges}</div>` : '<span class="muted">없음</span>'}</td>
+          <td>${attentionTags ? `<div class="mini-pills">${attentionTags}</div>` : ""}<div class="meta">${CareerOpsTracker.escapeHtml(row.attention?.summary || "정상")}</div></td>
+          <td><textarea id="notes-${row.id}" rows="2">${CareerOpsTracker.escapeHtml(row.notes || "")}</textarea></td>
+          <td>
+            <div class="table-actions">
+              <a class="link" href="/tracker/${row.id}">상세</a>
+              <button type="button" onclick="CareerOpsTracker.saveJob(${row.id})">저장</button>
+              <button type="button" class="danger" onclick="CareerOpsTracker.deleteJob(${row.id})">삭제</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    },
+
+    rowMatchesAttention(row, attention) {
+      const normalized = CareerOpsTracker.normalizeText(attention);
+      if (!normalized) return true;
+      if (normalized === "missing-report") return !row.artifact_summary?.report;
+      if (normalized === "missing-resume") return !row.artifact_summary?.html;
+      if (normalized === "follow-up-overdue") {
+        return (row.attention?.tags || []).some((tag) => tag.label === "팔로업 overdue");
+      }
+      if (normalized === "unlinked-tracker") return row.tracker_row == null;
+      return true;
+    },
+
+    rowMatchesFilters(row, filters) {
+      if (filters.status && row.status !== filters.status) return false;
+      if (filters.q) {
+        const query = CareerOpsTracker.normalizeText(filters.q);
+        const haystack = CareerOpsTracker.normalizeText([
+          row.company,
+          row.position,
+          row.notes,
+        ].join(" "));
+        if (!haystack.includes(query)) return false;
+      }
+      return CareerOpsTracker.rowMatchesAttention(row, filters.attention);
+    },
+
+    compareRows(left, right, filters) {
+      const sortKey = filters.sort || "updated_at";
+      const direction = filters.order === "ASC" ? 1 : -1;
+      const textValue = (row, key) => CareerOpsTracker.normalizeText(row?.[key]);
+      let result = 0;
+      if (["company", "position", "status", "source", "date_applied", "updated_at", "created_at"].includes(sortKey)) {
+        result = textValue(left, sortKey).localeCompare(textValue(right, sortKey), "ko");
+      }
+      if (result === 0) {
+        result = Number(right.id || 0) - Number(left.id || 0);
+        return result;
+      }
+      return result * direction;
+    },
+
+    emptyStateHtml() {
+      return '<tr data-empty-state="1"><td colspan="9" class="muted">조건에 맞는 공고가 없습니다.</td></tr>';
+    },
+
+    rowElement(jobId) {
+      return document.querySelector(`#jobs-table-body tr[data-job-id="${jobId}"]`);
+    },
+
+    ensureEmptyState() {
       const body = document.getElementById("jobs-table-body");
-      if (!jobs.length) {
-        body.innerHTML = '<tr><td colspan="8" class="muted">조건에 맞는 공고가 없습니다.</td></tr>';
+      const rowCount = body.querySelectorAll('tr[data-job-id]').length;
+      const emptyRow = body.querySelector('tr[data-empty-state="1"]');
+      if (!rowCount) {
+        body.innerHTML = CareerOpsTracker.emptyStateHtml();
+        CareerOpsTracker.selectedIds.clear();
+        CareerOpsTracker.syncSelectionSummary();
         return;
       }
-      body.innerHTML = jobs.map((row) => {
-        const statusOptions = CareerOpsTracker.statuses
-          .map((status) => `<option value="${CareerOpsTracker.escapeHtml(status)}" ${row.status === status ? "selected" : ""}>${CareerOpsTracker.escapeHtml(status)}</option>`)
-          .join("");
-        const artifactBadges = [
-          row.job_path ? '<span class="status-chip">JD</span>' : "",
-          row.report_path ? '<span class="status-chip">Report</span>' : "",
-          row.context_path ? '<span class="status-chip">Context</span>' : "",
-          row.html_path ? '<span class="status-chip ok">HTML</span>' : "",
-          row.pdf_path ? '<span class="status-chip ok">PDF</span>' : "",
-        ].filter(Boolean).join("");
-        const attentionTags = (row.attention?.tags || [])
-          .map((tag) => `<span class="status-chip ${tag.tone === "error" ? "error" : tag.tone === "warn" ? "warn" : ""}">${CareerOpsTracker.escapeHtml(tag.label)}</span>`)
-          .join("");
-        return `
-          <tr>
-            <td>#${row.id}</td>
-            <td><strong>${CareerOpsTracker.escapeHtml(row.company)}</strong><br><span class="muted">${CareerOpsTracker.escapeHtml(row.position)}</span></td>
-            <td>
-              <select id="status-${row.id}">${statusOptions}</select>
-              <input id="follow-up-${row.id}" value="${CareerOpsTracker.escapeHtml(row.follow_up || "")}" placeholder="Follow-up">
-            </td>
-            <td>
-              <input id="source-${row.id}" value="${CareerOpsTracker.escapeHtml(row.source || "")}" placeholder="source">
-              <input id="location-${row.id}" value="${CareerOpsTracker.escapeHtml(row.location || "")}" placeholder="location">
-              ${row.url ? `<div class="meta"><a class="link" href="${CareerOpsTracker.escapeHtml(row.url)}" target="_blank" rel="noreferrer">원문 공고</a></div>` : ""}
-            </td>
-            <td>${artifactBadges ? `<div class="mini-pills">${artifactBadges}</div>` : '<span class="muted">없음</span>'}</td>
-            <td>${attentionTags ? `<div class="mini-pills">${attentionTags}</div>` : ""}<div class="meta">${CareerOpsTracker.escapeHtml(row.attention?.summary || "정상")}</div></td>
-            <td><textarea id="notes-${row.id}" rows="2">${CareerOpsTracker.escapeHtml(row.notes || "")}</textarea></td>
-            <td>
-              <div class="table-actions">
-                <a class="link" href="/tracker/${row.id}">상세</a>
-                <button type="button" onclick="CareerOpsTracker.saveJob(${row.id})">저장</button>
-                <button type="button" class="danger" onclick="CareerOpsTracker.deleteJob(${row.id})">삭제</button>
-              </div>
-            </td>
-          </tr>
-        `;
-      }).join("");
+      if (emptyRow) {
+        emptyRow.remove();
+      }
+    },
+
+    applyRowPatch(row) {
+      const filters = CareerOpsTracker.filters();
+      const jobId = Number(row.id);
+      const body = document.getElementById("jobs-table-body");
+      CareerOpsTracker.currentJobs = CareerOpsTracker.currentJobs.filter((item) => Number(item.id) !== jobId);
+
+      const existingElement = CareerOpsTracker.rowElement(jobId);
+      if (existingElement) {
+        existingElement.remove();
+      }
+
+      if (!CareerOpsTracker.rowMatchesFilters(row, filters)) {
+        CareerOpsTracker.selectedIds.delete(jobId);
+        CareerOpsTracker.ensureEmptyState();
+        CareerOpsTracker.syncSelectionSummary();
+        return;
+      }
+
+      CareerOpsTracker.currentJobs.push(row);
+      CareerOpsTracker.currentJobs.sort((left, right) => CareerOpsTracker.compareRows(left, right, filters));
+
+      const template = document.createElement("template");
+      template.innerHTML = `<table><tbody>${CareerOpsTracker.renderRow(row)}</tbody></table>`;
+      const nextRow = template.content.querySelector("tr");
+      const rowIndex = CareerOpsTracker.currentJobs.findIndex((item) => Number(item.id) === jobId);
+      const nextVisible = CareerOpsTracker.currentJobs
+        .slice(rowIndex + 1)
+        .find((item) => CareerOpsTracker.rowElement(Number(item.id)));
+
+      if (nextVisible) {
+        body.insertBefore(nextRow, CareerOpsTracker.rowElement(Number(nextVisible.id)));
+      } else {
+        body.appendChild(nextRow);
+      }
+
+      CareerOpsTracker.ensureEmptyState();
+      CareerOpsTracker.syncSelectionSummary();
+    },
+
+    applyRowPatches(rows) {
+      rows.forEach((row) => CareerOpsTracker.applyRowPatch(row));
+    },
+
+    selectedDirtyDraftIds() {
+      return [...CareerOpsTracker.selectedIds].filter((jobId) => {
+        const notes = document.getElementById(`notes-${jobId}`);
+        const location = document.getElementById(`location-${jobId}`);
+        const notesDirty = notes && notes.value !== notes.defaultValue;
+        const locationDirty = location && location.value !== location.defaultValue;
+        return Boolean(notesDirty || locationDirty);
+      });
+    },
+
+    syncSelectionSummary() {
+      const summary = document.getElementById("bulk-selection-summary");
+      const checkboxes = [...document.querySelectorAll(".job-select")];
+      const selectedVisible = checkboxes.filter((checkbox) => checkbox.checked).length;
+      const totalVisible = checkboxes.length;
+      const selectAll = document.getElementById("select-all-visible");
+      if (summary) {
+        summary.textContent = `선택 ${CareerOpsTracker.selectedIds.size}개`;
+      }
+      if (selectAll) {
+        selectAll.checked = totalVisible > 0 && selectedVisible === totalVisible;
+        selectAll.indeterminate = selectedVisible > 0 && selectedVisible < totalVisible;
+      }
+    },
+
+    toggleSelection(jobId, checked) {
+      if (checked) CareerOpsTracker.selectedIds.add(jobId);
+      else CareerOpsTracker.selectedIds.delete(jobId);
+      CareerOpsTracker.syncSelectionSummary();
+    },
+
+    toggleVisibleSelection(checked) {
+      document.querySelectorAll(".job-select").forEach((checkbox) => {
+        checkbox.checked = checked;
+        const jobId = Number(checkbox.dataset.jobId);
+        if (checked) CareerOpsTracker.selectedIds.add(jobId);
+        else CareerOpsTracker.selectedIds.delete(jobId);
+      });
+      CareerOpsTracker.syncSelectionSummary();
+    },
+
+    clearSelection() {
+      CareerOpsTracker.selectedIds.clear();
+      document.querySelectorAll(".job-select").forEach((checkbox) => {
+        checkbox.checked = false;
+      });
+      CareerOpsTracker.syncSelectionSummary();
+    },
+
+    renderRows(jobs) {
+      CareerOpsTracker.currentJobs = [...jobs];
+      const body = document.getElementById("jobs-table-body");
+      if (!jobs.length) {
+        CareerOpsTracker.selectedIds.clear();
+        body.innerHTML = CareerOpsTracker.emptyStateHtml();
+        CareerOpsTracker.syncSelectionSummary();
+        return;
+      }
+      const visibleIds = new Set(jobs.map((row) => Number(row.id)));
+      CareerOpsTracker.selectedIds = new Set(
+        [...CareerOpsTracker.selectedIds].filter((jobId) => visibleIds.has(Number(jobId)))
+      );
+      body.innerHTML = jobs.map((row) => CareerOpsTracker.renderRow(row)).join("");
+      CareerOpsTracker.syncSelectionSummary();
     },
 
     async refreshJobs() {
@@ -397,7 +614,57 @@
       }
       output.className = "notice ok";
       output.innerHTML = `저장 완료: <a class="link" href="/tracker/${CareerOpsTracker.escapeHtml(data.id)}">#${CareerOpsTracker.escapeHtml(data.id)} ${CareerOpsTracker.escapeHtml(data.company)}</a>`;
-      if (response.ok) await CareerOpsTracker.refreshJobs();
+      if (response.ok) CareerOpsTracker.applyRowPatch(data);
+    },
+
+    async applyBulkUpdate() {
+      const output = document.getElementById("tracker-action-output");
+      const ids = [...CareerOpsTracker.selectedIds];
+      if (!ids.length) {
+        output.className = "notice warn";
+        output.textContent = "먼저 변경할 항목을 선택하세요.";
+        return;
+      }
+
+      const payload = {
+        ids,
+        status: document.getElementById("bulk-status").value,
+        follow_up: document.getElementById("bulk-follow-up").value.trim(),
+        source: document.getElementById("bulk-source").value.trim(),
+      };
+
+      if (!payload.status && !payload.follow_up && !payload.source) {
+        output.className = "notice warn";
+        output.textContent = "일괄 변경할 필드를 하나 이상 입력하세요.";
+        return;
+      }
+      const dirtyDraftIds = CareerOpsTracker.selectedDirtyDraftIds();
+      if (dirtyDraftIds.length) {
+        output.className = "notice warn";
+        output.textContent = `선택한 항목 중 메모/위치 미저장 변경이 있습니다. 먼저 개별 저장 후 다시 시도하세요: ${dirtyDraftIds.map((jobId) => `#${jobId}`).join(", ")}`;
+        return;
+      }
+
+      output.className = "notice warn";
+      output.textContent = `${ids.length}개 항목 일괄 변경 중...`;
+      const response = await fetch("/api/jobs/bulk-update", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        output.className = "notice error";
+        output.textContent = data.detail || "일괄 변경 실패";
+        return;
+      }
+      const appliedSummary = Object.entries(data.field_values || {})
+        .map(([key, value]) => `${key}=${value}`)
+        .join(" · ");
+      const labelSummary = (data.job_labels || []).slice(0, 3).join(", ");
+      output.className = "notice ok";
+      output.textContent = `${data.updated_count}개 항목에 ${data.fields.join(", ")} 변경을 적용했습니다.${appliedSummary ? ` (${appliedSummary})` : ""}${labelSummary ? ` | ${labelSummary}` : ""}`;
+      CareerOpsTracker.applyRowPatches(data.jobs || []);
     },
 
     async deleteJob(jobId) {
@@ -426,5 +693,7 @@
       if (response.ok) await CareerOpsTracker.refreshJobs();
     },
   };
+
+  CareerOpsTracker.syncSelectionSummary();
 </script>
 {% endblock %}

@@ -37,6 +37,8 @@ career-ops-kr prepare-resume-tailoring jds/<job-file>.md reports/<report-file>.m
 career-ops-kr apply-resume-tailoring output/resume-tailoring/<packet>.json examples/resume-context.example.json --out output/<company>-resume-context.json
 career-ops-kr build-tailored-resume jds/<job-file>.md reports/<report-file>.md examples/resume-context.platform.ko.example.json templates/resume-ko.html --html-out output/<company>-resume.html
 career-ops-kr build-tailored-resume-from-url "https://career.rememberapp.co.kr/job/posting/293599" examples/resume-context.platform.ko.example.json templates/resume-ko.html --job-out jds/remember-platform.md --report-out reports/remember-platform.md --html-out output/remember-platform.html --profile-path config/profile.example.yml
+career-ops-kr backfill-artifact-manifests
+career-ops-kr backfill-artifact-manifests --dry-run
 career-ops-kr validate-live-smoke-targets
 career-ops-kr validate-live-smoke-targets --max-candidates 2
 career-ops-kr validate-live-smoke-reports output --max-age-hours 24
@@ -219,10 +221,13 @@ rm -f research/test-toss.md research/test-toss-summary.md
 - `reviewer`와 `tester`는 기본적으로 소스 파일을 수정하지 않는다. 수정은 `builder`가 맡는다.
 - tracker의 source of truth는 [data/applications.md](/Users/alex/project/career-ops-kr/data/applications.md)다.
 - tracker에 새 항목을 직접 추가하지 말고 `data/tracker-additions/*.tsv`를 만든다. 기본 반영 경로는 `career-ops-kr finalize-tracker`이고, 세밀한 제어가 필요할 때만 `career-ops-kr merge-tracker`를 직접 사용한다.
+- web tracker bulk update는 `status`, `source`, `follow_up`만 다룬다. `status/source`는 markdown tracker와 같이 맞추고, `follow_up`는 web sidecar 전용으로 유지한다. 선택 row에 메모/위치 미저장 draft가 있으면 bulk 적용 전에 먼저 저장을 요구한다.
 - `prepare-resume-tailoring`는 `jds/*.md`와 `reports/*.md`에서 deterministic resume-tailoring packet만 생성한다. 템플릿 HTML이나 canonical resume context를 직접 수정하지 않는다.
 - `apply-resume-tailoring`는 resume-tailoring packet을 base context에 반영해 render-ready JSON을 만든다. 없는 기술을 자동 추가하지 않고, visible patch는 `headline`, `summary`, `skills` 순서, `experience/projects` 정렬까지만 허용한다.
 - `build-tailored-resume`는 `prepare-resume-tailoring -> apply-resume-tailoring -> render-resume` wrapper다. score report parsing과 render wiring만 묶고, fetch/score 단계까지 확장하지 않는다.
 - `build-tailored-resume-from-url`는 `fetch-job -> score-job -> build-tailored-resume` wrapper다. 출력 경로를 먼저 preflight하고, tracker addition은 `--tracker-out`을 준 경우에만 생성한다.
+- `backfill-artifact-manifests`는 기존 HTML 산출물 옆에 sibling `.manifest.json`을 생성해 web inventory provenance를 최신 규칙으로 맞춘다. 기본은 manifest가 없는 HTML만 채우고, `--overwrite`로 기존 manifest를 다시 쓸 수 있다. 같은 실행에서 output root의 `artifact-index.json` derived cache도 같이 맞춘다.
+- `build-tailored-resume`, `build-tailored-resume-from-url`, `backfill-artifact-manifests`가 쓰는 manifest에는 `build_run_id`와 `inventory_key`를 같이 기록한다.
 - `smoke-live-resume`는 registry 기반 target을 읽어 `build-tailored-resume-from-url` 경로를 검증하는 수동 smoke helper다. 기본은 성공 후 artifact를 정리하고, 확인이 필요할 때만 `--keep-artifacts`를 사용한다.
 - `validate-live-smoke-targets`는 registry를 네트워크 없이 검증하는 저비용 helper다. live smoke를 돌리기 전에 먼저 실행한다.
 - `validate-live-smoke-targets --strict`는 모든 target에 fallback candidate가 있을 때만 통과한다. coverage gate가 필요할 때 사용한다.

@@ -110,6 +110,31 @@ class WebAppE2ETests(unittest.TestCase):
         tailoring_out.write_text('{"focus":"platform"}', encoding="utf-8")
         tailored_context_out.write_text('{"headline":"Platform Engineer"}', encoding="utf-8")
         html_out.write_text("<html><body>Resume</body></html>", encoding="utf-8")
+        manifest_path = html_out.with_suffix(".manifest.json")
+        manifest_path.write_text(
+            '{"version":1,"generated_at":"2026-04-09T00:00:00+00:00","pipeline":"build_tailored_resume_from_url","job":{"company":"E2E Co","title":"Platform Engineer","url":"https://example.com/jobs/e2e","source":"web"},"selection":{"selected_role_profile":"Platform"},"focus":{},"paths":{"job_path":"'
+            + job_out.as_posix()
+            + '","report_path":"'
+            + report_out.as_posix()
+            + '","tailoring_path":"'
+            + tailoring_out.as_posix()
+            + '","context_path":"'
+            + tailored_context_out.as_posix()
+            + '","html_path":"'
+            + html_out.as_posix()
+            + '","pdf_path":'
+            + ('"' + pdf_out.as_posix() + '"' if pdf_out is not None else "null")
+            + ',"base_context_path":"'
+            + base_context_path.as_posix()
+            + '","template_path":"'
+            + template_path.as_posix()
+            + '","profile_path":"'
+            + profile_path.as_posix()
+            + '","scorecard_path":"'
+            + scorecard_path.as_posix()
+            + '"}}\n',
+            encoding="utf-8",
+        )
         if pdf_out is not None:
             pdf_out.parent.mkdir(parents=True, exist_ok=True)
             pdf_out.write_bytes(b"%PDF-1.4")
@@ -121,6 +146,7 @@ class WebAppE2ETests(unittest.TestCase):
             tailored_context_path=tailored_context_out,
             html_path=html_out,
             pdf_path=pdf_out,
+            manifest_path=manifest_path,
         )
 
     def test_home_to_tracker_to_detail_flow(self) -> None:
@@ -151,16 +177,8 @@ class WebAppE2ETests(unittest.TestCase):
                 page.locator('#tracker-create-form input[name="location"]').fill("Seoul")
                 page.locator('#tracker-create-form input[name="url"]').fill("https://example.com/jobs/e2e")
 
-                dialog_messages: list[str] = []
-
-                def _handle_dialog(dialog) -> None:
-                    dialog_messages.append(dialog.message)
-                    dialog.accept()
-
-                page.on("dialog", _handle_dialog)
                 page.locator('#tracker-create-form button[type="submit"]').click()
-                page.wait_for_timeout(300)
-                self.assertTrue(dialog_messages)
+                page.locator("#tracker-action-output").get_by_text("추가 완료").wait_for()
 
                 detail_link = page.get_by_role("link", name="상세")
                 detail_link.wait_for()

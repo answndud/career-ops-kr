@@ -61,6 +61,19 @@
     - snapshot export 시 legacy setting rows 제외
     - snapshot import 시 legacy setting rows를 무시
     - `tests/test_web.py`에 export/import roundtrip에서 legacy key가 복원되지 않는 회귀 추가
+  - 미실행 검증 정리와 legacy artifact provenance 정리 경로 추가
+    - `CAREER_OPS_RUN_BROWSER_E2E=1 python -m unittest tests.test_web_e2e`를 다시 실행해 통과 확인
+    - tracker create/build E2E mock을 현재 `manifest_path` contract와 in-page result panel 흐름에 맞게 갱신
+    - `output/live-smoke/20260409-batch-report.json` 저장 후 `validate-live-smoke-reports output/live-smoke --max-age-hours 24`로 `6 ok, 0 failing` 재확인
+    - `career-ops-kr backfill-artifact-manifests` 추가
+    - 기존 HTML 산출물 옆에 sibling `.manifest.json`을 생성해 web inventory provenance를 최신 규칙으로 맞출 수 있게 정리
+    - backfill은 context에 `tailoringGuidance`가 없어도 동작하도록 안전화
+    - backfill manifest는 HTML mtime을 `generated_at`으로 기록하고, web inventory는 manifest mtime이 아니라 manifest `generated_at` 기준으로 정렬해 오래된 산출물이 최근 생성물처럼 보이지 않게 수정
+    - `tests/test_resume.py`, `tests/test_cli.py`, `tests/test_web.py`에 helper/CLI/dashboard sorting 회귀 추가
+    - `career-ops-kr backfill-artifact-manifests --output-dir output --dry-run`로 현재 저장소 기준 `Scanned HTML artifacts: 0` 확인
+    - manifest에 `build_run_id`, `inventory_key`를 추가하고 같은 output root에 `artifact-index.json` derived cache를 같이 유지하도록 정리
+    - `build-tailored-resume`, `build-tailored-resume-from-url`, `backfill-artifact-manifests`가 모두 같은 artifact index upsert 경로를 재사용하도록 정리
+    - `tests/test_resume.py`에 build/from-url/backfill manifest metadata와 deterministic backfill run id 회귀 추가
   - web UI 디자인 시스템 전면 개편 완료
     - `design-guidelines.md` 기준으로 gradient, blur, translucent panel, 강한 accent를 제거
     - `base.html`에서 grayscale token, 공통 form, table, badge, result-panel primitives를 재정의
@@ -89,6 +102,17 @@
     - saved job detail에 `다음에 할 일`, 상태/메모 inline 수정, tracker/web drift 경고를 추가
     - home은 live smoke compact summary만 보여주고 settings는 detailed health/report metadata를 유지하도록 분리
     - `tests/test_web.py`에 canonical import dedupe, high-signal search provider status, search saved-job state, tracker attention filter, job-detail next-action 회귀 추가
+  - tracker bulk update UX 추가
+    - `tracker.html`에 row checkbox, visible-row select all, bulk action bar 추가
+    - `status / source / follow_up`를 선택한 항목에 일괄 적용하는 `/api/jobs/bulk-update` 추가
+    - bulk update는 기존 `_update_job_record()` 경로를 재사용해 status/source의 markdown tracker sync를 유지
+    - `follow_up`는 web sidecar 전용으로만 bulk 변경
+    - tracker-linked bulk update는 `tracker_id`가 없는 row를 먼저 막아 company/position fallback 매칭으로 잘못된 markdown row를 건드리지 않도록 보강
+    - detail drift 경고에 source mismatch도 추가
+    - 단일 row 저장은 full table refetch 대신 해당 row만 부분 갱신하도록 정리
+    - bulk update 응답에 `field_values`, `job_labels`, UI-enriched `jobs` payload를 포함하도록 정리
+    - bulk update 전에 선택 row의 메모/위치 미저장 draft를 감지해 먼저 저장을 요구하도록 보강
+    - `tests/test_web.py`에 bulk update success/validation/page render 회귀 추가
   - settings 화면에 web DB backup/export/import 추가
     - SQLite backup 생성
     - JSON snapshot export/import
@@ -634,7 +658,7 @@
 
 ## 남은 문제
 
-- web generated artifact inventory는 이제 sibling `.manifest.json`을 우선 읽는 manifest-backed inventory다. manifest가 없는 예전 HTML은 legacy fallback으로 계속 보이므로, 오래된 산출물을 점진적으로 새 build 경로로 교체해야 provenance가 균일해진다.
+- web generated artifact inventory는 이제 sibling `.manifest.json`을 우선 읽는 manifest-backed inventory다. manifest가 없는 예전 HTML은 `career-ops-kr backfill-artifact-manifests`로 보강할 수 있지만, 오래된 주요 산출물은 점진적으로 새 build 경로로 다시 생성하는 편이 provenance를 더 균일하게 만든다.
 - `fetch-job`는 일부 로컬 Python 환경에서 TLS 인증서 검증 실패가 날 수 있다. 현재는 `--insecure` 옵션으로 우회 가능하다.
 - `discover-jobs`는 현재 Wanted / Jumpit / Remember / Saramin을 지원한다. Saramin은 `SARAMIN_ACCESS_KEY`가 있어야 한다.
 - `process-pipeline --score`는 score/report/addition까지 생성하지만, tracker 반영은 의도적으로 `finalize-tracker`를 별도 실행해야 한다.
@@ -667,7 +691,7 @@
    - 새 company research skill이 portal research와 잘 분리되는지 확인
    - builder / reviewer / tester handoff 품질 추가 점검
 2. optional web surface 운영 마무리
-   - manifest-backed artifact inventory의 legacy fallback 정리 정책 결정
+   - manifest-backed artifact inventory의 legacy 산출물 재생성 범위 결정
    - search / tracker / detail 화면의 세부 UX polish 범위 확정
    - 포털 parser drift 발생 시 live smoke와 web build-from-url 흐름을 우선 점검
 3. 직군별 scorecard 2차 tuning

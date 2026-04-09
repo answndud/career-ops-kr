@@ -18,6 +18,7 @@ from career_ops_kr.commands.research import (
     run_prepare_company_research,
 )
 from career_ops_kr.commands.resume import (
+    backfill_artifact_manifests,
     compare_live_smoke_reports,
     DEFAULT_LIVE_SMOKE_TARGETS_PATH,
     build_tailored_resume,
@@ -413,6 +414,8 @@ def build_tailored_resume_command(
     typer.echo(f"HTML: {artifacts.html_path.as_posix()}")
     if artifacts.pdf_path:
         typer.echo(f"PDF: {artifacts.pdf_path.as_posix()}")
+    if artifacts.manifest_path:
+        typer.echo(f"Manifest: {artifacts.manifest_path.as_posix()}")
 
 
 @app.command("build-tailored-resume-from-url")
@@ -493,6 +496,45 @@ def build_tailored_resume_from_url_command(
     typer.echo(f"HTML: {artifacts.html_path.as_posix()}")
     if artifacts.pdf_path:
         typer.echo(f"PDF: {artifacts.pdf_path.as_posix()}")
+    if artifacts.manifest_path:
+        typer.echo(f"Manifest: {artifacts.manifest_path.as_posix()}")
+
+
+@app.command("backfill-artifact-manifests")
+def backfill_artifact_manifests_command(
+    output_dir: Path = typer.Option(Path("output"), "--output-dir", help="Root output directory to scan for HTML artifacts."),
+    jd_dir: Path = typer.Option(Path("jds"), "--jd-dir", help="JD markdown directory used for legacy path inference."),
+    report_dir: Path = typer.Option(
+        Path("reports"),
+        "--report-dir",
+        help="Score report directory used for legacy path inference.",
+    ),
+    overwrite: bool = typer.Option(
+        False,
+        "--overwrite",
+        help="Rewrite existing sibling manifest files instead of skipping them.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="List which manifest files would be written without modifying disk.",
+    ),
+) -> None:
+    result = backfill_artifact_manifests(
+        output_dir=output_dir,
+        jd_dir=jd_dir,
+        report_dir=report_dir,
+        overwrite=overwrite,
+        dry_run=dry_run,
+    )
+    typer.echo(f"Scanned HTML artifacts: {result.scanned}")
+    typer.echo(f"Created: {result.created}")
+    typer.echo(f"Overwritten: {result.overwritten}")
+    typer.echo(f"Skipped: {result.skipped}")
+    if result.manifests:
+        typer.echo("Manifest paths:")
+        for path in result.manifests:
+            typer.echo(path.as_posix())
 
 
 @app.command("smoke-live-resume")

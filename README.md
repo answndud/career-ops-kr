@@ -121,7 +121,10 @@ career-ops-kr serve-web
 - **산출물**
   - 웹과 CLI에서 생성한 HTML/PDF 이력서 inventory 확인
   - 새 산출물은 HTML 옆 `.manifest.json`까지 같이 남겨 provenance를 추적
+  - 같은 output root에는 `artifact-index.json` derived cache도 같이 갱신되어 build run 기준 inventory lookup을 돕습니다.
+  - manifest에는 `build_run_id`와 `inventory_key`가 같이 기록됩니다.
   - manifest가 없는 예전 HTML도 legacy fallback으로 계속 보임
+  - 예전 HTML을 새 inventory 기준으로 맞추고 싶으면 `career-ops-kr backfill-artifact-manifests`로 sibling manifest를 일괄 생성
   - 연결된 공고가 있으면 바로 상세 화면으로 이동
 - **검색**
   - 사람인 / 원티드 / eFinancial 통합 검색
@@ -133,6 +136,8 @@ career-ops-kr serve-web
 - **트래커**
   - 저장된 공고 목록 확인
   - `리포트 없음 / 이력서 없음 / 팔로업 overdue / tracker 미연결` attention preset으로 바로 좁혀 보기
+  - 보이는 항목을 선택해서 상태 / 팔로업 / 출처를 일괄 변경
+  - 선택한 항목 중 메모/위치에 미저장 변경이 있으면 먼저 개별 저장 후 bulk를 실행
   - 저장된 공고 상세 화면에서 tracker 상태와 생성 산출물 확인
   - 저장된 공고 상세 화면에서 다음에 할 일을 읽기 쉽게 확인
   - 저장된 공고 상세 화면에서 같은 URL로 맞춤 이력서 HTML/PDF 다시 생성
@@ -189,6 +194,16 @@ career-ops-kr serve-web
 - `templates/resume-*.html`
   이력서 모양을 결정하는 틀입니다.
   한국어 이력서는 `resume-ko.html`, 영문 이력서는 `resume-en.html`을 쓰면 됩니다.
+
+예전 `output/*.html` 산출물이 많다면 한 번 정리해 두는 것이 좋습니다.
+
+```bash
+source .venv/bin/activate
+career-ops-kr backfill-artifact-manifests
+```
+
+이 명령은 기존 HTML 옆에 `.manifest.json`을 만들어서 웹 `산출물` 화면과 provenance 표시를 최신 기준으로 맞춰 줍니다.
+이미 manifest가 있는 HTML도 같은 실행에서 `artifact-index.json` entry를 같이 맞춥니다.
 
 역할별 이력서 예시:
 
