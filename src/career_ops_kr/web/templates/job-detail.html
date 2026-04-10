@@ -277,7 +277,7 @@
   <section class="card section-stack">
     <div class="section-header">
       <div>
-        <span class="pill">Activity</span>
+          <span class="pill">Activity</span>
         <h2>연결된 매칭 결과</h2>
       </div>
     </div>
@@ -292,28 +292,6 @@
       {% endfor %}
     </ul>
   </section>
-
-  {% if ai_enabled %}
-    <section class="card section-stack">
-      <div class="section-header">
-        <div>
-          <span class="pill">AI</span>
-          <h2>연결된 AI 출력</h2>
-        </div>
-      </div>
-      <ul class="list-compact">
-        {% for item in ai_outputs %}
-          <li>
-            <div class="title">{{ item.type }}</div>
-            <div class="meta">{{ item.created_at }}</div>
-            <div class="muted">{{ item.preview }}</div>
-          </li>
-        {% else %}
-          <li class="muted">아직 이 공고에 연결된 AI 출력이 없습니다.</li>
-        {% endfor %}
-      </ul>
-    </section>
-  {% endif %}
 </div>
 </div>
 

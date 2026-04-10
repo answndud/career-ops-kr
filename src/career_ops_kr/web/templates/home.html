@@ -19,7 +19,7 @@
     <a class="link" href="/search">공고 검색</a>
     <a class="link" href="/resume">이력서 업로드</a>
     <a class="link" href="/tracker">트래커 확인</a>
-    <a class="link" href="/settings">설정 저장</a>
+    <a class="link" href="/settings">설정/백업</a>
   </div>
 </section>
 
@@ -39,13 +39,6 @@
     <div class="value">{{ dashboard.generatedResumeCount }}</div>
     <div class="hint">웹 {{ dashboard.generatedWebResumeCount }} · CLI {{ dashboard.generatedCliResumeCount }}</div>
   </article>
-  {% if ai_enabled %}
-    <article class="stat">
-      <div class="label">AI outputs</div>
-      <div class="value">{{ dashboard.totalAiOutputs }}</div>
-      <div class="hint">어시스턴트 출력 수</div>
-    </article>
-  {% endif %}
 </section>
 
 <section class="card section-stack">
@@ -63,7 +56,7 @@
     </article>
     <article class="subcard">
       <h3>2. 이력서 업로드</h3>
-      <p class="muted">PDF/TXT/MD 이력서를 넣으면 매칭과 재작성이 가능합니다.</p>
+      <p class="muted">PDF/TXT/MD 이력서를 넣어 두면 URL 기반 맞춤 이력서 생성을 바로 이어갈 수 있습니다.</p>
       <div class="actions"><a class="link" href="/resume">이력서 열기</a></div>
     </article>
     <article class="subcard">
@@ -243,26 +236,5 @@
   </section>
 </div>
 
-{% if ai_enabled %}
-  <section class="card">
-    <span class="pill">AI</span>
-    <h2>최근 AI 출력</h2>
-    <ul class="list-compact">
-      {% for item in dashboard.recentAiOutputs %}
-        <li>
-          <div class="title">#{{ item.id }} · {{ item.type }}</div>
-          <div class="meta">{{ item.created_at }}</div>
-          <div class="meta">{{ item.preview }}</div>
-        </li>
-      {% else %}
-        <li class="muted">아직 AI 출력이 없습니다.</li>
-      {% endfor %}
-    </ul>
-  </section>
-{% else %}
-  <section class="notice warn">
-    AI 기능은 현재 기본 비활성화 상태입니다. 지금은 검색, 저장, tracker, deterministic resume build만 사용하면 됩니다.
-  </section>
-{% endif %}
 </div>
 {% endblock %}

@@ -552,9 +552,6 @@
           <a href="/search" class="{% if request.url.path.startswith('/search') %}active{% endif %}">검색</a>
           <a href="/resume" class="{% if request.url.path.startswith('/resume') %}active{% endif %}">이력서</a>
           <a href="/artifacts" class="{% if request.url.path.startswith('/artifacts') %}active{% endif %}">산출물</a>
-          {% if ai_enabled %}
-            <a href="/assistant" class="{% if request.url.path.startswith('/assistant') %}active{% endif %}">어시스턴트</a>
-          {% endif %}
           <a href="/tracker" class="{% if request.url.path.startswith('/tracker') %}active{% endif %}">트래커</a>
           <a href="/settings" class="{% if request.url.path.startswith('/settings') %}active{% endif %}">설정</a>
         </nav>

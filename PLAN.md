@@ -27,7 +27,7 @@
 - tracker, report, output 디렉터리 워크플로우 유지
 - README, docs, AGENTS 문서 동기화
   - 초보자용 전체 README 가이드 작성 완료
-  - README에 웹 3단계 시작 루트, AI 없이 쓰는 기본 루트, DB backup/export/import 설명 보강 완료
+  - README에 웹 3단계 시작 루트, 웹 기본 루트, DB backup/export/import 설명 보강 완료
   - 이후 CLI 표면이 바뀌면 README 예시 명령도 함께 갱신
 - git hygiene 유지
   - 생성 산출물은 `.gitignore`와 `.gitkeep` 기준으로 버전 관리에서 제외
@@ -47,15 +47,51 @@
   - job detail drift 경고는 status뿐 아니라 source mismatch도 포함
   - tracker 단일 row 저장은 full table refetch 없이 부분 갱신하고, bulk update는 메모/위치 미저장 draft가 있으면 먼저 막아 입력 손실을 피함
   - tracker/detail은 `다음에 할 일`, attention preset, tracker/web drift 같은 read-only operational hint를 유지
-  - AI surface는 기본 비활성화로 유지하고 필요할 때만 `serve-web --enable-ai`로 노출
+  - AI surface는 제거하고 web 표면은 검색/저장/deterministic resume build 중심으로 유지
   - settings 화면에서 web DB backup/export/import를 지원
   - search / tracker 화면은 alert 대신 in-page result panel과 artifact badge 중심으로 유지
   - 국내 구직 기준으로 불필요한 Adzuna web search/provider 연동 제거 완료
-  - legacy DB snapshot import/export에서도 Adzuna 설정이 복원되지 않도록 scrub 완료
   - `design-guidelines.md` 기준 grayscale-first admin dashboard 전면 개편 완료
     - shared design tokens 정의 완료
     - base layout / shared primitives / tables / forms / badges 통일 완료
     - 각 화면에서 inline style 제거 완료
+  - web 구조 개선 1차 완료
+    - `web/app.py`의 dashboard / artifact inventory / live smoke / tracker view helper를 service 모듈로 추출
+    - 신규 모듈 `web/common.py`, `web/artifacts.py`, `web/dashboard.py`, `web/live_smoke.py`, `web/jobs_view.py`, `web/paths.py` 추가
+    - `web/app.py`는 route + mutation helper 중심으로 축소
+  - web 구조 개선 2차 완료
+    - `web/app.py` route를 `web/routers/`로 분리
+    - 신규 모듈 `web/routers/pages.py`, `web/routers/system.py`, `web/routers/jobs.py`, `web/routers/search.py`, `web/routers/resume.py`, `web/routers/deps.py` 추가
+    - `web/app.py`는 app 조립, router deps wiring, mutation helper 중심으로 축소
+  - web 구조 개선 3차 완료
+    - `web/job_records.py`로 job 저장/수정/삭제/bulk update/tracker sync/artifact attach helper 분리
+    - `web/app.py`는 path/preset 설정, router deps wiring, patch 포인트 유지 중심으로 축소
+    - web DB backup/export/import 경로는 import 시점 상수가 아니라 현재 `OUTPUT_DIR` 기준으로 파생되게 유지
+- resume 구조 개선 1차 완료
+    - `resume_pipeline/models.py`로 resume/live-smoke dataclass 분리
+    - `resume_pipeline/artifacts.py`로 manifest/index/backfill helper 분리
+    - `commands/resume.py`는 기존 공개 import 경로를 유지하는 facade로 축소
+  - resume 구조 개선 2차 완료
+    - `resume_pipeline/live_smoke.py`로 target registry/report helper 분리
+    - `resume_pipeline/rendering.py`로 HTML/PDF helper 분리
+    - `resume_pipeline/tailoring.py`로 tailoring packet helper 분리
+    - `commands/resume.py`는 build/live smoke runner 중심으로 축소
+  - resume 구조 개선 3차 완료
+    - `resume_pipeline/build.py`로 resume build/from-url 구현 분리
+    - `resume_pipeline/smoke_runner.py`로 live smoke runner 구현 분리
+    - `commands/resume.py`는 facade wrapper + 공개 re-export 중심으로 축소
+  - CLI 구조 개선 1차 완료
+    - `commands/web_cli.py`, `commands/intake_cli.py`, `commands/research_cli.py`, `commands/resume_cli.py`, `commands/tracker_cli.py`로 command registration 분리
+    - `cli.py`는 app 생성과 registration 호출만 담당
+    - smoke CLI patchability를 위해 `run_live_resume_smoke`, `run_batch_live_resume_smoke`는 cli module 이름을 유지한 채 늦은 바인딩으로 주입
+  - CLI 구조 개선 2차 완료
+    - `commands/resume_build_cli.py`로 render/build/apply/backfill command registration 분리
+    - `commands/resume_smoke_cli.py`로 live smoke/report command registration 분리
+    - `commands/resume_cli.py`는 두 registration을 조합하는 얇은 aggregator로 축소
+  - CLI 구조 개선 3차 완료
+    - `commands/intake_fetch_cli.py`로 fetch/discovery command registration 분리
+    - `commands/intake_pipeline_cli.py`로 process-pipeline/score-job registration 분리
+    - `commands/intake_cli.py`는 두 registration을 조합하는 얇은 aggregator로 축소
 - AI harness 로컬 설정 추가 설계
   - Codex: `AGENTS.md`, `.codex/config.toml`, `.codex/agents/`, `.agents/skills/`
   - command surface는 skill 우선으로 통일하고, 별도 command 계층은 만들지 않음

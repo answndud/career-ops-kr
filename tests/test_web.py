@@ -66,45 +66,19 @@ class WebAppTests(unittest.TestCase):
         self.client = TestClient(web_app.create_app())
 
     def test_pages_render(self) -> None:
-        for route in ("/", "/search", "/settings", "/resume", "/assistant", "/tracker", "/artifacts"):
+        for route in ("/", "/search", "/settings", "/resume", "/tracker", "/artifacts"):
             response = self.client.get(route)
             self.assertEqual(response.status_code, 200, route)
         home = self.client.get("/")
         search = self.client.get("/search")
         settings = self.client.get("/settings")
         self.assertNotIn("어시스턴트</a>", home.text)
-        self.assertIn("AI 기능은 현재 기본 비활성화 상태입니다.", home.text)
         self.assertNotIn("Adzuna", home.text)
         self.assertNotIn("Adzuna", search.text)
-        self.assertNotIn("ADZUNA_API_KEY", settings.text)
         self.assertIn("별도 API 키가 필요하지 않습니다.", settings.text)
         tracker = self.client.get("/tracker")
         self.assertIn("선택 항목 일괄 변경", tracker.text)
         self.assertIn("보이는 항목 전체 선택", tracker.text)
-
-    def test_settings_roundtrip(self) -> None:
-        response = self.client.post("/api/settings", json={"key": "AI_PROVIDER", "value": "gemini"})
-        self.assertEqual(response.status_code, 200)
-        payload = self.client.get("/api/settings").json()
-        self.assertEqual(payload["AI_PROVIDER"], "gemini")
-        self.assertFalse(payload["ai_enabled"])
-        self.assertEqual(payload["active_provider"], "disabled")
-
-    def test_removed_search_setting_keys_are_rejected(self) -> None:
-        response = self.client.post("/api/settings", json={"key": "ADZUNA_API_KEY", "value": "secret"})
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["detail"], "Invalid key")
-
-    def test_ai_routes_are_disabled_by_default(self) -> None:
-        for path, body in (
-            ("/api/search/analyze", {"title": "Backend", "company": "Acme", "url": "https://example.com"}),
-            ("/api/resume/match", {"resume_id": 1, "job_description": "Backend role"}),
-            ("/api/resume/rewrite", {"job_description": "Backend role"}),
-            ("/api/resume/recommend", {}),
-            ("/api/ai/cover-letter", {"company": "Acme"}),
-        ):
-            response = self.client.post(path, json=body)
-            self.assertEqual(response.status_code, 404, path)
 
     def test_jobs_crud_updates_tracker_file(self) -> None:
         create_response = self.client.post(
@@ -276,10 +250,6 @@ class WebAppTests(unittest.TestCase):
             description="",
         )
         with (
-            patch(
-                "career_ops_kr.web.search.translate_query",
-                side_effect=lambda query, target_language: "backend" if target_language == "en" else "백엔드",
-            ),
             patch("career_ops_kr.web.search._search_saramin", return_value=[]),
             patch("career_ops_kr.web.search._search_wanted", return_value=[wanted_result]),
             patch("career_ops_kr.web.search._search_efinancial", side_effect=httpx.ReadTimeout("timed out")),
@@ -296,7 +266,7 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(saramin_status["query_label"], "입력어")
         efinancial_status = next(item for item in payload["provider_statuses"] if item["key"] == "efinancial")
         self.assertEqual(efinancial_status["status"], "error")
-        self.assertEqual(efinancial_status["query_label"], "영문 번역")
+        self.assertEqual(efinancial_status["query_label"], "입력어")
         self.assertEqual(efinancial_status["detail"], "요청 시간 초과")
 
     def test_search_import_and_build_from_url_endpoint(self) -> None:
@@ -633,7 +603,7 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("상세 상태 보기", text)
         self.assertNotIn("최근 AI 출력", text)
 
-    def test_dashboard_api_includes_recent_ai_outputs_and_artifact_paths(self) -> None:
+    def test_dashboard_api_includes_recent_artifact_paths(self) -> None:
         self.client.post(
             "/api/resume/upload",
             files={"file": ("resume.txt", b"Python\nFastAPI\nSQL", "text/plain")},
@@ -668,23 +638,14 @@ class WebAppTests(unittest.TestCase):
         (self.output_dir / "jds").mkdir(parents=True, exist_ok=True)
         (self.output_dir / "reports").mkdir(parents=True, exist_ok=True)
 
-        with connection_scope() as conn:
-            conn.execute(
-                "INSERT INTO ai_outputs(type, input_json, output) VALUES(?, ?, ?)",
-                ("resume_rewrite", "{}", "Tailored summary output for dashboard preview"),
-            )
-            conn.commit()
-
         response = self.client.get("/api/dashboard")
         self.assertEqual(response.status_code, 200)
         payload = response.json()
 
         self.assertEqual(payload["totalResumes"], 1)
-        self.assertEqual(payload["totalAiOutputs"], 1)
         self.assertEqual(payload["generatedResumeCount"], 2)
         self.assertEqual(payload["generatedWebResumeCount"], 1)
         self.assertEqual(payload["generatedCliResumeCount"], 1)
-        self.assertEqual(payload["activeProvider"], "disabled")
         generated_by_url = {item["html_url"]: item for item in payload["recentGeneratedResumes"]}
         self.assertIn("/output/web-resumes/demo-resume.html", generated_by_url)
         self.assertIn("/output/cli-resume.html", generated_by_url)
@@ -703,8 +664,6 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(generated_by_url["/output/web-resumes/demo-resume.html"]["provenance"], "manifest")
         self.assertEqual(generated_by_url["/output/cli-resume.html"]["source_label"], "cli")
         self.assertEqual(generated_by_url["/output/cli-resume.html"]["provenance"], "legacy")
-        self.assertEqual(payload["recentAiOutputs"][0]["type"], "resume_rewrite")
-        self.assertIn("Tailored summary output", payload["recentAiOutputs"][0]["preview"])
 
     def test_dashboard_api_sorts_manifest_artifacts_by_generated_at_not_manifest_mtime(self) -> None:
         generated_dir = self.output_dir / "web-resumes"
@@ -834,10 +793,6 @@ class WebAppTests(unittest.TestCase):
                 """,
                 (resume_id, job_id, "Backend role", 91.0, "{}"),
             )
-            conn.execute(
-                "INSERT INTO ai_outputs(type, job_id, input_json, output) VALUES(?, ?, ?, ?)",
-                ("job_analysis", job_id, "{}", "Detailed AI follow-up output"),
-            )
             conn.commit()
 
         detail_response = self.client.get(f"/tracker/{job_id}")
@@ -925,7 +880,7 @@ class WebAppTests(unittest.TestCase):
         with connection_scope() as conn:
             conn.execute(
                 "INSERT INTO settings(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                ("ADZUNA_API_KEY", "legacy-secret"),
+                ("EXPORT_TEST_KEY", "test-secret"),
             )
             conn.commit()
 
@@ -933,16 +888,18 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(backup_response.status_code, 200)
         backup_path = Path(backup_response.json()["backup_path"])
         self.assertTrue(backup_path.exists())
+        self.assertEqual(backup_path.parent, self.output_dir / "web-db")
 
         export_response = self.client.post("/api/system/db/export")
         self.assertEqual(export_response.status_code, 200)
         export_path = Path(export_response.json()["export_path"])
         self.assertTrue(export_path.exists())
+        self.assertEqual(export_path.parent, self.output_dir / "web-db")
         exported_payload = json.loads(export_path.read_text(encoding="utf-8"))
         self.assertEqual(exported_payload["tables"]["jobs"][0]["company"], "Backup Co")
-        self.assertNotIn("ADZUNA_API_KEY", {row["key"] for row in exported_payload["tables"]["settings"]})
+        self.assertIn("EXPORT_TEST_KEY", {row["key"] for row in exported_payload["tables"]["settings"]})
 
-        exported_payload["tables"]["settings"].append({"key": "ADZUNA_API_KEY", "value": "should-not-come-back"})
+        exported_payload["tables"]["settings"].append({"key": "IMPORTED_TEST_KEY", "value": "restored-value"})
         export_path.write_text(json.dumps(exported_payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
         with connection_scope() as conn:
@@ -956,14 +913,14 @@ class WebAppTests(unittest.TestCase):
             files={"file": (export_path.name, export_path.read_bytes(), "application/json")},
         )
         self.assertEqual(import_response.status_code, 200)
+        import_path = Path(import_response.json()["import_path"])
+        self.assertEqual(import_path.parent, self.output_dir / "web-db")
         restored_jobs = self.client.get("/api/jobs").json()
         self.assertEqual(len(restored_jobs), 1)
         self.assertEqual(restored_jobs[0]["company"], "Backup Co")
-        settings_payload = self.client.get("/api/settings").json()
-        self.assertNotIn("ADZUNA_API_KEY", settings_payload)
         with connection_scope() as conn:
-            count = conn.execute("SELECT COUNT(*) AS count FROM settings WHERE key = ?", ("ADZUNA_API_KEY",)).fetchone()["count"]
-        self.assertEqual(count, 0)
+            restored = conn.execute("SELECT value FROM settings WHERE key = ?", ("IMPORTED_TEST_KEY",)).fetchone()
+        self.assertEqual(restored["value"], "restored-value")
 
     def test_settings_page_surfaces_live_smoke_summary(self) -> None:
         live_smoke_dir = self.output_dir / "live-smoke"

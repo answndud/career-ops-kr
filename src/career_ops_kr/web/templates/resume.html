@@ -36,76 +36,17 @@
 </div>
 
 <div class="grid two">
-  {% if ai_enabled %}
-    <section class="card section-stack">
-      <div class="section-header">
-        <div>
-          <span class="pill">Match</span>
-          <h2>이력서 적합도 분석</h2>
-        </div>
+  <section class="card section-stack">
+    <div class="section-header">
+      <div>
+        <span class="pill">Focus</span>
+        <h2>지금은 deterministic resume build만 사용</h2>
       </div>
-      <div class="grid">
-        <div class="field">
-          <label for="match-resume-id">Resume ID</label>
-          <input id="match-resume-id" type="number" min="1" placeholder="예: 1">
-        </div>
-        <div class="field">
-          <label for="match-job-description">Job Description</label>
-          <textarea id="match-job-description" placeholder="공고 본문을 붙여넣으세요"></textarea>
-        </div>
-        <button type="button" onclick="runResumeMatch()">매칭 분석</button>
-      </div>
-      <pre id="match-output">결과가 여기에 표시됩니다.</pre>
-    </section>
-
-    <section class="card section-stack">
-      <div class="section-header">
-        <div>
-          <span class="pill">Rewrite</span>
-          <h2>공고 맞춤 이력서 재작성</h2>
-        </div>
-      </div>
-      <div class="grid">
-        <div class="field">
-          <label for="rewrite-resume-id">Resume ID</label>
-          <input id="rewrite-resume-id" type="number" min="1" placeholder="비우면 최신 이력서 사용">
-        </div>
-        <div class="field">
-          <label for="rewrite-company">Company</label>
-          <input id="rewrite-company" type="text" placeholder="회사명">
-        </div>
-        <div class="field">
-          <label for="rewrite-position">Position</label>
-          <input id="rewrite-position" type="text" placeholder="포지션">
-        </div>
-        <div class="field">
-          <label for="rewrite-language">Language</label>
-          <select id="rewrite-language">
-            <option value="ko">한국어</option>
-            <option value="en">English</option>
-          </select>
-        </div>
-        <div class="field span-full">
-          <label for="rewrite-job-description">Job Description</label>
-          <textarea id="rewrite-job-description" placeholder="공고 본문을 붙여넣으세요"></textarea>
-        </div>
-        <button type="button" onclick="runRewrite()">재작성</button>
-      </div>
-      <pre id="rewrite-output">재작성 결과가 여기에 표시됩니다.</pre>
-    </section>
-  {% else %}
-    <section class="card section-stack">
-      <div class="section-header">
-        <div>
-          <span class="pill">Focus</span>
-          <h2>지금은 deterministic resume build만 사용</h2>
-        </div>
-      </div>
-      <div class="notice warn">
-        AI 기반 매칭, 재작성, 추천은 현재 비활성화되어 있습니다. 업로드된 이력서 관리와 URL 기반 맞춤 이력서 생성만 사용하세요.
-      </div>
-    </section>
-  {% endif %}
+    </div>
+    <div class="notice warn">
+      업로드된 이력서 관리와 URL 기반 맞춤 이력서 생성만 사용하세요.
+    </div>
+  </section>
 
   <section class="card section-stack">
     <div class="section-header">
@@ -146,34 +87,7 @@
   </section>
 </div>
 
-{% if ai_enabled %}
-  <div class="grid two">
-    <section class="card section-stack">
-      <div class="section-header">
-        <div>
-          <span class="pill">Recommend</span>
-          <h2>이력서 기반 추천 공고</h2>
-        </div>
-      </div>
-      <div class="grid">
-        <div class="field">
-          <label for="recommend-resume-id">Resume ID</label>
-          <input id="recommend-resume-id" type="number" min="1" placeholder="비우면 최신 이력서 사용">
-        </div>
-        <button type="button" onclick="runRecommend()">추천 공고 찾기</button>
-      </div>
-      <pre id="recommend-output">추천 결과가 여기에 표시됩니다.</pre>
-    </section>
-  </div>
-{% endif %}
-</div>
-
 <script>
-  function valueOrNull(id) {
-    const value = document.getElementById(id).value.trim();
-    return value ? value : null;
-  }
-
   async function refreshResumeList() {
     const res = await fetch("/api/resume/upload");
     const data = await res.json();
@@ -207,69 +121,6 @@
       status.textContent = error.message;
     }
   });
-
-  async function runResumeMatch() {
-    const output = document.getElementById("match-output");
-    output.textContent = "Loading...";
-    try {
-      const res = await fetch("/api/resume/match", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-          resume_id: Number(document.getElementById("match-resume-id").value),
-          job_description: document.getElementById("match-job-description").value,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "매칭 실패");
-      output.textContent = JSON.stringify(data, null, 2);
-    } catch (error) {
-      output.textContent = error.message;
-    }
-  }
-
-  async function runRewrite() {
-    const output = document.getElementById("rewrite-output");
-    output.textContent = "Loading...";
-    try {
-      const res = await fetch("/api/resume/rewrite", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-          resume_id: valueOrNull("rewrite-resume-id"),
-          company: document.getElementById("rewrite-company").value,
-          position: document.getElementById("rewrite-position").value,
-          language: document.getElementById("rewrite-language").value,
-          job_description: document.getElementById("rewrite-job-description").value,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "재작성 실패");
-      output.textContent = data.rewritten_resume || "";
-    } catch (error) {
-      output.textContent = error.message;
-    }
-  }
-
-  async function runRecommend() {
-    const output = document.getElementById("recommend-output");
-    output.textContent = "Loading...";
-    try {
-      const body = {};
-      const resumeId = valueOrNull("recommend-resume-id");
-      if (resumeId) body.resume_id = Number(resumeId);
-      const res = await fetch("/api/resume/recommend", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "추천 실패");
-      output.textContent = JSON.stringify(data, null, 2);
-    } catch (error) {
-      output.textContent = error.message;
-    }
-  }
 
   async function runBuildFromUrl() {
     const output = document.getElementById("build-output");

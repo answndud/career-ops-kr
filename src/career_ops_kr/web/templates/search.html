@@ -19,11 +19,7 @@
       <input type="hidden" name="source" value="전체">
       <button type="submit">검색</button>
     </form>
-    {% if ai_enabled %}
-      <p class="muted">현재 AI provider: <strong>{{ provider }}</strong></p>
-    {% else %}
-      <p class="muted">AI 기능은 현재 꺼져 있습니다. 검색, 저장, 이력서 생성은 그대로 사용할 수 있습니다.</p>
-    {% endif %}
+    <p class="muted">검색, 저장, 이력서 생성 중심의 단순한 운영 화면입니다.</p>
   </section>
   <section class="card section-stack">
     <div class="section-header">
@@ -33,9 +29,6 @@
       </div>
     </div>
     <ul class="plain-list">
-      {% if ai_enabled %}
-        <li>공고 분석: <code>POST /api/search/analyze</code></li>
-      {% endif %}
       <li>트래커 저장: <code>POST /api/import</code></li>
       <li>맞춤 이력서 HTML/PDF 생성: <code>POST /api/resume/build-from-url</code></li>
       <li>외부 공고 URL 복사 후 다른 곳에서 직접 검토</li>
@@ -154,19 +147,6 @@
                         <a class="link" href="{{ item.saved_job.detail_url }}">저장된 공고</a>
                       {% endif %}
                     </span>
-                    {% if ai_enabled %}
-                      <button
-                        type="button"
-                        data-title="{{ item.title }}"
-                        data-company="{{ item.company }}"
-                        data-location="{{ item.location }}"
-                        data-source="{{ item.source }}"
-                        data-url="{{ item.url }}"
-                        onclick="CareerOpsSearch.analyze(this)"
-                      >
-                        분석
-                      </button>
-                    {% endif %}
                     <button
                       type="button"
                       class="secondary"
@@ -215,17 +195,10 @@
     <span class="pill">저장</span>
     <div id="search-save-output" class="notice result-panel">아직 저장한 공고가 없습니다.</div>
   </section>
-  {% if ai_enabled %}
-    <section class="card section-stack">
-      <span class="pill">공고 분석</span>
-      <pre id="search-analysis-output">아직 분석한 결과가 없습니다.</pre>
-    </section>
-  {% else %}
-    <section class="card section-stack">
-      <span class="pill">안내</span>
-      <div class="notice warn">AI 분석은 현재 사용하지 않습니다. 저장 또는 이력서 생성만 사용하세요.</div>
-    </section>
-  {% endif %}
+  <section class="card section-stack">
+    <span class="pill">안내</span>
+    <div class="notice warn">공고 분석 기능은 제거되었습니다. 저장 또는 이력서 생성만 사용하세요.</div>
+  </section>
   <section class="card section-stack">
     <span class="pill">이력서 생성</span>
     <div id="search-build-output" class="notice result-panel">아직 생성한 이력서가 없습니다.</div>
@@ -301,24 +274,6 @@
         output.className = "notice error result-panel";
         output.textContent = error.message;
       }
-    },
-    async analyze(button) {
-      const payload = {
-        title: button.dataset.title,
-        company: button.dataset.company,
-        location: button.dataset.location,
-        source: button.dataset.source,
-        url: button.dataset.url,
-      };
-      const output = document.getElementById("search-analysis-output");
-      output.textContent = "분석 중...";
-      const response = await fetch("/api/search/analyze", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(payload),
-      });
-      const data = await response.json();
-      output.textContent = JSON.stringify(data, null, 2);
     },
     async save(button) {
       const payload = {

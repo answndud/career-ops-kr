@@ -155,8 +155,6 @@ career-ops-kr serve-web
 - 이 웹 화면은 **선택 기능**입니다.
 - 기본 CLI/file workflow는 그대로 유지됩니다.
 - 웹 화면은 편한 사용을 위해 로컬 SQLite 파일 `data/career-ops-web.db`를 같이 씁니다.
-- AI 기능은 지금 기본으로 꺼져 있습니다.
-- 나중에 필요하면 `career-ops-kr serve-web --enable-ai`로 다시 켤 수 있습니다.
 - 웹에서 공고를 추가/수정/삭제하면 tracker markdown도 같이 맞추고, 필요하면 `트래커` 화면에서 다시 sync할 수 있습니다.
 - `트래커`에서 저장된 공고 상세 화면으로 들어가면 JD/report/context/HTML/PDF 연결 상태를 다시 확인할 수 있고, 저장된 공고 URL이 있으면 그 자리에서 다시 맞춤 이력서를 생성할 수 있습니다.
 - 최종 HTML/PDF 이력서 산출은 기존 Python resume pipeline을 그대로 호출합니다.
@@ -165,7 +163,7 @@ career-ops-kr serve-web
 - `홈` 화면의 최근 생성 결과는 웹과 CLI에서 만든 HTML/PDF 산출물을 함께 보여줍니다.
 - `홈`은 live smoke 상태를 짧게 요약해서 보여주고, 자세한 target 상태와 report 정보는 `설정`에서 봅니다.
 
-### 웹에서 AI 없이 쓰는 기본 루트
+### 웹에서 쓰는 기본 루트
 
 지금 이 프로젝트의 웹 화면은 아래 4가지만 써도 충분합니다.
 
@@ -174,7 +172,6 @@ career-ops-kr serve-web
 3. `트래커`에서 상태와 메모 정리
 4. `검색` 또는 `트래커 상세`에서 맞춤 이력서 HTML/PDF 생성
 
-즉, 처음에는 AI 기능을 신경 쓰지 않아도 됩니다.
 같은 공고를 저장 버튼으로 다시 눌러도 duplicate row를 만들지 않고, 이미 저장된 항목이면 기존 항목으로 연결됩니다.
 
 ## 3. 가장 먼저 해야 할 일

@@ -14,10 +14,6 @@ from career_ops_kr.portals import canonicalize_job_url
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DB_PATH = REPO_ROOT / "data" / "career-ops-web.db"
-LEGACY_REMOVED_SETTING_KEYS = {
-    "ADZUNA_APP_ID",
-    "ADZUNA_API_KEY",
-}
 
 
 def resolve_db_path(db_path: Path | None = None) -> Path:
@@ -74,15 +70,6 @@ def init_schema(conn: sqlite3.Connection) -> None:
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
-        CREATE TABLE IF NOT EXISTS ai_outputs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            type TEXT NOT NULL,
-            job_id INTEGER REFERENCES jobs(id),
-            input_json TEXT NOT NULL,
-            output TEXT NOT NULL,
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        );
-
         CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
         CREATE INDEX IF NOT EXISTS idx_jobs_company ON jobs(company);
         CREATE INDEX IF NOT EXISTS idx_jobs_updated_at ON jobs(updated_at);
@@ -98,7 +85,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
     _ensure_column(conn, "jobs", "context_path", "TEXT")
     _ensure_column(conn, "jobs", "html_path", "TEXT")
     _ensure_column(conn, "jobs", "pdf_path", "TEXT")
-    _delete_legacy_settings(conn)
+    _drop_legacy_tables(conn)
     _backfill_jobs_canonical_urls(conn)
     conn.commit()
 
@@ -111,14 +98,8 @@ def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) 
     conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
 
-def _delete_legacy_settings(conn: sqlite3.Connection) -> None:
-    if not LEGACY_REMOVED_SETTING_KEYS:
-        return
-    placeholders = ", ".join("?" for _ in LEGACY_REMOVED_SETTING_KEYS)
-    conn.execute(
-        f"DELETE FROM settings WHERE key IN ({placeholders})",
-        tuple(sorted(LEGACY_REMOVED_SETTING_KEYS)),
-    )
+def _drop_legacy_tables(conn: sqlite3.Connection) -> None:
+    conn.execute("DROP TABLE IF EXISTS ai_outputs")
 
 
 def _backfill_jobs_canonical_urls(conn: sqlite3.Connection) -> None:
@@ -173,6 +154,7 @@ def create_database_backup(*, backup_dir: Path | None = None, db_path: Path | No
             target_conn.close()
     finally:
         source_conn.close()
+    prune_snapshot_directory(target_dir)
     return backup_path
 
 
@@ -183,15 +165,15 @@ def export_database_snapshot(*, out_path: Path, db_path: Path | None = None) -> 
             "version": 1,
             "exported_at": datetime.now(UTC).isoformat(),
             "tables": {
-                "settings": _filtered_settings_rows(conn.execute("SELECT * FROM settings ORDER BY key").fetchall()),
+                "settings": conn.execute("SELECT * FROM settings ORDER BY key").fetchall(),
                 "jobs": conn.execute("SELECT * FROM jobs ORDER BY id").fetchall(),
                 "resumes": conn.execute("SELECT * FROM resumes ORDER BY id").fetchall(),
                 "match_results": conn.execute("SELECT * FROM match_results ORDER BY id").fetchall(),
-                "ai_outputs": conn.execute("SELECT * FROM ai_outputs ORDER BY id").fetchall(),
             },
         }
     ensure_dir(out_path.parent)
     out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    prune_snapshot_directory(out_path.parent)
     return out_path
 
 
@@ -206,18 +188,15 @@ def import_database_snapshot(
         raise ValueError("Invalid database snapshot format.")
 
     tables_payload = payload["tables"]
-    required_tables = ["settings", "jobs", "resumes", "match_results", "ai_outputs"]
+    required_tables = ["settings", "jobs", "resumes", "match_results"]
     for table in required_tables:
         if table not in tables_payload or not isinstance(tables_payload[table], list):
             raise ValueError(f"Database snapshot is missing table: {table}")
-
-    tables_payload["settings"] = _filtered_settings_rows(tables_payload["settings"])
 
     backup_path = create_database_backup(backup_dir=backup_dir, db_path=db_path)
 
     with connection_scope(db_path) as conn:
         conn.execute("DELETE FROM match_results")
-        conn.execute("DELETE FROM ai_outputs")
         conn.execute("DELETE FROM resumes")
         conn.execute("DELETE FROM jobs")
         conn.execute("DELETE FROM settings")
@@ -225,27 +204,42 @@ def import_database_snapshot(
         for table in required_tables:
             _bulk_insert_rows(conn, table, tables_payload[table])
 
-        for table in ["jobs", "resumes", "match_results", "ai_outputs"]:
+        for table in ["jobs", "resumes", "match_results"]:
             _reset_sqlite_sequence(conn, table)
         conn.commit()
 
+    prune_snapshot_directory(snapshot_path.parent)
     return {
         "backup_path": backup_path.as_posix(),
         "counts": {table: len(tables_payload[table]) for table in required_tables},
     }
 
 
-def _filtered_settings_rows(rows: list[object]) -> list[object]:
-    filtered: list[object] = []
-    for raw_row in rows:
-        if not isinstance(raw_row, dict):
-            filtered.append(raw_row)
+def prune_snapshot_directory(directory: Path, *, keep_per_group: int = 5) -> None:
+    if keep_per_group < 1 or not directory.exists():
+        return
+
+    grouped: dict[str, list[Path]] = {}
+    for path in directory.iterdir():
+        if not path.is_file():
             continue
-        key = str(raw_row.get("key") or "")
-        if key in LEGACY_REMOVED_SETTING_KEYS:
-            continue
-        filtered.append(raw_row)
-    return filtered
+        grouped.setdefault(_snapshot_group_key(path), []).append(path)
+
+    for paths in grouped.values():
+        paths.sort(key=lambda item: item.stat().st_mtime, reverse=True)
+        for stale_path in paths[keep_per_group:]:
+            stale_path.unlink(missing_ok=True)
+
+
+def _snapshot_group_key(path: Path) -> str:
+    name = path.name
+    if name.startswith("career-ops-web-export-"):
+        return "export"
+    if name.startswith("import-"):
+        return "import"
+    if name.endswith(".sqlite3"):
+        return "backup"
+    return "other"
 
 
 def _bulk_insert_rows(conn: sqlite3.Connection, table: str, rows: list[object]) -> None:

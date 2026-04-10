@@ -122,7 +122,7 @@ Codex에게는 아래 순서로 요청하는 것이 좋습니다.
 12. 상세 화면에는 `다음에 할 일`과 tracker/web drift 요약이 같이 보여서, 단순 조회가 아니라 다음 액션 결정 화면으로 사용합니다.
 13. `홈`으로 돌아오면 최근 생성한 HTML/PDF 이력서와 preset 경로를 다시 바로 확인할 수 있습니다. 이 목록은 웹에서 만든 산출물과 CLI에서 만든 산출물을 함께 보여줍니다.
 14. `홈`은 recent live smoke 상태를 짧게 요약하고, `설정`은 target별 문제/dir/report 수를 자세히 보여줍니다.
-15. AI 기능은 기본 비활성화 상태입니다. 나중에 필요하면 `career-ops-kr serve-web --enable-ai`로 다시 켤 수 있습니다.
+15. 웹 화면은 검색, 저장, tracker 정리, deterministic resume build 중심으로 사용합니다.
 
 규칙:
 
