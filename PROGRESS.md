@@ -66,6 +66,11 @@
     - home recent generated output과 `artifacts.html`이 linked job attention tag / `다음 액션`을 같이 표시
     - `pages.py`, `router_bindings.py`, `router_deps_factory.py`, `routers/deps.py`가 같은 helper를 artifacts page에도 재사용하도록 정리
     - `tests/test_web.py`에 artifacts page linked-job next-action 회귀 추가
+  - artifacts attention filter 추가
+    - `artifacts.py`의 inventory filter가 `problem-only / follow-up-overdue / follow-up-missing / missing-report`를 지원
+    - `artifacts.html`에 운영 신호 select filter 추가
+    - generated artifact job signal helper를 `dashboard.py`에서 `jobs_view.py`로 옮겨 책임 정리
+    - `tests/test_web.py`에 overdue attention filter 회귀 추가
   - web search preset 1차 추가
     - `src/career_ops_kr/web/search_presets.py`
     - `/api/search-presets` GET/POST/DELETE 추가

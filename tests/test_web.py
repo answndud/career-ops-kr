@@ -1353,6 +1353,13 @@ class WebAppTests(unittest.TestCase):
         filtered = self.client.get("/artifacts", params={"source": "cli"})
         self.assertEqual(filtered.status_code, 200)
         self.assertIn("cli-backend.html", filtered.text)
+        self.assertNotIn("web-platform.html", filtered.text)
+
+        attention_filtered = self.client.get("/artifacts", params={"attention": "follow-up-overdue"})
+        self.assertEqual(attention_filtered.status_code, 200)
+        self.assertIn("web-platform.html", attention_filtered.text)
+        self.assertNotIn("cli-backend.html", attention_filtered.text)
+        self.assertIn("팔로업 overdue", attention_filtered.text)
 
 
 if __name__ == "__main__":

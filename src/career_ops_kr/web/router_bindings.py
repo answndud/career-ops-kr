@@ -23,7 +23,6 @@ from career_ops_kr.web.common import (
     safe_text as _safe_text,
 )
 from career_ops_kr.web.dashboard import (
-    attach_generated_resume_job_signals,
     default_web_profile_path,
     get_follow_up_agenda,
     get_dashboard_snapshot,
@@ -48,6 +47,7 @@ from career_ops_kr.web.job_records import (
     update_job_record,
 )
 from career_ops_kr.web.jobs_view import (
+    attach_generated_resume_job_signals,
     describe_save_result,
     enrich_search_results,
     job_artifact_specs,

@@ -78,9 +78,11 @@ def filter_generated_resume_items(
     *,
     source: str = "all",
     query: str = "",
+    attention: str = "all",
 ) -> list[dict[str, Any]]:
     normalized_source = source.strip().lower()
     normalized_query = query.strip().lower()
+    normalized_attention = attention.strip().lower()
     filtered: list[dict[str, Any]] = []
     for item in items:
         if normalized_source in {"web", "cli"} and item.get("source_label") != normalized_source:
@@ -100,8 +102,29 @@ def filter_generated_resume_items(
             ).lower()
             if normalized_query not in haystack:
                 continue
+        if not _matches_generated_resume_attention(item, normalized_attention):
+            continue
         filtered.append(item)
     return filtered
+
+
+def _matches_generated_resume_attention(item: dict[str, Any], attention: str) -> bool:
+    if not attention or attention == "all":
+        return True
+    tags = {
+        safe_text(tag.get("label")).lower()
+        for tag in (item.get("job_attention_tags") or [])
+        if isinstance(tag, dict)
+    }
+    if attention == "problem-only":
+        return bool(item.get("job_has_problem"))
+    if attention == "follow-up-overdue":
+        return "팔로업 overdue" in tags
+    if attention == "follow-up-missing":
+        return "팔로업 미설정" in tags
+    if attention == "missing-report":
+        return "리포트 없음" in tags
+    return True
 
 
 def load_tailoring_guidance(context_path: Path | None, *, paths: WebPaths) -> dict[str, Any] | None:

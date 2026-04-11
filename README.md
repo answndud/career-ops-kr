@@ -123,6 +123,7 @@ career-ops-kr serve-web
 - **산출물**
   - 웹과 CLI에서 생성한 HTML/PDF 이력서 inventory 확인
   - 연결된 공고가 있으면 산출물 카드에서 그 공고의 다음 액션도 함께 확인
+  - `문제 있음 / 팔로업 overdue / 팔로업 미설정 / 리포트 없음` 기준으로 바로 좁혀 보기
   - 새 산출물은 HTML 옆 `.manifest.json`까지 같이 남겨 provenance를 추적
   - 같은 output root에는 `artifact-index.json` derived cache도 같이 갱신되어 build run 기준 inventory lookup을 돕습니다.
   - manifest에는 `build_run_id`와 `inventory_key`가 같이 기록됩니다.

@@ -37,7 +37,7 @@
         <div class="hint">manifest 없이 발견된 HTML</div>
       </article>
     </div>
-    <form method="get" action="/artifacts" class="grid three">
+    <form method="get" action="/artifacts" class="grid four">
       <div class="field">
         <label>검색</label>
         <input type="text" name="q" value="{{ query }}" placeholder="파일명, 회사, 포지션">
@@ -48,6 +48,16 @@
           <option value="all" {% if source_filter == "all" %}selected{% endif %}>전체</option>
           <option value="web" {% if source_filter == "web" %}selected{% endif %}>웹</option>
           <option value="cli" {% if source_filter == "cli" %}selected{% endif %}>CLI</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>운영 신호</label>
+        <select name="attention">
+          <option value="all" {% if attention_filter == "all" %}selected{% endif %}>전체</option>
+          <option value="problem-only" {% if attention_filter == "problem-only" %}selected{% endif %}>문제 있음</option>
+          <option value="follow-up-overdue" {% if attention_filter == "follow-up-overdue" %}selected{% endif %}>팔로업 overdue</option>
+          <option value="follow-up-missing" {% if attention_filter == "follow-up-missing" %}selected{% endif %}>팔로업 미설정</option>
+          <option value="missing-report" {% if attention_filter == "missing-report" %}selected{% endif %}>리포트 없음</option>
         </select>
       </div>
       <div class="field">

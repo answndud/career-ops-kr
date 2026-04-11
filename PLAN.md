@@ -42,6 +42,7 @@
   - home dashboard는 최근 공고 / 최근 이력서 / 최근 생성 웹 HTML/PDF / preset 경로를 함께 보여주는 입구로 유지
   - home dashboard의 recent jobs는 attention tag / artifact 상태 / 다음 액션 요약까지 같이 보여주는 운영 entry로 유지
   - artifacts inventory와 home recent generated output은 linked job이 있으면 그 공고의 attention tag / 다음 액션도 같이 보여주는 운영 entry로 유지
+  - artifacts inventory는 `문제 있음 / 팔로업 overdue / 팔로업 미설정 / 리포트 없음` filter로 attention 높은 산출물만 바로 좁힐 수 있게 유지
   - home dashboard는 웹과 CLI에서 만든 최근 HTML/PDF 산출물을 함께 보여주고, linked saved job이 있으면 detail entry로 이어지게 유지
   - follow-up inbox는 overdue / today / next-7-days / unscheduled-active agenda를 보여주는 별도 화면으로 유지
   - follow-up inbox는 today / 3일 뒤 / 7일 뒤 / 미설정 quick action으로 follow_up 날짜를 바로 조정할 수 있게 유지

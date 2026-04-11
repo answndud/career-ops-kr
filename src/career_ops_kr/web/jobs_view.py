@@ -199,6 +199,39 @@ def enrich_search_results(items: list[dict[str, Any]], *, paths: WebPaths) -> li
     return enriched
 
 
+def attach_generated_resume_job_signals(
+    items: list[dict[str, Any]],
+    *,
+    paths: WebPaths,
+) -> list[dict[str, Any]]:
+    enriched_items = [dict(item) for item in items]
+    linked_job_ids = sorted(
+        {
+            int(item["job_id"])
+            for item in enriched_items
+            if item.get("job_id") is not None
+        }
+    )
+    generated_jobs_by_id: dict[int, dict[str, Any]] = {}
+    if linked_job_ids:
+        placeholders = ", ".join("?" for _ in linked_job_ids)
+        with connection_scope() as conn:
+            generated_job_rows = conn.execute(
+                f"SELECT * FROM jobs WHERE id IN ({placeholders})",
+                linked_job_ids,
+            ).fetchall()
+        generated_jobs_by_id = {
+            int(row["id"]): job_row_with_ui_state(row, paths=paths)
+            for row in generated_job_rows
+        }
+    for item in enriched_items:
+        linked_job = generated_jobs_by_id.get(int(item["job_id"])) if item.get("job_id") is not None else None
+        item["job_attention_summary"] = linked_job["attention"]["summary"] if linked_job else None
+        item["job_attention_tags"] = linked_job["attention"]["tags"] if linked_job else []
+        item["job_has_problem"] = bool(linked_job["attention"]["has_problem"]) if linked_job else False
+    return enriched_items
+
+
 def job_artifact_specs(job_row: dict[str, Any], *, paths: WebPaths) -> list[dict[str, Any]]:
     artifact_specs = [
         ("job_path", "저장된 JD", paths.jd_dir, "job"),
