@@ -22,6 +22,7 @@ class PagesRouterDeps:
     resume_preset_options: Callable[[], list[dict[str, str]]]
     generated_resume_snapshot: Callable[..., dict[str, Any]]
     filter_generated_resume_items: Callable[..., list[dict[str, Any]]]
+    enrich_generated_resume_items: Callable[[list[dict[str, Any]]], list[dict[str, Any]]]
     tracker_status_choices: Callable[[], list[str]]
     job_row_with_ui_state: Callable[[dict[str, Any]], dict[str, Any]]
     load_tracker_row_for_job: Callable[[dict[str, Any]], dict[str, str] | None]

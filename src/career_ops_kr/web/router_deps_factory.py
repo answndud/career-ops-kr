@@ -46,6 +46,7 @@ def build_router_deps(*, hooks: WebRouterFactoryHooks) -> WebRouterDeps:
             resume_preset_options=bindings.preset_options,
             generated_resume_snapshot=bindings.generated_snapshot,
             filter_generated_resume_items=bindings.filter_generated_resume_items,
+            enrich_generated_resume_items=bindings.enriched_generated_items,
             tracker_status_choices=bindings.status_choices,
             job_row_with_ui_state=bindings.job_ui_state,
             load_tracker_row_for_job=bindings.tracker_row_for_job,

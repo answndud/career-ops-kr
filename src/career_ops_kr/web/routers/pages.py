@@ -84,13 +84,14 @@ def build_pages_router(deps: PagesRouterDeps) -> APIRouter:
     ) -> HTMLResponse:
         inventory = deps.generated_resume_snapshot(limit=None)
         filtered_items = deps.filter_generated_resume_items(inventory["items"], source=source, query=q)
+        enriched_items = deps.enrich_generated_resume_items(filtered_items)
         return deps.templates.TemplateResponse(
             request,
             "artifacts.html",
             deps.template_context(
                 source_filter=source if source in {"all", "web", "cli"} else "all",
                 query=q,
-                artifacts=filtered_items,
+                artifacts=enriched_items,
                 inventory_total=inventory["total"],
                 inventory_web_total=inventory["web_total"],
                 inventory_cli_total=inventory["cli_total"],

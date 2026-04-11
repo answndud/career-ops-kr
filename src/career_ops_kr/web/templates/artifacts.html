@@ -97,6 +97,16 @@
               <a class="link" href="{{ item.job_detail_url }}">연결된 공고</a>
             {% endif %}
           </div>
+          {% if item.job_attention_tags %}
+            <div class="mini-pills">
+              {% for tag in item.job_attention_tags %}
+                <span class="status-chip {% if tag.tone == 'error' %}error{% elif tag.tone == 'warn' %}warn{% endif %}">{{ tag.label }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+          {% if item.job_attention_summary %}
+            <div class="meta">연결 공고 다음 액션: {{ item.job_attention_summary }}</div>
+          {% endif %}
           <div class="path-list meta">
             {% if item.inventory_key %}<div>inventory: <code>{{ item.inventory_key }}</code></div>{% endif %}
             <div>html: <code>{{ item.html_path }}</code></div>

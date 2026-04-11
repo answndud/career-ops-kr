@@ -1268,6 +1268,16 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("saved report dir", response.text)
 
     def test_artifacts_page_surfaces_web_and_cli_outputs(self) -> None:
+        created_job = self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Manifest Platform",
+                "position": "Platform Engineer",
+                "status": "검토중",
+                "source": "web",
+                "follow_up": (date.today() - timedelta(days=1)).isoformat(),
+            },
+        ).json()
         generated_dir = self.output_dir / "web-resumes"
         generated_dir.mkdir(parents=True, exist_ok=True)
         (generated_dir / "web-platform.html").write_text("<html></html>", encoding="utf-8")
@@ -1307,6 +1317,25 @@ class WebAppTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        self.report_dir.mkdir(parents=True, exist_ok=True)
+        report_path = self.report_dir / "web-platform.md"
+        report_path.write_text("# Report\n\nArtifacts", encoding="utf-8")
+        with connection_scope() as conn:
+            conn.execute(
+                """
+                UPDATE jobs
+                SET html_path = ?, pdf_path = ?, report_path = ?, context_path = ?
+                WHERE id = ?
+                """,
+                (
+                    (generated_dir / "web-platform.html").as_posix(),
+                    (generated_dir / "web-platform.pdf").as_posix(),
+                    report_path.as_posix(),
+                    (context_dir / "web-platform.json").as_posix(),
+                    created_job["id"],
+                ),
+            )
+            conn.commit()
         response = self.client.get("/artifacts")
         self.assertEqual(response.status_code, 200)
         self.assertIn("생성된 이력서 산출물", response.text)
@@ -1316,6 +1345,9 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("br_20260409T023000Z_demo1234", response.text)
         self.assertIn("web-resumes/web-platform.html", response.text)
         self.assertIn("manifest", response.text)
+        self.assertIn("연결 공고 다음 액션:", response.text)
+        self.assertIn("팔로업 overdue", response.text)
+        self.assertIn("팔로업 날짜가 지났습니다. 상태와 메모를 갱신하세요.", response.text)
         self.assertIn("생성된 이력서 산출물", response.text)
 
         filtered = self.client.get("/artifacts", params={"source": "cli"})

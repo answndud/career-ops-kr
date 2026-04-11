@@ -23,6 +23,7 @@ from career_ops_kr.web.common import (
     safe_text as _safe_text,
 )
 from career_ops_kr.web.dashboard import (
+    attach_generated_resume_job_signals,
     default_web_profile_path,
     get_follow_up_agenda,
     get_dashboard_snapshot,
@@ -125,6 +126,9 @@ class WebRouterBindings:
 
     def generated_snapshot(self, *, limit: int | None = 6) -> dict[str, Any]:
         return generated_resume_snapshot(paths=self.current_paths(), limit=limit)
+
+    def enriched_generated_items(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return attach_generated_resume_job_signals(items, paths=self.current_paths())
 
     def loaded_tailoring_guidance(self, context_path: Path | None) -> dict[str, Any] | None:
         return load_tailoring_guidance(context_path, paths=self.current_paths())

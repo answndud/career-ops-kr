@@ -61,6 +61,11 @@
     - `dashboard.py`가 recent jobs도 `job_row_with_ui_state()`를 거친 payload로 노출
     - `home.html` recent jobs 카드에 attention tag, report/resume badge, `다음 액션` 요약 추가
     - `tests/test_web.py`에 home recent jobs attention summary 회귀 추가
+  - generated artifact inventory 신호 강화
+    - `dashboard.py`에 linked job 운영 신호 부착 helper 추가
+    - home recent generated output과 `artifacts.html`이 linked job attention tag / `다음 액션`을 같이 표시
+    - `pages.py`, `router_bindings.py`, `router_deps_factory.py`, `routers/deps.py`가 같은 helper를 artifacts page에도 재사용하도록 정리
+    - `tests/test_web.py`에 artifacts page linked-job next-action 회귀 추가
   - web search preset 1차 추가
     - `src/career_ops_kr/web/search_presets.py`
     - `/api/search-presets` GET/POST/DELETE 추가

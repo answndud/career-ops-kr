@@ -11,6 +11,39 @@ from career_ops_kr.web.jobs_view import job_row_with_ui_state
 from career_ops_kr.web.paths import WebPaths
 
 
+def attach_generated_resume_job_signals(
+    items: list[dict[str, Any]],
+    *,
+    paths: WebPaths,
+) -> list[dict[str, Any]]:
+    enriched_items = [dict(item) for item in items]
+    linked_job_ids = sorted(
+        {
+            int(item["job_id"])
+            for item in enriched_items
+            if item.get("job_id") is not None
+        }
+    )
+    generated_jobs_by_id: dict[int, dict[str, Any]] = {}
+    if linked_job_ids:
+        placeholders = ", ".join("?" for _ in linked_job_ids)
+        with connection_scope() as conn:
+            generated_job_rows = conn.execute(
+                f"SELECT * FROM jobs WHERE id IN ({placeholders})",
+                linked_job_ids,
+            ).fetchall()
+        generated_jobs_by_id = {
+            int(row["id"]): job_row_with_ui_state(row, paths=paths)
+            for row in generated_job_rows
+        }
+    for item in enriched_items:
+        linked_job = generated_jobs_by_id.get(int(item["job_id"])) if item.get("job_id") is not None else None
+        item["job_attention_summary"] = linked_job["attention"]["summary"] if linked_job else None
+        item["job_attention_tags"] = linked_job["attention"]["tags"] if linked_job else []
+        item["job_has_problem"] = bool(linked_job["attention"]["has_problem"]) if linked_job else False
+    return enriched_items
+
+
 def get_dashboard_snapshot(*, paths: WebPaths) -> dict[str, Any]:
     with connection_scope() as conn:
         total_jobs = conn.execute("SELECT COUNT(*) AS count FROM jobs").fetchone()["count"]
@@ -33,31 +66,7 @@ def get_dashboard_snapshot(*, paths: WebPaths) -> dict[str, Any]:
     generated_outputs = generated_resume_snapshot(paths=paths, limit=6)
     follow_up_agenda = build_follow_up_agenda(list(follow_up_rows))
     recent_jobs = [job_row_with_ui_state(row, paths=paths) for row in recent_job_rows]
-    recent_generated_resumes = [dict(item) for item in generated_outputs["items"]]
-    linked_job_ids = sorted(
-        {
-            int(item["job_id"])
-            for item in recent_generated_resumes
-            if item.get("job_id") is not None
-        }
-    )
-    generated_jobs_by_id: dict[int, dict[str, Any]] = {}
-    if linked_job_ids:
-        placeholders = ", ".join("?" for _ in linked_job_ids)
-        with connection_scope() as conn:
-            generated_job_rows = conn.execute(
-                f"SELECT * FROM jobs WHERE id IN ({placeholders})",
-                linked_job_ids,
-            ).fetchall()
-        generated_jobs_by_id = {
-            int(row["id"]): job_row_with_ui_state(row, paths=paths)
-            for row in generated_job_rows
-        }
-    for item in recent_generated_resumes:
-        linked_job = generated_jobs_by_id.get(int(item["job_id"])) if item.get("job_id") is not None else None
-        item["job_attention_summary"] = linked_job["attention"]["summary"] if linked_job else None
-        item["job_attention_tags"] = linked_job["attention"]["tags"] if linked_job else []
-        item["job_has_problem"] = bool(linked_job["attention"]["has_problem"]) if linked_job else False
+    recent_generated_resumes = attach_generated_resume_job_signals(generated_outputs["items"], paths=paths)
     return {
         "totalJobs": total_jobs,
         "totalResumes": total_resumes,
