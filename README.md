@@ -148,6 +148,7 @@ career-ops-kr serve-web
 - **팔로업**
   - overdue / 오늘 / 앞으로 7일 / 날짜 미설정 active 항목을 전용 inbox에서 확인
   - 오늘로 이동 / 3일 뒤 / 7일 뒤 / 미설정 quick action으로 팔로업 날짜를 바로 조정
+  - 홈 대시보드의 팔로업 preview에서도 같은 quick action 지원
   - tracker 상세로 바로 이동해 상태와 메모를 갱신
   - 팔로업 날짜는 web sidecar 전용이며 tracker markdown 포맷은 바꾸지 않음
 

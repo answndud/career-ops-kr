@@ -52,6 +52,11 @@
     - follow-up 화면에서 `오늘로 / 3일 뒤 / 7일 뒤 / 미설정` quick action 지원
     - quick action은 기존 `update_job_record()` 경로를 재사용해 `follow_up`만 빠르게 갱신
     - `tests/test_web.py`에 quick action API와 follow-up inbox 버튼 노출 회귀 추가
+  - home dashboard follow-up preview에 quick action 확장
+    - `base.html`에 공용 `quickFollowUpAction` helper 추가
+    - `home.html` follow-up preview에서 `오늘로 / 3일 뒤 / 7일 뒤 / 미설정` 바로 실행 가능하게 정리
+    - `follow-ups.html`도 같은 공용 helper를 재사용하도록 중복 제거
+    - `tests/test_web.py`에 home dashboard quick action 버튼 노출 회귀 추가
   - web search preset 1차 추가
     - `src/career_ops_kr/web/search_presets.py`
     - `/api/search-presets` GET/POST/DELETE 추가

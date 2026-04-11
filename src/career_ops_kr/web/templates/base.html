@@ -573,6 +573,37 @@
         async copyText(value) {
           await navigator.clipboard.writeText(String(value || ""));
         },
+        renderNotice(targetId, message, tone = "ok") {
+          const target = document.getElementById(targetId);
+          if (!target) return;
+          target.className = `notice ${tone} result-panel`;
+          target.innerHTML = `<div><strong>${this.escapeHtml(message)}</strong></div>`;
+        },
+        async quickFollowUpAction(targetId, jobId, action, label, reload = true) {
+          if (!jobId || !action) return;
+          const actionLabels = {
+            today: "오늘로 이동",
+            plus3: "3일 뒤로 이동",
+            plus7: "7일 뒤로 이동",
+            clear: "미설정으로 변경",
+          };
+          const actionLabel = actionLabels[action] || "갱신";
+          this.renderNotice(targetId, `${label} 항목을 ${actionLabel} 중입니다...`, "warn");
+          const response = await fetch(`/api/jobs/${jobId}/follow-up-quick`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({action}),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            this.renderNotice(targetId, data.detail || "팔로업 quick action 실패", "error");
+            return;
+          }
+          this.renderNotice(targetId, `${label} 항목의 팔로업을 ${actionLabel}했습니다.`, "ok");
+          if (reload) {
+            window.setTimeout(() => window.location.reload(), 250);
+          }
+        },
         renderSavedJobResult(targetId, payload, message) {
           const target = document.getElementById(targetId);
           const detailUrl = payload.id ? `<a class="link" href="/tracker/${payload.id}">저장된 공고 보기</a>` : "";

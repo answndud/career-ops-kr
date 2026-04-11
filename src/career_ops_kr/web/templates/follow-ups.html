@@ -116,35 +116,8 @@
 </div>
 <script>
   const CareerOpsFollowUps = {
-    renderResult(message, tone = "ok") {
-      const output = document.getElementById("follow-up-action-output");
-      output.className = `notice ${tone} result-panel`;
-      output.innerHTML = `<div><strong>${CareerOpsWeb.escapeHtml(message)}</strong></div>`;
-    },
     async quickAction(jobId, action, label) {
-      if (!jobId || !action) return;
-      const actionLabels = {
-        today: "오늘로 이동",
-        plus3: "3일 뒤로 이동",
-        plus7: "7일 뒤로 이동",
-        clear: "미설정으로 변경",
-      };
-      CareerOpsFollowUps.renderResult(`${label} 항목을 ${actionLabels[action] || "갱신"} 중입니다...`, "warn");
-      const response = await fetch(`/api/jobs/${jobId}/follow-up-quick`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({action}),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        CareerOpsFollowUps.renderResult(data.detail || "팔로업 quick action 실패", "error");
-        return;
-      }
-      CareerOpsFollowUps.renderResult(
-        `${label} 항목의 팔로업을 ${actionLabels[action] || "갱신"}했습니다.`,
-        "ok",
-      );
-      window.setTimeout(() => window.location.reload(), 250);
+      await CareerOpsWeb.quickFollowUpAction("follow-up-action-output", jobId, action, label, true);
     },
   };
 </script>

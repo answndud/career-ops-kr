@@ -798,6 +798,7 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("검색어가 비어 있습니다.", response.json()["detail"])
 
     def test_home_dashboard_surfaces_recent_outputs(self) -> None:
+        overdue = (date.today() - timedelta(days=1)).isoformat()
         self.client.post(
             "/api/jobs",
             json={
@@ -805,6 +806,7 @@ class WebAppTests(unittest.TestCase):
                 "position": "Platform Engineer",
                 "status": "검토중",
                 "source": "web",
+                "follow_up": overdue,
             },
         )
         self.client.post(
@@ -851,6 +853,11 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("최근 생성한 HTML/PDF", text)
         self.assertIn("최근 live smoke 상태", text)
         self.assertIn("상세 상태 보기", text)
+        self.assertIn("홈에서 바로 일정 조정이 가능합니다.", text)
+        self.assertIn("오늘로", text)
+        self.assertIn("3일 뒤", text)
+        self.assertIn("7일 뒤", text)
+        self.assertIn("미설정", text)
         self.assertNotIn("최근 AI 출력", text)
 
     def test_dashboard_api_includes_recent_artifact_paths(self) -> None:

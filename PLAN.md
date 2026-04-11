@@ -43,6 +43,7 @@
   - home dashboard는 웹과 CLI에서 만든 최근 HTML/PDF 산출물을 함께 보여주고, linked saved job이 있으면 detail entry로 이어지게 유지
   - follow-up inbox는 overdue / today / next-7-days / unscheduled-active agenda를 보여주는 별도 화면으로 유지
   - follow-up inbox는 today / 3일 뒤 / 7일 뒤 / 미설정 quick action으로 follow_up 날짜를 바로 조정할 수 있게 유지
+  - home dashboard의 follow-up preview도 같은 quick action으로 가장 급한 일정만 바로 조정할 수 있게 유지
   - home은 최근 saved live smoke 상태를 compact summary로만 보여주고, settings는 detailed health/report metadata를 유지
   - saved job detail은 tracker 상태와 연결된 JD / report / context / HTML / PDF, related match activity를 다시 확인하고, 저장된 공고 URL이 있으면 같은 화면에서 resume build를 다시 시작하는 entry point로 유지
   - saved job detail은 context에 저장된 tailoring guidance도 다시 확인할 수 있게 유지

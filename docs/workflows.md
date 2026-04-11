@@ -119,13 +119,14 @@ Codex에게는 아래 순서로 요청하는 것이 좋습니다.
    같은 canonical detail URL을 다시 저장하면 새 row를 만들지 않고 기존 항목을 다시 엽니다. 저장 panel에서 `새 저장 / 기존 항목 보완 / 기존 항목 재사용`도 바로 확인합니다.
 8. `산출물` 페이지에서 웹과 CLI에서 생성한 HTML/PDF inventory를 함께 확인하고, 연결된 공고가 있으면 상세 화면으로 바로 이동할 수 있습니다. 새 산출물은 manifest 기반으로 provenance를 보여주고, manifest가 없는 예전 HTML은 legacy로 구분합니다.
 9. `팔로업` 페이지에서는 overdue / 오늘 / 앞으로 7일 / 날짜 미설정 active 항목을 전용 inbox로 모아 봅니다. tracker markdown 포맷은 유지하고, 일정 정리만 web sidecar 기준으로 돕습니다. 같은 화면에서 `오늘로`, `3일 뒤`, `7일 뒤`, `미설정` quick action으로 팔로업 날짜를 바로 조정할 수 있습니다.
-10. `트래커` 페이지에서 상태와 메모를 정리합니다. `리포트 없음`, `이력서 없음`, `팔로업 overdue`, `tracker 미연결` preset으로 attention item만 바로 좁힐 수 있습니다.
-11. 여러 항목을 한 번에 정리할 때는 `트래커`에서 보이는 row만 선택해서 상태, 팔로업, 출처를 일괄 변경할 수 있습니다. 이 bulk update도 기존 update 경로를 재사용하므로 상태와 출처는 markdown tracker가 같이 맞춰지고, 팔로업은 web sidecar에서만 관리합니다. 선택한 row에 메모/위치 미저장 draft가 있으면 먼저 개별 저장을 요구해서 다른 draft를 잃지 않게 유지합니다. tracker-linked field를 바꿀 때 `tracker_id`가 없는 row는 먼저 막아서 잘못된 markdown row를 건드리지 않게 유지합니다.
-12. 저장한 공고를 다시 볼 때는 `트래커` 목록에서 상세 화면으로 들어가 tracker 상태와 연결된 JD/report/context/HTML/PDF를 확인하고, 공고 URL이 있으면 그 자리에서 맞춤 이력서를 다시 생성합니다.
-13. 상세 화면에는 `다음에 할 일`과 tracker/web drift 요약이 같이 보여서, 단순 조회가 아니라 다음 액션 결정 화면으로 사용합니다.
-14. `홈`으로 돌아오면 최근 생성한 HTML/PDF 이력서와 preset 경로를 다시 바로 확인할 수 있습니다. 이 목록은 웹에서 만든 산출물과 CLI에서 만든 산출물을 함께 보여줍니다.
-15. `홈`은 recent live smoke 상태를 짧게 요약하고, `설정`은 target별 문제/dir/report 수를 자세히 보여줍니다.
-16. 웹 화면은 검색, 저장, 팔로업 정리, tracker 정리, deterministic resume build 중심으로 사용합니다.
+10. `홈` 대시보드의 follow-up preview에서도 같은 quick action을 제공하므로, inbox로 이동하지 않고도 가장 급한 일정만 바로 밀거나 비울 수 있습니다.
+11. `트래커` 페이지에서 상태와 메모를 정리합니다. `리포트 없음`, `이력서 없음`, `팔로업 overdue`, `tracker 미연결` preset으로 attention item만 바로 좁힐 수 있습니다.
+12. 여러 항목을 한 번에 정리할 때는 `트래커`에서 보이는 row만 선택해서 상태, 팔로업, 출처를 일괄 변경할 수 있습니다. 이 bulk update도 기존 update 경로를 재사용하므로 상태와 출처는 markdown tracker가 같이 맞춰지고, 팔로업은 web sidecar에서만 관리합니다. 선택한 row에 메모/위치 미저장 draft가 있으면 먼저 개별 저장을 요구해서 다른 draft를 잃지 않게 유지합니다. tracker-linked field를 바꿀 때 `tracker_id`가 없는 row는 먼저 막아서 잘못된 markdown row를 건드리지 않게 유지합니다.
+13. 저장한 공고를 다시 볼 때는 `트래커` 목록에서 상세 화면으로 들어가 tracker 상태와 연결된 JD/report/context/HTML/PDF를 확인하고, 공고 URL이 있으면 그 자리에서 맞춤 이력서를 다시 생성합니다.
+14. 상세 화면에는 `다음에 할 일`과 tracker/web drift 요약이 같이 보여서, 단순 조회가 아니라 다음 액션 결정 화면으로 사용합니다.
+15. `홈`으로 돌아오면 최근 생성한 HTML/PDF 이력서와 preset 경로를 다시 바로 확인할 수 있습니다. 이 목록은 웹에서 만든 산출물과 CLI에서 만든 산출물을 함께 보여줍니다.
+16. `홈`은 recent live smoke 상태를 짧게 요약하고, `설정`은 target별 문제/dir/report 수를 자세히 보여줍니다.
+17. 웹 화면은 검색, 저장, 팔로업 정리, tracker 정리, deterministic resume build 중심으로 사용합니다.
 
 규칙:
 

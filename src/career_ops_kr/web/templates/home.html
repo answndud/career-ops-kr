@@ -105,6 +105,7 @@
       <span class="status-chip ok">next {{ follow_up_agenda.counts.get("upcoming", 0) }}</span>
       <span class="status-chip warn">미설정 {{ follow_up_agenda.counts.get("unscheduled_active", 0) }}</span>
     </div>
+    <div id="home-follow-up-output" class="notice result-panel">홈에서 바로 일정 조정이 가능합니다.</div>
     <ul class="list-compact">
       {% for row in dashboard.upcomingFollowUps %}
         <li>
@@ -113,6 +114,18 @@
             {% if row.follow_up %}{{ row.follow_up }} · {% endif %}
             {{ row.follow_up_label }} · 상태 {{ row.status }}
           </div>
+          {% if row.id %}
+            <div class="actions">
+              {% if row.follow_up != follow_up_agenda.today %}
+                <button type="button" class="ghost" onclick="CareerOpsHome.quickAction({{ row.id }}, 'today', {{ (row.company ~ ' · ' ~ row.position) | tojson }})">오늘로</button>
+              {% endif %}
+              <button type="button" class="ghost" onclick="CareerOpsHome.quickAction({{ row.id }}, 'plus3', {{ (row.company ~ ' · ' ~ row.position) | tojson }})">3일 뒤</button>
+              <button type="button" class="ghost" onclick="CareerOpsHome.quickAction({{ row.id }}, 'plus7', {{ (row.company ~ ' · ' ~ row.position) | tojson }})">7일 뒤</button>
+              {% if row.follow_up %}
+                <button type="button" class="ghost" onclick="CareerOpsHome.quickAction({{ row.id }}, 'clear', {{ (row.company ~ ' · ' ~ row.position) | tojson }})">미설정</button>
+              {% endif %}
+            </div>
+          {% endif %}
         </li>
       {% else %}
         <li class="muted">다가오는 팔로업이 없습니다.</li>
@@ -250,4 +263,11 @@
 </div>
 
 </div>
+<script>
+  const CareerOpsHome = {
+    async quickAction(jobId, action, label) {
+      await CareerOpsWeb.quickFollowUpAction("home-follow-up-output", jobId, action, label, true);
+    },
+  };
+</script>
 {% endblock %}
