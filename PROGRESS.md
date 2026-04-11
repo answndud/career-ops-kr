@@ -54,6 +54,12 @@
     - search 화면에서 현재 검색어 preset 저장 / 삭제 / 재실행 UI 추가
     - settings table JSON payload로 저장해 export/import에 자동 포함되도록 유지
     - `tests/test_web.py`에 preset CRUD와 preset-based search page 회귀 추가
+  - web search preset 2차 마감
+    - `src/career_ops_kr/web/search_presets.py`에서 preset별 `last_used_at`, `is_default`, `activity_label` metadata 추가
+    - 첫 preset 자동 기본 지정, `/api/search-presets/{preset_key}/default` 기본 preset 변경 지원
+    - `/search`가 query 없이 열렸을 때 기본 preset으로 자동 검색되도록 정리
+    - `search.html`에서 기본 preset 지정 버튼과 마지막 사용 시각을 같이 노출
+    - `tests/test_web.py`에 default preset 자동 적용과 usage timestamp 회귀 추가
   - web 구조 개선 5차 완료
     - `src/career_ops_kr/web/routers/deps.py`를 `PagesRouterDeps`, `JobsRouterDeps`, `SearchRouterDeps`, `ResumeRouterDeps`, `SystemRouterDeps`로 분리
     - `src/career_ops_kr/web/app.py`는 route별 deps factory를 조합하고 `_router_deps()` bundle patch 포인트만 유지하도록 정리

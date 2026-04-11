@@ -645,6 +645,8 @@ class WebAppTests(unittest.TestCase):
         preset = payload["preset"]
         self.assertEqual(preset["name"], "플랫폼 기본")
         self.assertEqual(preset["query"], "platform engineer")
+        self.assertTrue(preset["is_default"])
+        self.assertIsNone(preset["last_used_at"])
         self.assertEqual(len(payload["presets"]), 1)
 
         list_response = self.client.get("/api/search-presets")
@@ -680,11 +682,74 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("저장된 preset으로 검색 중", page_response.text)
         self.assertIn("platform engineer", page_response.text)
         self.assertIn("플랫폼 기본", page_response.text)
+        self.assertIn("기본 preset", page_response.text)
         search_mock.assert_called_once_with("platform engineer")
+
+        used_list_response = self.client.get("/api/search-presets")
+        self.assertEqual(used_list_response.status_code, 200)
+        self.assertIsNotNone(used_list_response.json()["presets"][0]["last_used_at"])
 
         delete_response = self.client.delete(f"/api/search-presets/{preset['key']}")
         self.assertEqual(delete_response.status_code, 200)
         self.assertEqual(delete_response.json()["presets"], [])
+
+    def test_search_page_uses_default_preset_when_query_is_empty(self) -> None:
+        first_response = self.client.post(
+            "/api/search-presets",
+            json={"name": "플랫폼 기본", "query": "platform engineer"},
+        )
+        self.assertEqual(first_response.status_code, 200)
+        first_preset = first_response.json()["preset"]
+
+        second_response = self.client.post(
+            "/api/search-presets",
+            json={"name": "데이터 기본", "query": "data platform", "make_default": True},
+        )
+        self.assertEqual(second_response.status_code, 200)
+        second_preset = second_response.json()["preset"]
+        self.assertTrue(second_preset["is_default"])
+
+        default_response = self.client.post(f"/api/search-presets/{first_preset['key']}/default")
+        self.assertEqual(default_response.status_code, 200)
+        self.assertTrue(default_response.json()["preset"]["is_default"])
+
+        mocked = {
+            "results": [
+                {
+                    "id": "wanted-2",
+                    "title": "Platform Engineer",
+                    "company": "Default Co",
+                    "location": "Seoul",
+                    "source": "원티드",
+                    "url": "https://www.wanted.co.kr/wd/99999",
+                    "type": "-",
+                    "experience": "-",
+                    "salary": "-",
+                    "deadline": "-",
+                    "description": "",
+                }
+            ],
+            "count": 1,
+            "translated_query": None,
+            "provider_statuses": [],
+            "provider_summary": None,
+            "degraded": False,
+            "sources": {"전체": 1, "원티드": 1},
+        }
+        with patch("career_ops_kr.web.app.search_jobs", return_value=mocked) as search_mock:
+            page_response = self.client.get("/search")
+        self.assertEqual(page_response.status_code, 200)
+        self.assertIn("기본 preset으로 검색 중", page_response.text)
+        self.assertIn("플랫폼 기본", page_response.text)
+        search_mock.assert_called_once_with("platform engineer")
+
+        list_response = self.client.get("/api/search-presets")
+        self.assertEqual(list_response.status_code, 200)
+        presets = list_response.json()["presets"]
+        presets_by_key = {item["key"]: item for item in presets}
+        self.assertTrue(presets_by_key[first_preset["key"]]["is_default"])
+        self.assertFalse(presets_by_key[second_preset["key"]]["is_default"])
+        self.assertIsNotNone(presets_by_key[first_preset["key"]]["last_used_at"])
 
     def test_search_preset_save_rejects_empty_query(self) -> None:
         response = self.client.post("/api/search-presets", json={"name": "빈 검색", "query": "   "})

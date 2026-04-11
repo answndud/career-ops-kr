@@ -129,6 +129,7 @@ career-ops-kr serve-web
 - **검색**
   - 사람인 / 원티드 / eFinancial 통합 검색
   - 자주 쓰는 검색어를 search preset으로 저장하고 다시 실행
+  - preset별 기본 검색 지정과 마지막 사용 시각 확인
   - 검색 source 상태 strip에서 provider별 `정상 / 결과 없음 / 실패`와 실제 사용 검색어를 바로 확인
   - 검색 결과 저장
   - 같은 공고를 다시 저장해도 canonical URL 기준으로 기존 항목을 다시 열고 중복 row를 만들지 않음
@@ -173,7 +174,7 @@ career-ops-kr serve-web
 지금 이 프로젝트의 웹 화면은 아래 4가지만 써도 충분합니다.
 
 1. `이력서`에서 이력서 업로드
-2. `검색`에서 공고 저장과 search preset 저장
+2. `검색`에서 공고 저장과 search preset 저장, 기본 preset 지정
 3. `팔로업`과 `트래커`에서 다음 액션 정리
 4. `검색` 또는 `트래커 상세`에서 맞춤 이력서 HTML/PDF 생성
 

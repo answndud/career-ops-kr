@@ -46,7 +46,7 @@
   - saved job detail은 tracker 상태와 연결된 JD / report / context / HTML / PDF, related match activity를 다시 확인하고, 저장된 공고 URL이 있으면 같은 화면에서 resume build를 다시 시작하는 entry point로 유지
   - saved job detail은 context에 저장된 tailoring guidance도 다시 확인할 수 있게 유지
   - search는 provider runtime status strip과 canonical URL 기준 import dedupe를 유지
-  - search는 saved search preset 저장/재실행을 지원
+  - search는 saved search preset 저장/재실행, 기본 preset 지정, 마지막 사용 시각 표시를 지원
   - search provider status는 `정상 / 결과 없음 / 실패`를 구분하고, duplicate-save 결과는 새 row 생성 여부를 in-page에서 바로 설명하도록 유지
   - tracker 목록에서 선택한 항목에 대한 bulk status/source/follow-up 변경을 지원하고, status/source는 markdown tracker sync를 유지
   - tracker-linked bulk update는 `tracker_id`가 없는 row를 먼저 막아 잘못된 markdown fallback 매칭을 피함

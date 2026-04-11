@@ -33,8 +33,9 @@ class PagesRouterDeps:
     build_focus_preview: Callable[[dict[str, Any] | None], dict[str, list[str]]]
     safe_relative_to: Callable[[Path, Path], bool]
     list_resumes: Callable[[], list[dict[str, Any]]]
-    list_search_presets: Callable[[], list[dict[str, str]]]
-    get_search_preset: Callable[[str], dict[str, str] | None]
+    list_search_presets: Callable[[], list[dict[str, Any]]]
+    get_search_preset: Callable[[str], dict[str, Any] | None]
+    use_search_preset: Callable[[str], dict[str, Any] | None]
     search_jobs: Callable[[str], dict[str, Any]]
     enrich_search_results: Callable[[list[dict[str, Any]]], list[dict[str, Any]]]
 
@@ -59,8 +60,9 @@ class JobsRouterDeps:
 class SearchRouterDeps:
     search_jobs: Callable[[str], dict[str, Any]]
     enrich_search_results: Callable[[list[dict[str, Any]]], list[dict[str, Any]]]
-    list_search_presets: Callable[[], list[dict[str, str]]]
-    save_search_preset: Callable[[str | None, str | None], dict[str, str]]
+    list_search_presets: Callable[[], list[dict[str, Any]]]
+    save_search_preset: Callable[[str | None, str | None, bool], dict[str, Any]]
+    set_default_search_preset: Callable[[str], dict[str, Any]]
     delete_search_preset: Callable[[str], bool]
 
 

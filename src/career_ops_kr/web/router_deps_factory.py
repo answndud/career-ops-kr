@@ -59,6 +59,7 @@ def build_router_deps(*, hooks: WebRouterFactoryHooks) -> WebRouterDeps:
             list_resumes=bindings.list_resumes,
             list_search_presets=bindings.search_preset_list,
             get_search_preset=bindings.search_preset_item,
+            use_search_preset=bindings.used_search_preset,
             search_jobs=bindings.search_jobs,
             enrich_search_results=bindings.enriched_search_results,
         ),
@@ -81,6 +82,7 @@ def build_router_deps(*, hooks: WebRouterFactoryHooks) -> WebRouterDeps:
             enrich_search_results=bindings.enriched_search_results,
             list_search_presets=bindings.search_preset_list,
             save_search_preset=bindings.stored_search_preset,
+            set_default_search_preset=bindings.default_search_preset,
             delete_search_preset=bindings.removed_search_preset,
         ),
         resume=ResumeRouterDeps(

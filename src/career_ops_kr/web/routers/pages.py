@@ -34,8 +34,16 @@ def build_pages_router(deps: PagesRouterDeps) -> APIRouter:
     ) -> HTMLResponse:
         results: dict[str, Any] | None = None
         visible_results: list[dict[str, Any]] = []
+        selected_preset_source: str | None = None
+        selected_preset = deps.use_search_preset(preset or "") if preset else None
+        if selected_preset:
+            selected_preset_source = "saved"
+        elif not q:
+            default_preset = next((item for item in deps.list_search_presets() if item.get("is_default")), None)
+            if default_preset:
+                selected_preset = deps.use_search_preset(default_preset["key"]) or default_preset
+                selected_preset_source = "default"
         saved_presets = deps.list_search_presets()
-        selected_preset = deps.get_search_preset(preset or "") if preset else None
         resolved_query = q or (selected_preset["query"] if selected_preset else "")
         active_source = source or "전체"
         if resolved_query:
@@ -59,6 +67,7 @@ def build_pages_router(deps: PagesRouterDeps) -> APIRouter:
             deps.template_context(
                 query=resolved_query,
                 selected_preset=selected_preset,
+                selected_preset_source=selected_preset_source,
                 search_presets=saved_presets,
                 results=results,
                 visible_results=visible_results,

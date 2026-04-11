@@ -69,6 +69,8 @@ from career_ops_kr.web.search_presets import (
     get_search_preset,
     list_search_presets,
     save_search_preset,
+    set_default_search_preset,
+    use_search_preset,
 )
 
 if TYPE_CHECKING:
@@ -160,19 +162,26 @@ class WebRouterBindings:
     def enriched_search_results(self, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return enrich_search_results(items, paths=self.current_paths())
 
-    def search_preset_list(self) -> list[dict[str, str]]:
+    def search_preset_list(self) -> list[dict[str, Any]]:
         return list_search_presets(connection_scope=connection_scope)
 
-    def search_preset_item(self, preset_key: str) -> dict[str, str] | None:
+    def search_preset_item(self, preset_key: str) -> dict[str, Any] | None:
         return get_search_preset(preset_key, connection_scope=connection_scope)
 
-    def stored_search_preset(self, name: str | None, query: str | None) -> dict[str, str]:
+    def used_search_preset(self, preset_key: str) -> dict[str, Any] | None:
+        return use_search_preset(preset_key, connection_scope=connection_scope)
+
+    def stored_search_preset(self, name: str | None, query: str | None, make_default: bool = False) -> dict[str, Any]:
         return save_search_preset(
             name,
             query,
             connection_scope=connection_scope,
             slugify=slugify,
+            make_default=make_default,
         )
+
+    def default_search_preset(self, preset_key: str) -> dict[str, Any]:
+        return set_default_search_preset(preset_key, connection_scope=connection_scope)
 
     def removed_search_preset(self, preset_key: str) -> bool:
         return delete_search_preset(preset_key, connection_scope=connection_scope)
