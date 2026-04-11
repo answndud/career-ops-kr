@@ -105,6 +105,7 @@ career-ops-kr serve-web
 - 저장된 공고 수
 - 최근 공고의 attention 요약과 다음 액션
 - 최근 생성한 HTML/PDF 이력서 다시 열기
+- 최근 생성 산출물에 연결된 공고의 다음 액션 다시 확인
 - web/CLI 산출물 구분
 - resume preset 시작점
 - 최근 saved live smoke 상태 요약

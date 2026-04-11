@@ -799,7 +799,7 @@ class WebAppTests(unittest.TestCase):
 
     def test_home_dashboard_surfaces_recent_outputs(self) -> None:
         overdue = (date.today() - timedelta(days=1)).isoformat()
-        self.client.post(
+        created_job = self.client.post(
             "/api/jobs",
             json={
                 "company": "Acme",
@@ -808,7 +808,7 @@ class WebAppTests(unittest.TestCase):
                 "source": "web",
                 "follow_up": overdue,
             },
-        )
+        ).json()
         self.client.post(
             "/api/resume/upload",
             files={"file": ("resume.txt", b"Python\nFastAPI\nSQL", "text/plain")},
@@ -818,6 +818,8 @@ class WebAppTests(unittest.TestCase):
         generated_dir.mkdir(parents=True, exist_ok=True)
         (generated_dir / "demo-resume.html").write_text("<html></html>", encoding="utf-8")
         (generated_dir / "demo-resume.pdf").write_bytes(b"%PDF-1.4")
+        self.report_dir.mkdir(parents=True, exist_ok=True)
+        (self.report_dir / "demo-resume.md").write_text("# Report\n\nPreview", encoding="utf-8")
         (self.output_dir / "cli-resume.html").write_text("<html></html>", encoding="utf-8")
         (self.output_dir / "live-smoke").mkdir(parents=True, exist_ok=True)
         (self.output_dir / "live-smoke" / "batch-report.json").write_text(
@@ -840,6 +842,22 @@ class WebAppTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        with connection_scope() as conn:
+            conn.execute(
+                """
+                UPDATE jobs
+                SET html_path = ?, pdf_path = ?, report_path = ?, context_path = ?
+                WHERE id = ?
+                """,
+                (
+                    (generated_dir / "demo-resume.html").as_posix(),
+                    (generated_dir / "demo-resume.pdf").as_posix(),
+                    (self.report_dir / "demo-resume.md").as_posix(),
+                    None,
+                    created_job["id"],
+                ),
+            )
+            conn.commit()
 
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
@@ -854,8 +872,9 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("최근 live smoke 상태", text)
         self.assertIn("상세 상태 보기", text)
         self.assertIn("다음 액션:", text)
-        self.assertIn("리포트 없음", text)
-        self.assertIn("이력서 없음", text)
+        self.assertIn("연결 공고 다음 액션:", text)
+        self.assertIn("Report", text)
+        self.assertIn("Resume", text)
         self.assertIn("팔로업 날짜가 지났습니다. 상태와 메모를 갱신하세요.", text)
         self.assertIn("홈에서 바로 일정 조정이 가능합니다.", text)
         self.assertIn("오늘로", text)
@@ -865,6 +884,15 @@ class WebAppTests(unittest.TestCase):
         self.assertNotIn("최근 AI 출력", text)
 
     def test_dashboard_api_includes_recent_artifact_paths(self) -> None:
+        created_job = self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Manifest Co",
+                "position": "Platform Engineer",
+                "status": "검토중",
+                "source": "web",
+            },
+        ).json()
         self.client.post(
             "/api/resume/upload",
             files={"file": ("resume.txt", b"Python\nFastAPI\nSQL", "text/plain")},
@@ -897,7 +925,25 @@ class WebAppTests(unittest.TestCase):
         (self.output_dir / "resume-contexts").mkdir(parents=True, exist_ok=True)
         (self.output_dir / "resume-contexts" / "demo-resume.json").write_text("{}", encoding="utf-8")
         (self.output_dir / "jds").mkdir(parents=True, exist_ok=True)
-        (self.output_dir / "reports").mkdir(parents=True, exist_ok=True)
+        self.report_dir.mkdir(parents=True, exist_ok=True)
+        report_path = self.report_dir / "demo-resume.md"
+        report_path.write_text("# Report\n\nManifest", encoding="utf-8")
+        with connection_scope() as conn:
+            conn.execute(
+                """
+                UPDATE jobs
+                SET html_path = ?, pdf_path = ?, context_path = ?, report_path = ?
+                WHERE id = ?
+                """,
+                (
+                    (generated_dir / "demo-resume.html").as_posix(),
+                    (generated_dir / "demo-resume.pdf").as_posix(),
+                    (self.output_dir / "resume-contexts" / "demo-resume.json").as_posix(),
+                    report_path.as_posix(),
+                    created_job["id"],
+                ),
+            )
+            conn.commit()
 
         response = self.client.get("/api/dashboard")
         self.assertEqual(response.status_code, 200)
@@ -921,6 +967,22 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(
             generated_by_url["/output/web-resumes/demo-resume.html"]["context_path"],
             (self.output_dir / "resume-contexts" / "demo-resume.json").as_posix(),
+        )
+        self.assertEqual(
+            generated_by_url["/output/web-resumes/demo-resume.html"]["job_id"],
+            created_job["id"],
+        )
+        self.assertEqual(
+            generated_by_url["/output/web-resumes/demo-resume.html"]["job_detail_url"],
+            f"/tracker/{created_job['id']}",
+        )
+        self.assertEqual(
+            generated_by_url["/output/web-resumes/demo-resume.html"]["job_attention_summary"],
+            "다음 액션을 잊지 않도록 팔로업 날짜를 지정하세요.",
+        )
+        self.assertEqual(
+            generated_by_url["/output/web-resumes/demo-resume.html"]["job_attention_tags"][0]["label"],
+            "팔로업 미설정",
         )
         self.assertEqual(generated_by_url["/output/web-resumes/demo-resume.html"]["provenance"], "manifest")
         self.assertEqual(generated_by_url["/output/cli-resume.html"]["source_label"], "cli")
