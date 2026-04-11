@@ -1969,6 +1969,7 @@ class ArtifactManifestCliTest(unittest.TestCase):
             self.assertIn("Created: 1", result.output)
             self.assertIn("Overwritten: 1", result.output)
             self.assertIn("Skipped: 0", result.output)
+            self.assertIn("Pruned artifact-index entries: 0", result.output)
             self.assertIn(new_html.with_suffix(".manifest.json").as_posix(), result.output)
             self.assertIn(existing_manifest.as_posix(), result.output)
             self.assertEqual('{"version":1,"paths":{}}\n', existing_manifest.read_text(encoding="utf-8"))

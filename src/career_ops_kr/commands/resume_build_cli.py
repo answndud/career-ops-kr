@@ -225,6 +225,7 @@ def register_resume_build_commands(app: typer.Typer) -> None:
         typer.echo(f"Created: {result.created}")
         typer.echo(f"Overwritten: {result.overwritten}")
         typer.echo(f"Skipped: {result.skipped}")
+        typer.echo(f"Pruned artifact-index entries: {result.pruned_index_entries}")
         if result.manifests:
             typer.echo("Manifest paths:")
             for path in result.manifests:

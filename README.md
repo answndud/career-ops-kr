@@ -205,7 +205,7 @@ career-ops-kr backfill-artifact-manifests
 ```
 
 이 명령은 기존 HTML 옆에 `.manifest.json`을 만들어서 웹 `산출물` 화면과 provenance 표시를 최신 기준으로 맞춰 줍니다.
-이미 manifest가 있는 HTML도 같은 실행에서 `artifact-index.json` entry를 같이 맞춥니다.
+이미 manifest가 있는 HTML도 같은 실행에서 `artifact-index.json` entry를 같이 맞추고, stale orphan entry가 있으면 함께 정리합니다.
 
 역할별 이력서 예시:
 

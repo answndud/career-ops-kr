@@ -73,6 +73,23 @@ def _load_artifact_index_payload(index_path: Path) -> dict[str, Any]:
 
 
 def _upsert_artifact_index_entry_from_manifest(manifest_path: Path) -> Path:
+    output_root, inventory_key, entry = _artifact_index_entry_from_manifest(manifest_path)
+    index_path = _artifact_index_path_for_output_root(output_root)
+    try:
+        payload = _load_artifact_index_payload(index_path)
+    except (ValueError, json.JSONDecodeError, OSError):
+        payload = _default_artifact_index_payload()
+    payload["entries"][inventory_key] = entry
+    payload["updated_at"] = datetime.now(UTC).isoformat()
+    ensure_dir(index_path.parent)
+    index_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return index_path
+
+
+def _artifact_index_entry_from_manifest(manifest_path: Path) -> tuple[Path, str, dict[str, Any]]:
     manifest = load_resume_artifact_manifest(manifest_path)
     manifest_paths = manifest.get("paths") or {}
     if not isinstance(manifest_paths, dict):
@@ -83,12 +100,6 @@ def _upsert_artifact_index_entry_from_manifest(manifest_path: Path) -> Path:
 
     html_path = Path(html_path_value)
     output_root = _artifact_output_root_for_path(html_path)
-    index_path = _artifact_index_path_for_output_root(output_root)
-    try:
-        payload = _load_artifact_index_payload(index_path)
-    except (ValueError, json.JSONDecodeError, OSError):
-        payload = _default_artifact_index_payload()
-
     inventory_key = str(
         manifest.get("inventory_key")
         or _artifact_inventory_key(html_path, output_root=output_root)
@@ -102,14 +113,50 @@ def _upsert_artifact_index_entry_from_manifest(manifest_path: Path) -> Path:
         "html_path": html_path.as_posix(),
         "pdf_path": manifest_paths.get("pdf_path"),
     }
-    payload["entries"][inventory_key] = entry
+    return output_root, inventory_key, entry
+
+
+def _rebuild_artifact_index(output_root: Path) -> int:
+    index_path = _artifact_index_path_for_output_root(output_root)
+    previous_keys: set[str] = set()
+    try:
+        previous_payload = _load_artifact_index_payload(index_path)
+        previous_keys = {
+            key for key in previous_payload.get("entries", {}).keys() if isinstance(key, str)
+        }
+    except (ValueError, json.JSONDecodeError, OSError):
+        previous_keys = set()
+
+    entries: dict[str, dict[str, Any]] = {}
+    for manifest_path in sorted(output_root.rglob("*.manifest.json")):
+        if not manifest_path.is_file():
+            continue
+        try:
+            manifest_output_root, inventory_key, entry = _artifact_index_entry_from_manifest(manifest_path)
+        except (ValueError, json.JSONDecodeError, OSError):
+            continue
+        if manifest_output_root.resolve() != output_root.resolve():
+            continue
+        html_path = Path(str(entry["html_path"]))
+        if not html_path.exists():
+            continue
+        entries[inventory_key] = entry
+
+    pruned_count = len(previous_keys - set(entries))
+    if not entries:
+        if index_path.exists():
+            index_path.unlink()
+        return pruned_count
+
+    payload = _default_artifact_index_payload()
+    payload["entries"] = entries
     payload["updated_at"] = datetime.now(UTC).isoformat()
     ensure_dir(index_path.parent)
     index_path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    return index_path
+    return pruned_count
 
 
 def _load_resume_guidance_from_context(context_path: Path) -> dict[str, Any] | None:
@@ -251,6 +298,7 @@ def backfill_artifact_manifests(
             overwritten=0,
             skipped=0,
             manifests=[],
+            pruned_index_entries=0,
         )
 
     html_paths = sorted(
@@ -319,12 +367,17 @@ def backfill_artifact_manifests(
         else:
             created += 1
 
+    pruned_index_entries = 0
+    if not dry_run:
+        pruned_index_entries = _rebuild_artifact_index(output_dir)
+
     return BackfillArtifactManifestResult(
         scanned=len(html_paths),
         created=created,
         overwritten=overwritten_count,
         skipped=skipped,
         manifests=manifests,
+        pruned_index_entries=pruned_index_entries,
     )
 
 

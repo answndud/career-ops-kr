@@ -121,6 +121,7 @@
   - Python Playwright 기반 `tests/test_web_e2e.py`
   - 홈 -> resume upload -> tracker 생성 -> saved job detail -> resume build 기본 흐름을 필요할 때만 실제 브라우저에서 점검
   - resume manifest는 `build_run_id`, `inventory_key`, derived `artifact-index.json`까지 같이 유지
+  - `backfill-artifact-manifests`는 stale `artifact-index.json` orphan entry도 같이 정리
 
 ### P0.5
 

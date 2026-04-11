@@ -83,6 +83,7 @@ class BackfillArtifactManifestResult:
     overwritten: int
     skipped: int
     manifests: list[Path]
+    pruned_index_entries: int = 0
 
 
 @dataclass(slots=True)
@@ -110,4 +111,3 @@ __all__ = [
     "ResumeTailoringArtifacts",
     "TailoredResumeContextArtifacts",
 ]
-

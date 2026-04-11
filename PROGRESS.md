@@ -35,6 +35,11 @@
   - `artifact-index.json` 누락, manifest/index entry mismatch, orphan index entry를 추가 점검
   - `tests/test_tracker.py`, `tests/test_cli.py`에 manifest/index drift 회귀 추가
   - `python -m unittest tests.test_tracker tests.test_cli`, `career-ops-kr audit-jobs --help` 통과
+  - artifact index cleanup 경로 보강
+  - `backfill-artifact-manifests`가 stale `artifact-index.json` orphan entry를 prune하도록 정리
+  - `BackfillArtifactManifestResult`와 CLI 출력에 pruned index entry 수를 추가
+  - `tests/test_resume.py`, `tests/test_cli.py`에 stale index prune 회귀 추가
+  - `python -m unittest tests.test_resume tests.test_cli`, `python -m compileall src/career_ops_kr/resume_pipeline src/career_ops_kr/commands/resume_build_cli.py` 통과
   - web follow-up inbox 1차 추가
     - `src/career_ops_kr/web/followups.py`
     - `/follow-ups`, `/api/follow-ups`

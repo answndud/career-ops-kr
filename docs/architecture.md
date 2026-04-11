@@ -57,7 +57,7 @@ saved JD + score report
 
 `apply-resume-tailoring`는 packet을 base resume context에 반영하되, 없는 기술을 임의로 추가하지 않는다. 기본적으로 `headline`, `summary`, `skills` 순서, `experience/projects` 정렬만 바꾸고, 나머지 guidance는 `tailoringGuidance` metadata로 남긴다.
 
-`build-tailored-resume`와 `build-tailored-resume-from-url`는 HTML 옆에 sibling `.manifest.json`도 같이 남긴다. manifest에는 `build_run_id`와 `inventory_key`도 같이 기록되고, 같은 output root에는 `artifact-index.json` derived cache를 같이 갱신한다. web inventory는 여전히 manifest를 primary source로 읽어 provenance와 selection/focus metadata를 보여주고, manifest가 없는 예전 HTML만 legacy fallback으로 취급한다. 오래된 산출물을 새 기준에 맞출 때는 `career-ops-kr backfill-artifact-manifests`로 sibling manifest를 일괄 생성한다.
+`build-tailored-resume`와 `build-tailored-resume-from-url`는 HTML 옆에 sibling `.manifest.json`도 같이 남긴다. manifest에는 `build_run_id`와 `inventory_key`도 같이 기록되고, 같은 output root에는 `artifact-index.json` derived cache를 같이 갱신한다. web inventory는 여전히 manifest를 primary source로 읽어 provenance와 selection/focus metadata를 보여주고, manifest가 없는 예전 HTML만 legacy fallback으로 취급한다. 오래된 산출물을 새 기준에 맞출 때는 `career-ops-kr backfill-artifact-manifests`로 sibling manifest를 일괄 생성하고 stale `artifact-index.json` entry도 함께 정리한다.
 
 회사 조사는 별도 흐름입니다.
 
