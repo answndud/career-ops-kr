@@ -47,6 +47,11 @@
     - home dashboard의 follow-up 요약도 새 agenda snapshot을 재사용하도록 정리
     - `tests/test_web.py`에 follow-up page/API 회귀 추가
     - `python -m unittest tests.test_web`, `python -m unittest discover -s tests`, `career-ops-kr serve-web --help` 통과
+  - web follow-up inbox 2차 추가
+    - `POST /api/jobs/{job_id}/follow-up-quick` 추가
+    - follow-up 화면에서 `오늘로 / 3일 뒤 / 7일 뒤 / 미설정` quick action 지원
+    - quick action은 기존 `update_job_record()` 경로를 재사용해 `follow_up`만 빠르게 갱신
+    - `tests/test_web.py`에 quick action API와 follow-up inbox 버튼 노출 회귀 추가
   - web search preset 1차 추가
     - `src/career_ops_kr/web/search_presets.py`
     - `/api/search-presets` GET/POST/DELETE 추가

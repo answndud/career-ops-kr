@@ -159,6 +159,10 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("Today Co", page.text)
         self.assertIn("Upcoming Co", page.text)
         self.assertIn("No Date Co", page.text)
+        self.assertIn("오늘로", page.text)
+        self.assertIn("3일 뒤", page.text)
+        self.assertIn("7일 뒤", page.text)
+        self.assertIn("미설정", page.text)
 
         payload = self.client.get("/api/follow-ups").json()
         self.assertEqual(payload["counts"]["overdue"], 1)
@@ -167,6 +171,43 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(payload["counts"]["later"], 1)
         self.assertEqual(payload["counts"]["unscheduled_active"], 1)
         self.assertEqual(payload["preview_items"][0]["company"], "Overdue Co")
+
+    def test_follow_up_quick_action_updates_schedule(self) -> None:
+        today = date.today()
+        overdue = (today - timedelta(days=1)).isoformat()
+        created = self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Quick Action Co",
+                "position": "Backend Engineer",
+                "status": "검토중",
+                "follow_up": overdue,
+                "source": "web",
+            },
+        ).json()
+
+        move_response = self.client.post(
+            f"/api/jobs/{created['id']}/follow-up-quick",
+            json={"action": "plus7"},
+        )
+        self.assertEqual(move_response.status_code, 200)
+        moved_payload = move_response.json()
+        self.assertEqual(moved_payload["follow_up"], (today + timedelta(days=7)).isoformat())
+
+        agenda = self.client.get("/api/follow-ups").json()
+        self.assertEqual(agenda["counts"]["overdue"], 0)
+        self.assertEqual(agenda["counts"]["upcoming"], 1)
+
+        clear_response = self.client.post(
+            f"/api/jobs/{created['id']}/follow-up-quick",
+            json={"action": "clear"},
+        )
+        self.assertEqual(clear_response.status_code, 200)
+        self.assertIsNone(clear_response.json()["follow_up"])
+
+        cleared_agenda = self.client.get("/api/follow-ups").json()
+        self.assertEqual(cleared_agenda["counts"]["upcoming"], 0)
+        self.assertEqual(cleared_agenda["counts"]["unscheduled_active"], 1)
 
     def test_jobs_crud_updates_tracker_file(self) -> None:
         create_response = self.client.post(

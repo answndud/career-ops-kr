@@ -49,6 +49,17 @@
     <span>팔로업 날짜는 web sidecar 전용 데이터입니다. 상태와 메모 정리는 여전히 <a class="link" href="/tracker">트래커</a>와 <code>data/applications.md</code> 기준으로 이어집니다.</span>
   </section>
 
+  <section class="card section-stack">
+    <div class="section-header">
+      <div>
+        <span class="pill">Quick Action</span>
+        <h2>팔로업 날짜 빠르게 정리</h2>
+        <div class="muted">오늘로 이동, 3일 뒤, 7일 뒤, 미설정을 페이지 안에서 바로 처리합니다.</div>
+      </div>
+    </div>
+    <div id="follow-up-action-output" class="notice result-panel">아직 실행한 quick action이 없습니다.</div>
+  </section>
+
   <div class="grid two">
     {% for section in agenda.sections %}
       <section class="card">
@@ -82,6 +93,18 @@
               {% if item.notes %}
                 <div class="meta">{{ item.notes }}</div>
               {% endif %}
+              {% if item.id %}
+                <div class="actions">
+                  {% if item.follow_up != agenda.today %}
+                    <button type="button" class="ghost" onclick="CareerOpsFollowUps.quickAction({{ item.id }}, 'today', {{ (item.company ~ ' · ' ~ item.position) | tojson }})">오늘로</button>
+                  {% endif %}
+                  <button type="button" class="ghost" onclick="CareerOpsFollowUps.quickAction({{ item.id }}, 'plus3', {{ (item.company ~ ' · ' ~ item.position) | tojson }})">3일 뒤</button>
+                  <button type="button" class="ghost" onclick="CareerOpsFollowUps.quickAction({{ item.id }}, 'plus7', {{ (item.company ~ ' · ' ~ item.position) | tojson }})">7일 뒤</button>
+                  {% if item.follow_up %}
+                    <button type="button" class="ghost" onclick="CareerOpsFollowUps.quickAction({{ item.id }}, 'clear', {{ (item.company ~ ' · ' ~ item.position) | tojson }})">미설정</button>
+                  {% endif %}
+                </div>
+              {% endif %}
             </li>
           {% else %}
             <li class="muted">해당 항목이 없습니다.</li>
@@ -91,4 +114,38 @@
     {% endfor %}
   </div>
 </div>
+<script>
+  const CareerOpsFollowUps = {
+    renderResult(message, tone = "ok") {
+      const output = document.getElementById("follow-up-action-output");
+      output.className = `notice ${tone} result-panel`;
+      output.innerHTML = `<div><strong>${CareerOpsWeb.escapeHtml(message)}</strong></div>`;
+    },
+    async quickAction(jobId, action, label) {
+      if (!jobId || !action) return;
+      const actionLabels = {
+        today: "오늘로 이동",
+        plus3: "3일 뒤로 이동",
+        plus7: "7일 뒤로 이동",
+        clear: "미설정으로 변경",
+      };
+      CareerOpsFollowUps.renderResult(`${label} 항목을 ${actionLabels[action] || "갱신"} 중입니다...`, "warn");
+      const response = await fetch(`/api/jobs/${jobId}/follow-up-quick`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({action}),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        CareerOpsFollowUps.renderResult(data.detail || "팔로업 quick action 실패", "error");
+        return;
+      }
+      CareerOpsFollowUps.renderResult(
+        `${label} 항목의 팔로업을 ${actionLabels[action] || "갱신"}했습니다.`,
+        "ok",
+      );
+      window.setTimeout(() => window.location.reload(), 250);
+    },
+  };
+</script>
 {% endblock %}

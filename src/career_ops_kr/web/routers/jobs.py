@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, timedelta
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -106,6 +107,24 @@ def build_jobs_router(deps: JobsRouterDeps) -> APIRouter:
         payload = await request.json()
         try:
             return deps.update_job_record(job_id, payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @router.post("/api/jobs/{job_id}/follow-up-quick")
+    async def api_quick_follow_up(job_id: int, request: Request) -> dict[str, Any]:
+        payload = await request.json()
+        action = deps.safe_text(payload.get("action")).lower()
+        today = date.today()
+        quick_values = {
+            "today": today.isoformat(),
+            "plus3": (today + timedelta(days=3)).isoformat(),
+            "plus7": (today + timedelta(days=7)).isoformat(),
+            "clear": "",
+        }
+        if action not in quick_values:
+            raise HTTPException(status_code=400, detail="Unsupported follow-up quick action")
+        try:
+            return deps.update_job_record(job_id, {"follow_up": quick_values[action]})
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
