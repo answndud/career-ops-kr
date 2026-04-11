@@ -57,6 +57,10 @@
     - `home.html` follow-up preview에서 `오늘로 / 3일 뒤 / 7일 뒤 / 미설정` 바로 실행 가능하게 정리
     - `follow-ups.html`도 같은 공용 helper를 재사용하도록 중복 제거
     - `tests/test_web.py`에 home dashboard quick action 버튼 노출 회귀 추가
+  - home dashboard recent jobs 신호 강화
+    - `dashboard.py`가 recent jobs도 `job_row_with_ui_state()`를 거친 payload로 노출
+    - `home.html` recent jobs 카드에 attention tag, report/resume badge, `다음 액션` 요약 추가
+    - `tests/test_web.py`에 home recent jobs attention summary 회귀 추가
   - web search preset 1차 추가
     - `src/career_ops_kr/web/search_presets.py`
     - `/api/search-presets` GET/POST/DELETE 추가

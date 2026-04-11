@@ -7,6 +7,7 @@ from career_ops_kr.utils import load_yaml
 from career_ops_kr.web.artifacts import generated_resume_snapshot
 from career_ops_kr.web.db import connection_scope
 from career_ops_kr.web.followups import build_follow_up_agenda
+from career_ops_kr.web.jobs_view import job_row_with_ui_state
 from career_ops_kr.web.paths import WebPaths
 
 
@@ -17,9 +18,7 @@ def get_dashboard_snapshot(*, paths: WebPaths) -> dict[str, Any]:
         status_counts = conn.execute(
             "SELECT status, COUNT(*) AS count FROM jobs GROUP BY status ORDER BY status"
         ).fetchall()
-        recent_jobs = conn.execute(
-            "SELECT id, company, position, status, updated_at FROM jobs ORDER BY updated_at DESC LIMIT 5"
-        ).fetchall()
+        recent_job_rows = conn.execute("SELECT * FROM jobs ORDER BY updated_at DESC LIMIT 5").fetchall()
         follow_up_rows = conn.execute(
             """
             SELECT id, company, position, status, source, follow_up, notes, updated_at
@@ -33,6 +32,7 @@ def get_dashboard_snapshot(*, paths: WebPaths) -> dict[str, Any]:
         ).fetchall()
     generated_outputs = generated_resume_snapshot(paths=paths, limit=6)
     follow_up_agenda = build_follow_up_agenda(list(follow_up_rows))
+    recent_jobs = [job_row_with_ui_state(row, paths=paths) for row in recent_job_rows]
     return {
         "totalJobs": total_jobs,
         "totalResumes": total_resumes,

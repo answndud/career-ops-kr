@@ -88,7 +88,15 @@
       {% for row in dashboard.recentJobs %}
         <li>
           <div class="title"><a class="link" href="/tracker/{{ row.id }}">#{{ row.id }} · {{ row.company }} · {{ row.position }}</a></div>
-          <div class="meta">상태: {{ row.status }} · 업데이트: {{ row.updated_at }}</div>
+          <div class="meta">상태: {{ row.status }}{% if row.source %} · 출처: {{ row.source }}{% endif %} · 업데이트: {{ row.updated_at }}</div>
+          <div class="mini-pills">
+            {% for tag in row.attention.tags %}
+              <span class="status-chip {% if tag.tone == 'error' %}error{% elif tag.tone == 'warn' %}warn{% endif %}">{{ tag.label }}</span>
+            {% endfor %}
+            {% if row.artifact_summary.report %}<span class="status-chip">Report</span>{% endif %}
+            {% if row.artifact_summary.html %}<span class="status-chip ok">Resume</span>{% endif %}
+          </div>
+          <div class="meta">다음 액션: {{ row.attention.summary }}</div>
         </li>
       {% else %}
         <li class="muted">아직 저장된 공고가 없습니다. 검색에서 공고를 저장해 보세요.</li>

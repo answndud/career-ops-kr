@@ -103,6 +103,7 @@ career-ops-kr serve-web
 - 무엇부터 해야 하는지 순서
 - 업로드된 이력서 수
 - 저장된 공고 수
+- 최근 공고의 attention 요약과 다음 액션
 - 최근 생성한 HTML/PDF 이력서 다시 열기
 - web/CLI 산출물 구분
 - resume preset 시작점
