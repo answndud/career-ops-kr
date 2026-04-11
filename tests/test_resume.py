@@ -757,6 +757,7 @@ class ResumeTailoringTest(unittest.TestCase):
             self.assertEqual(1, result.created)
             self.assertEqual(0, result.overwritten)
             self.assertEqual(0, result.skipped)
+            self.assertEqual(0, result.pruned_index_entries)
             self.assertEqual([manifest_path], result.manifests)
             self.assertTrue(manifest_path.exists())
 
@@ -803,8 +804,95 @@ class ResumeTailoringTest(unittest.TestCase):
                 overwrite=True,
             )
             self.assertEqual(1, second.overwritten)
+            self.assertEqual(0, second.pruned_index_entries)
             second_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(first_manifest["build_run_id"], second_manifest["build_run_id"])
+
+    def test_backfill_artifact_manifests_prunes_stale_index_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            output_dir = temp_path / "output"
+            jd_dir = temp_path / "jds"
+            report_dir = temp_path / "reports"
+            html_path = output_dir / "rendered-resumes" / "legacy-platform.html"
+
+            html_path.parent.mkdir(parents=True, exist_ok=True)
+            jd_dir.mkdir(parents=True, exist_ok=True)
+            report_dir.mkdir(parents=True, exist_ok=True)
+            html_path.write_text("<html></html>", encoding="utf-8")
+            html_path.with_suffix(".manifest.json").write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "generated_at": "2026-04-11T00:00:00+00:00",
+                        "build_run_id": "br_keep",
+                        "inventory_key": "rendered-resumes/legacy-platform.html",
+                        "pipeline": "legacy_backfill",
+                        "paths": {
+                            "job_path": None,
+                            "report_path": None,
+                            "tailoring_path": None,
+                            "context_path": None,
+                            "html_path": html_path.as_posix(),
+                            "pdf_path": None,
+                            "base_context_path": None,
+                            "template_path": None,
+                            "profile_path": None,
+                            "scorecard_path": None,
+                        },
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            index_path = output_dir / "artifact-index.json"
+            index_path.write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "updated_at": "2026-04-11T00:00:00+00:00",
+                        "entries": {
+                            "rendered-resumes/legacy-platform.html": {
+                                "inventory_key": "rendered-resumes/legacy-platform.html",
+                                "build_run_id": "br_keep",
+                                "generated_at": "2026-04-11T00:00:00+00:00",
+                                "pipeline": "legacy_backfill",
+                                "manifest_path": html_path.with_suffix(".manifest.json").as_posix(),
+                                "html_path": html_path.as_posix(),
+                                "pdf_path": None,
+                            },
+                            "rendered-resumes/orphan.html": {
+                                "inventory_key": "rendered-resumes/orphan.html",
+                                "build_run_id": "br_orphan",
+                                "generated_at": "2026-04-11T00:00:00+00:00",
+                                "pipeline": "legacy_backfill",
+                                "manifest_path": (output_dir / "rendered-resumes" / "orphan.manifest.json").as_posix(),
+                                "html_path": (output_dir / "rendered-resumes" / "orphan.html").as_posix(),
+                                "pdf_path": None,
+                            },
+                        },
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = backfill_artifact_manifests(
+                output_dir=output_dir,
+                jd_dir=jd_dir,
+                report_dir=report_dir,
+            )
+
+            self.assertEqual(1, result.pruned_index_entries)
+            index_payload = json.loads(index_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                ["rendered-resumes/legacy-platform.html"],
+                sorted(index_payload["entries"].keys()),
+            )
 
     def test_build_tailored_resume_from_url_stops_before_scoring_when_fetch_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

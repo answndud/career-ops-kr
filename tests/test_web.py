@@ -4,6 +4,7 @@ import os
 import json
 import tempfile
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -66,45 +67,149 @@ class WebAppTests(unittest.TestCase):
         self.client = TestClient(web_app.create_app())
 
     def test_pages_render(self) -> None:
-        for route in ("/", "/search", "/settings", "/resume", "/assistant", "/tracker", "/artifacts"):
+        for route in ("/", "/search", "/follow-ups", "/settings", "/resume", "/tracker", "/artifacts"):
             response = self.client.get(route)
             self.assertEqual(response.status_code, 200, route)
         home = self.client.get("/")
         search = self.client.get("/search")
         settings = self.client.get("/settings")
         self.assertNotIn("어시스턴트</a>", home.text)
-        self.assertIn("AI 기능은 현재 기본 비활성화 상태입니다.", home.text)
         self.assertNotIn("Adzuna", home.text)
         self.assertNotIn("Adzuna", search.text)
-        self.assertNotIn("ADZUNA_API_KEY", settings.text)
         self.assertIn("별도 API 키가 필요하지 않습니다.", settings.text)
         tracker = self.client.get("/tracker")
         self.assertIn("선택 항목 일괄 변경", tracker.text)
         self.assertIn("보이는 항목 전체 선택", tracker.text)
 
-    def test_settings_roundtrip(self) -> None:
-        response = self.client.post("/api/settings", json={"key": "AI_PROVIDER", "value": "gemini"})
-        self.assertEqual(response.status_code, 200)
-        payload = self.client.get("/api/settings").json()
-        self.assertEqual(payload["AI_PROVIDER"], "gemini")
-        self.assertFalse(payload["ai_enabled"])
-        self.assertEqual(payload["active_provider"], "disabled")
-
-    def test_removed_search_setting_keys_are_rejected(self) -> None:
-        response = self.client.post("/api/settings", json={"key": "ADZUNA_API_KEY", "value": "secret"})
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["detail"], "Invalid key")
-
-    def test_ai_routes_are_disabled_by_default(self) -> None:
-        for path, body in (
-            ("/api/search/analyze", {"title": "Backend", "company": "Acme", "url": "https://example.com"}),
-            ("/api/resume/match", {"resume_id": 1, "job_description": "Backend role"}),
-            ("/api/resume/rewrite", {"job_description": "Backend role"}),
-            ("/api/resume/recommend", {}),
-            ("/api/ai/cover-letter", {"company": "Acme"}),
+    def test_runtime_paths_follow_current_output_root_when_overrides_are_unset(self) -> None:
+        with (
+            patch.object(web_app, "WEB_RESUME_OUTPUT_DIR", None),
+            patch.object(web_app, "LIVE_SMOKE_REPORT_DIR", None),
         ):
-            response = self.client.post(path, json=body)
-            self.assertEqual(response.status_code, 404, path)
+            paths = web_app._web_paths()
+            deps = web_app._router_deps()
+
+        self.assertEqual(paths.output_dir, self.output_dir)
+        self.assertEqual(paths.web_resume_output_dir, self.output_dir / "web-resumes")
+        self.assertEqual(paths.live_smoke_report_dir, self.output_dir / "live-smoke")
+        self.assertEqual(paths.web_db_output_dir, self.output_dir / "web-db")
+        self.assertEqual(deps.output_dir, self.output_dir)
+        self.assertEqual(deps.web_resume_output_dir, self.output_dir / "web-resumes")
+
+    def test_follow_up_agenda_page_and_api(self) -> None:
+        today = date.today()
+        overdue = (today - timedelta(days=2)).isoformat()
+        due_today = today.isoformat()
+        upcoming = (today + timedelta(days=3)).isoformat()
+        later = (today + timedelta(days=10)).isoformat()
+        self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Overdue Co",
+                "position": "Backend Engineer",
+                "status": "지원예정",
+                "follow_up": overdue,
+                "source": "web",
+            },
+        )
+        self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Today Co",
+                "position": "Platform Engineer",
+                "status": "검토중",
+                "follow_up": due_today,
+                "source": "web",
+            },
+        )
+        self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Upcoming Co",
+                "position": "Data Engineer",
+                "status": "지원완료",
+                "follow_up": upcoming,
+                "source": "web",
+            },
+        )
+        self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Later Co",
+                "position": "SRE",
+                "status": "지원완료",
+                "follow_up": later,
+                "source": "web",
+            },
+        )
+        self.client.post(
+            "/api/jobs",
+            json={
+                "company": "No Date Co",
+                "position": "Platform Engineer",
+                "status": "검토중",
+                "source": "web",
+            },
+        )
+
+        page = self.client.get("/follow-ups")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("오늘 먼저 정리해야 할 팔로업만 모아보기", page.text)
+        self.assertIn("Overdue Co", page.text)
+        self.assertIn("Today Co", page.text)
+        self.assertIn("Upcoming Co", page.text)
+        self.assertIn("No Date Co", page.text)
+        self.assertIn("오늘로", page.text)
+        self.assertIn("3일 뒤", page.text)
+        self.assertIn("7일 뒤", page.text)
+        self.assertIn("미설정", page.text)
+        self.assertIn('CareerOpsFollowUps.quickActionButton(this)', page.text)
+        self.assertIn('data-job-id="1"', page.text)
+
+        payload = self.client.get("/api/follow-ups").json()
+        self.assertEqual(payload["counts"]["overdue"], 1)
+        self.assertEqual(payload["counts"]["today"], 1)
+        self.assertEqual(payload["counts"]["upcoming"], 1)
+        self.assertEqual(payload["counts"]["later"], 1)
+        self.assertEqual(payload["counts"]["unscheduled_active"], 1)
+        self.assertEqual(payload["preview_items"][0]["company"], "Overdue Co")
+
+    def test_follow_up_quick_action_updates_schedule(self) -> None:
+        today = date.today()
+        overdue = (today - timedelta(days=1)).isoformat()
+        created = self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Quick Action Co",
+                "position": "Backend Engineer",
+                "status": "검토중",
+                "follow_up": overdue,
+                "source": "web",
+            },
+        ).json()
+
+        move_response = self.client.post(
+            f"/api/jobs/{created['id']}/follow-up-quick",
+            json={"action": "plus7"},
+        )
+        self.assertEqual(move_response.status_code, 200)
+        moved_payload = move_response.json()
+        self.assertEqual(moved_payload["follow_up"], (today + timedelta(days=7)).isoformat())
+
+        agenda = self.client.get("/api/follow-ups").json()
+        self.assertEqual(agenda["counts"]["overdue"], 0)
+        self.assertEqual(agenda["counts"]["upcoming"], 1)
+
+        clear_response = self.client.post(
+            f"/api/jobs/{created['id']}/follow-up-quick",
+            json={"action": "clear"},
+        )
+        self.assertEqual(clear_response.status_code, 200)
+        self.assertIsNone(clear_response.json()["follow_up"])
+
+        cleared_agenda = self.client.get("/api/follow-ups").json()
+        self.assertEqual(cleared_agenda["counts"]["upcoming"], 0)
+        self.assertEqual(cleared_agenda["counts"]["unscheduled_active"], 1)
 
     def test_jobs_crud_updates_tracker_file(self) -> None:
         create_response = self.client.post(
@@ -276,10 +381,6 @@ class WebAppTests(unittest.TestCase):
             description="",
         )
         with (
-            patch(
-                "career_ops_kr.web.search.translate_query",
-                side_effect=lambda query, target_language: "backend" if target_language == "en" else "백엔드",
-            ),
             patch("career_ops_kr.web.search._search_saramin", return_value=[]),
             patch("career_ops_kr.web.search._search_wanted", return_value=[wanted_result]),
             patch("career_ops_kr.web.search._search_efinancial", side_effect=httpx.ReadTimeout("timed out")),
@@ -296,7 +397,7 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(saramin_status["query_label"], "입력어")
         efinancial_status = next(item for item in payload["provider_statuses"] if item["key"] == "efinancial")
         self.assertEqual(efinancial_status["status"], "error")
-        self.assertEqual(efinancial_status["query_label"], "영문 번역")
+        self.assertEqual(efinancial_status["query_label"], "입력어")
         self.assertEqual(efinancial_status["detail"], "요청 시간 초과")
 
     def test_search_import_and_build_from_url_endpoint(self) -> None:
@@ -577,16 +678,139 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("canonical URL 기준으로 이미 저장된 항목입니다.", response.text)
         self.assertIn(f"/tracker/{created['id']}", response.text)
 
+    def test_search_presets_can_be_saved_reused_and_deleted(self) -> None:
+        save_response = self.client.post(
+            "/api/search-presets",
+            json={"name": "플랫폼 기본", "query": "platform engineer"},
+        )
+        self.assertEqual(save_response.status_code, 200)
+        payload = save_response.json()
+        preset = payload["preset"]
+        self.assertEqual(preset["name"], "플랫폼 기본")
+        self.assertEqual(preset["query"], "platform engineer")
+        self.assertTrue(preset["is_default"])
+        self.assertIsNone(preset["last_used_at"])
+        self.assertEqual(len(payload["presets"]), 1)
+
+        list_response = self.client.get("/api/search-presets")
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(list_response.json()["presets"][0]["key"], preset["key"])
+
+        mocked = {
+            "results": [
+                {
+                    "id": "wanted-1",
+                    "title": "Platform Engineer",
+                    "company": "Preset Co",
+                    "location": "Seoul",
+                    "source": "원티드",
+                    "url": "https://www.wanted.co.kr/wd/54321",
+                    "type": "-",
+                    "experience": "-",
+                    "salary": "-",
+                    "deadline": "-",
+                    "description": "",
+                }
+            ],
+            "count": 1,
+            "translated_query": None,
+            "provider_statuses": [],
+            "provider_summary": None,
+            "degraded": False,
+            "sources": {"전체": 1, "원티드": 1},
+        }
+        with patch("career_ops_kr.web.app.search_jobs", return_value=mocked) as search_mock:
+            page_response = self.client.get("/search", params={"preset": preset["key"]})
+        self.assertEqual(page_response.status_code, 200)
+        self.assertIn("저장된 preset으로 검색 중", page_response.text)
+        self.assertIn("platform engineer", page_response.text)
+        self.assertIn("플랫폼 기본", page_response.text)
+        self.assertIn("기본 preset", page_response.text)
+        search_mock.assert_called_once_with("platform engineer")
+
+        used_list_response = self.client.get("/api/search-presets")
+        self.assertEqual(used_list_response.status_code, 200)
+        self.assertIsNotNone(used_list_response.json()["presets"][0]["last_used_at"])
+
+        delete_response = self.client.delete(f"/api/search-presets/{preset['key']}")
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertEqual(delete_response.json()["presets"], [])
+
+    def test_search_page_uses_default_preset_when_query_is_empty(self) -> None:
+        first_response = self.client.post(
+            "/api/search-presets",
+            json={"name": "플랫폼 기본", "query": "platform engineer"},
+        )
+        self.assertEqual(first_response.status_code, 200)
+        first_preset = first_response.json()["preset"]
+
+        second_response = self.client.post(
+            "/api/search-presets",
+            json={"name": "데이터 기본", "query": "data platform", "make_default": True},
+        )
+        self.assertEqual(second_response.status_code, 200)
+        second_preset = second_response.json()["preset"]
+        self.assertTrue(second_preset["is_default"])
+
+        default_response = self.client.post(f"/api/search-presets/{first_preset['key']}/default")
+        self.assertEqual(default_response.status_code, 200)
+        self.assertTrue(default_response.json()["preset"]["is_default"])
+
+        mocked = {
+            "results": [
+                {
+                    "id": "wanted-2",
+                    "title": "Platform Engineer",
+                    "company": "Default Co",
+                    "location": "Seoul",
+                    "source": "원티드",
+                    "url": "https://www.wanted.co.kr/wd/99999",
+                    "type": "-",
+                    "experience": "-",
+                    "salary": "-",
+                    "deadline": "-",
+                    "description": "",
+                }
+            ],
+            "count": 1,
+            "translated_query": None,
+            "provider_statuses": [],
+            "provider_summary": None,
+            "degraded": False,
+            "sources": {"전체": 1, "원티드": 1},
+        }
+        with patch("career_ops_kr.web.app.search_jobs", return_value=mocked) as search_mock:
+            page_response = self.client.get("/search")
+        self.assertEqual(page_response.status_code, 200)
+        self.assertIn("기본 preset으로 검색 중", page_response.text)
+        self.assertIn("플랫폼 기본", page_response.text)
+        search_mock.assert_called_once_with("platform engineer")
+
+        list_response = self.client.get("/api/search-presets")
+        self.assertEqual(list_response.status_code, 200)
+        presets = list_response.json()["presets"]
+        presets_by_key = {item["key"]: item for item in presets}
+        self.assertTrue(presets_by_key[first_preset["key"]]["is_default"])
+        self.assertFalse(presets_by_key[second_preset["key"]]["is_default"])
+        self.assertIsNotNone(presets_by_key[first_preset["key"]]["last_used_at"])
+
+    def test_search_preset_save_rejects_empty_query(self) -> None:
+        response = self.client.post("/api/search-presets", json={"name": "빈 검색", "query": "   "})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("검색어가 비어 있습니다.", response.json()["detail"])
+
     def test_home_dashboard_surfaces_recent_outputs(self) -> None:
-        self.client.post(
+        overdue = (date.today() - timedelta(days=1)).isoformat()
+        created_job = self.client.post(
             "/api/jobs",
             json={
                 "company": "Acme",
                 "position": "Platform Engineer",
                 "status": "검토중",
                 "source": "web",
+                "follow_up": overdue,
             },
-        )
+        ).json()
         self.client.post(
             "/api/resume/upload",
             files={"file": ("resume.txt", b"Python\nFastAPI\nSQL", "text/plain")},
@@ -596,6 +820,8 @@ class WebAppTests(unittest.TestCase):
         generated_dir.mkdir(parents=True, exist_ok=True)
         (generated_dir / "demo-resume.html").write_text("<html></html>", encoding="utf-8")
         (generated_dir / "demo-resume.pdf").write_bytes(b"%PDF-1.4")
+        self.report_dir.mkdir(parents=True, exist_ok=True)
+        (self.report_dir / "demo-resume.md").write_text("# Report\n\nPreview", encoding="utf-8")
         (self.output_dir / "cli-resume.html").write_text("<html></html>", encoding="utf-8")
         (self.output_dir / "live-smoke").mkdir(parents=True, exist_ok=True)
         (self.output_dir / "live-smoke" / "batch-report.json").write_text(
@@ -618,6 +844,22 @@ class WebAppTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        with connection_scope() as conn:
+            conn.execute(
+                """
+                UPDATE jobs
+                SET html_path = ?, pdf_path = ?, report_path = ?, context_path = ?
+                WHERE id = ?
+                """,
+                (
+                    (generated_dir / "demo-resume.html").as_posix(),
+                    (generated_dir / "demo-resume.pdf").as_posix(),
+                    (self.report_dir / "demo-resume.md").as_posix(),
+                    None,
+                    created_job["id"],
+                ),
+            )
+            conn.commit()
 
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
@@ -631,9 +873,29 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("최근 생성한 HTML/PDF", text)
         self.assertIn("최근 live smoke 상태", text)
         self.assertIn("상세 상태 보기", text)
+        self.assertIn("다음 액션:", text)
+        self.assertIn("연결 공고 다음 액션:", text)
+        self.assertIn("Report", text)
+        self.assertIn("Resume", text)
+        self.assertIn("팔로업 날짜가 지났습니다. 상태와 메모를 갱신하세요.", text)
+        self.assertIn("홈에서 바로 일정 조정이 가능합니다.", text)
+        self.assertIn("오늘로", text)
+        self.assertIn("3일 뒤", text)
+        self.assertIn("7일 뒤", text)
+        self.assertIn("미설정", text)
+        self.assertIn('CareerOpsHome.quickActionButton(this)', text)
         self.assertNotIn("최근 AI 출력", text)
 
-    def test_dashboard_api_includes_recent_ai_outputs_and_artifact_paths(self) -> None:
+    def test_dashboard_api_includes_recent_artifact_paths(self) -> None:
+        created_job = self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Manifest Co",
+                "position": "Platform Engineer",
+                "status": "검토중",
+                "source": "web",
+            },
+        ).json()
         self.client.post(
             "/api/resume/upload",
             files={"file": ("resume.txt", b"Python\nFastAPI\nSQL", "text/plain")},
@@ -666,12 +928,23 @@ class WebAppTests(unittest.TestCase):
         (self.output_dir / "resume-contexts").mkdir(parents=True, exist_ok=True)
         (self.output_dir / "resume-contexts" / "demo-resume.json").write_text("{}", encoding="utf-8")
         (self.output_dir / "jds").mkdir(parents=True, exist_ok=True)
-        (self.output_dir / "reports").mkdir(parents=True, exist_ok=True)
-
+        self.report_dir.mkdir(parents=True, exist_ok=True)
+        report_path = self.report_dir / "demo-resume.md"
+        report_path.write_text("# Report\n\nManifest", encoding="utf-8")
         with connection_scope() as conn:
             conn.execute(
-                "INSERT INTO ai_outputs(type, input_json, output) VALUES(?, ?, ?)",
-                ("resume_rewrite", "{}", "Tailored summary output for dashboard preview"),
+                """
+                UPDATE jobs
+                SET html_path = ?, pdf_path = ?, context_path = ?, report_path = ?
+                WHERE id = ?
+                """,
+                (
+                    (generated_dir / "demo-resume.html").as_posix(),
+                    (generated_dir / "demo-resume.pdf").as_posix(),
+                    (self.output_dir / "resume-contexts" / "demo-resume.json").as_posix(),
+                    report_path.as_posix(),
+                    created_job["id"],
+                ),
             )
             conn.commit()
 
@@ -680,11 +953,9 @@ class WebAppTests(unittest.TestCase):
         payload = response.json()
 
         self.assertEqual(payload["totalResumes"], 1)
-        self.assertEqual(payload["totalAiOutputs"], 1)
         self.assertEqual(payload["generatedResumeCount"], 2)
         self.assertEqual(payload["generatedWebResumeCount"], 1)
         self.assertEqual(payload["generatedCliResumeCount"], 1)
-        self.assertEqual(payload["activeProvider"], "disabled")
         generated_by_url = {item["html_url"]: item for item in payload["recentGeneratedResumes"]}
         self.assertIn("/output/web-resumes/demo-resume.html", generated_by_url)
         self.assertIn("/output/cli-resume.html", generated_by_url)
@@ -700,11 +971,25 @@ class WebAppTests(unittest.TestCase):
             generated_by_url["/output/web-resumes/demo-resume.html"]["context_path"],
             (self.output_dir / "resume-contexts" / "demo-resume.json").as_posix(),
         )
+        self.assertEqual(
+            generated_by_url["/output/web-resumes/demo-resume.html"]["job_id"],
+            created_job["id"],
+        )
+        self.assertEqual(
+            generated_by_url["/output/web-resumes/demo-resume.html"]["job_detail_url"],
+            f"/tracker/{created_job['id']}",
+        )
+        self.assertEqual(
+            generated_by_url["/output/web-resumes/demo-resume.html"]["job_attention_summary"],
+            "다음 액션을 잊지 않도록 팔로업 날짜를 지정하세요.",
+        )
+        self.assertEqual(
+            generated_by_url["/output/web-resumes/demo-resume.html"]["job_attention_tags"][0]["label"],
+            "팔로업 미설정",
+        )
         self.assertEqual(generated_by_url["/output/web-resumes/demo-resume.html"]["provenance"], "manifest")
         self.assertEqual(generated_by_url["/output/cli-resume.html"]["source_label"], "cli")
         self.assertEqual(generated_by_url["/output/cli-resume.html"]["provenance"], "legacy")
-        self.assertEqual(payload["recentAiOutputs"][0]["type"], "resume_rewrite")
-        self.assertIn("Tailored summary output", payload["recentAiOutputs"][0]["preview"])
 
     def test_dashboard_api_sorts_manifest_artifacts_by_generated_at_not_manifest_mtime(self) -> None:
         generated_dir = self.output_dir / "web-resumes"
@@ -834,10 +1119,6 @@ class WebAppTests(unittest.TestCase):
                 """,
                 (resume_id, job_id, "Backend role", 91.0, "{}"),
             )
-            conn.execute(
-                "INSERT INTO ai_outputs(type, job_id, input_json, output) VALUES(?, ?, ?, ?)",
-                ("job_analysis", job_id, "{}", "Detailed AI follow-up output"),
-            )
             conn.commit()
 
         detail_response = self.client.get(f"/tracker/{job_id}")
@@ -912,6 +1193,63 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("공고 평가 리포트를 먼저 생성하세요.", detail_response.text)
         self.assertIn("상태와 메모 수정", detail_response.text)
 
+    def test_tracker_attention_presets_cover_problem_only_and_follow_up_missing(self) -> None:
+        problem_response = self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Problem Co",
+                "position": "Platform Engineer",
+                "status": "검토중",
+                "source": "web",
+                "url": "https://example.com/jobs/problem-co",
+            },
+        )
+        self.assertEqual(problem_response.status_code, 201)
+        problem_job_id = problem_response.json()["id"]
+
+        healthy_response = self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Healthy Co",
+                "position": "Backend Engineer",
+                "status": "검토중",
+                "source": "web",
+                "url": "https://example.com/jobs/healthy-co",
+                "follow_up": "2026-04-20",
+            },
+        )
+        self.assertEqual(healthy_response.status_code, 201)
+        healthy_job_id = healthy_response.json()["id"]
+
+        self.report_dir.mkdir(parents=True, exist_ok=True)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        report_path = self.report_dir / "healthy-co.md"
+        html_path = self.output_dir / "healthy-co.html"
+        pdf_path = self.output_dir / "healthy-co.pdf"
+        report_path.write_text("# Report\n\nGood fit", encoding="utf-8")
+        html_path.write_text("<html><body>Healthy</body></html>", encoding="utf-8")
+        pdf_path.write_bytes(b"%PDF-1.4")
+        with connection_scope() as conn:
+            conn.execute(
+                "UPDATE jobs SET report_path = ?, html_path = ?, pdf_path = ? WHERE id = ?",
+                (report_path.as_posix(), html_path.as_posix(), pdf_path.as_posix(), healthy_job_id),
+            )
+            conn.commit()
+
+        tracker_response = self.client.get("/tracker")
+        self.assertEqual(tracker_response.status_code, 200)
+        self.assertIn("문제 있음 1", tracker_response.text)
+        self.assertIn("팔로업 미설정 1", tracker_response.text)
+        self.assertIn("overdue 오늘 준비", tracker_response.text)
+        self.assertIn("미설정 3일 준비", tracker_response.text)
+        self.assertIn("prepareBulkPreset", tracker_response.text)
+
+        problem_rows = self.client.get("/api/jobs", params={"attention": "problem-only"}).json()
+        self.assertEqual([row["id"] for row in problem_rows], [problem_job_id])
+
+        follow_up_missing_rows = self.client.get("/api/jobs", params={"attention": "follow-up-missing"}).json()
+        self.assertEqual([row["id"] for row in follow_up_missing_rows], [problem_job_id])
+
     def test_database_backup_export_and_import_roundtrip(self) -> None:
         self.client.post(
             "/api/jobs",
@@ -925,7 +1263,7 @@ class WebAppTests(unittest.TestCase):
         with connection_scope() as conn:
             conn.execute(
                 "INSERT INTO settings(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                ("ADZUNA_API_KEY", "legacy-secret"),
+                ("EXPORT_TEST_KEY", "test-secret"),
             )
             conn.commit()
 
@@ -933,16 +1271,18 @@ class WebAppTests(unittest.TestCase):
         self.assertEqual(backup_response.status_code, 200)
         backup_path = Path(backup_response.json()["backup_path"])
         self.assertTrue(backup_path.exists())
+        self.assertEqual(backup_path.parent, self.output_dir / "web-db")
 
         export_response = self.client.post("/api/system/db/export")
         self.assertEqual(export_response.status_code, 200)
         export_path = Path(export_response.json()["export_path"])
         self.assertTrue(export_path.exists())
+        self.assertEqual(export_path.parent, self.output_dir / "web-db")
         exported_payload = json.loads(export_path.read_text(encoding="utf-8"))
         self.assertEqual(exported_payload["tables"]["jobs"][0]["company"], "Backup Co")
-        self.assertNotIn("ADZUNA_API_KEY", {row["key"] for row in exported_payload["tables"]["settings"]})
+        self.assertIn("EXPORT_TEST_KEY", {row["key"] for row in exported_payload["tables"]["settings"]})
 
-        exported_payload["tables"]["settings"].append({"key": "ADZUNA_API_KEY", "value": "should-not-come-back"})
+        exported_payload["tables"]["settings"].append({"key": "IMPORTED_TEST_KEY", "value": "restored-value"})
         export_path.write_text(json.dumps(exported_payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
         with connection_scope() as conn:
@@ -956,14 +1296,14 @@ class WebAppTests(unittest.TestCase):
             files={"file": (export_path.name, export_path.read_bytes(), "application/json")},
         )
         self.assertEqual(import_response.status_code, 200)
+        import_path = Path(import_response.json()["import_path"])
+        self.assertEqual(import_path.parent, self.output_dir / "web-db")
         restored_jobs = self.client.get("/api/jobs").json()
         self.assertEqual(len(restored_jobs), 1)
         self.assertEqual(restored_jobs[0]["company"], "Backup Co")
-        settings_payload = self.client.get("/api/settings").json()
-        self.assertNotIn("ADZUNA_API_KEY", settings_payload)
         with connection_scope() as conn:
-            count = conn.execute("SELECT COUNT(*) AS count FROM settings WHERE key = ?", ("ADZUNA_API_KEY",)).fetchone()["count"]
-        self.assertEqual(count, 0)
+            restored = conn.execute("SELECT value FROM settings WHERE key = ?", ("IMPORTED_TEST_KEY",)).fetchone()
+        self.assertEqual(restored["value"], "restored-value")
 
     def test_settings_page_surfaces_live_smoke_summary(self) -> None:
         live_smoke_dir = self.output_dir / "live-smoke"
@@ -988,6 +1328,16 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("saved report dir", response.text)
 
     def test_artifacts_page_surfaces_web_and_cli_outputs(self) -> None:
+        created_job = self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Manifest Platform",
+                "position": "Platform Engineer",
+                "status": "검토중",
+                "source": "web",
+                "follow_up": (date.today() - timedelta(days=1)).isoformat(),
+            },
+        ).json()
         generated_dir = self.output_dir / "web-resumes"
         generated_dir.mkdir(parents=True, exist_ok=True)
         (generated_dir / "web-platform.html").write_text("<html></html>", encoding="utf-8")
@@ -1027,6 +1377,25 @@ class WebAppTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
+        self.report_dir.mkdir(parents=True, exist_ok=True)
+        report_path = self.report_dir / "web-platform.md"
+        report_path.write_text("# Report\n\nArtifacts", encoding="utf-8")
+        with connection_scope() as conn:
+            conn.execute(
+                """
+                UPDATE jobs
+                SET html_path = ?, pdf_path = ?, report_path = ?, context_path = ?
+                WHERE id = ?
+                """,
+                (
+                    (generated_dir / "web-platform.html").as_posix(),
+                    (generated_dir / "web-platform.pdf").as_posix(),
+                    report_path.as_posix(),
+                    (context_dir / "web-platform.json").as_posix(),
+                    created_job["id"],
+                ),
+            )
+            conn.commit()
         response = self.client.get("/artifacts")
         self.assertEqual(response.status_code, 200)
         self.assertIn("생성된 이력서 산출물", response.text)
@@ -1036,11 +1405,21 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("br_20260409T023000Z_demo1234", response.text)
         self.assertIn("web-resumes/web-platform.html", response.text)
         self.assertIn("manifest", response.text)
+        self.assertIn("연결 공고 다음 액션:", response.text)
+        self.assertIn("팔로업 overdue", response.text)
+        self.assertIn("팔로업 날짜가 지났습니다. 상태와 메모를 갱신하세요.", response.text)
         self.assertIn("생성된 이력서 산출물", response.text)
 
         filtered = self.client.get("/artifacts", params={"source": "cli"})
         self.assertEqual(filtered.status_code, 200)
         self.assertIn("cli-backend.html", filtered.text)
+        self.assertNotIn("web-platform.html", filtered.text)
+
+        attention_filtered = self.client.get("/artifacts", params={"attention": "follow-up-overdue"})
+        self.assertEqual(attention_filtered.status_code, 200)
+        self.assertIn("web-platform.html", attention_filtered.text)
+        self.assertNotIn("cli-backend.html", attention_filtered.text)
+        self.assertIn("팔로업 overdue", attention_filtered.text)
 
 
 if __name__ == "__main__":

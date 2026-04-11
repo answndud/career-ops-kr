@@ -19,8 +19,98 @@
   - 설치, 첫 설정, one-shot 이력서 생성, pipeline 처리, tracker 반영, 회사 조사, 문제 해결 순서로 재구성
   - 자주 쓰는 명령과 폴더 역할을 쉬운 한국어로 설명
   - live smoke/report tooling은 일반 사용자 흐름과 분리해 고급 기능으로 안내
-  - Playwright 설치를 선택 항목으로 내리고, 웹 3단계 시작 루트와 AI 없이 쓰는 기본 웹 루트를 추가
+  - Playwright 설치를 선택 항목으로 내리고, 웹 3단계 시작 루트와 웹 기본 루트를 추가
   - settings 화면의 DB backup / JSON export / JSON import를 언제 쓰는지 쉬운 문장으로 보강
+  - tracker audit helper 1차 추가
+  - `career-ops-kr audit-jobs`
+  - `src/career_ops_kr/tracker.py`, `src/career_ops_kr/commands/tracker.py`, `src/career_ops_kr/commands/tracker_cli.py`
+  - tracker row 기준 `missing_report`, `missing_report_file`, `missing_resume`, `missing_resume_file`를 점검
+  - `output/**/*.html` 중 sibling `.manifest.json`이 없는 legacy HTML도 같이 점검
+  - `--json`, `--strict` 지원
+  - `tests/test_tracker.py`, `tests/test_cli.py`에 helper/CLI 회귀 추가
+  - `python -m unittest tests.test_tracker tests.test_cli`, `python -m unittest discover -s tests`, `career-ops-kr audit-jobs --help`, `career-ops-kr verify` 통과
+  - tracker audit helper 2차 확장
+  - `career-ops-kr audit-jobs`
+  - manifest가 참조하는 `job/report/tailoring/context/pdf/html` 경로 누락을 추가 점검
+  - `artifact-index.json` 누락, manifest/index entry mismatch, orphan index entry를 추가 점검
+  - `tests/test_tracker.py`, `tests/test_cli.py`에 manifest/index drift 회귀 추가
+  - `python -m unittest tests.test_tracker tests.test_cli`, `career-ops-kr audit-jobs --help` 통과
+  - artifact index cleanup 경로 보강
+  - `backfill-artifact-manifests`가 stale `artifact-index.json` orphan entry를 prune하도록 정리
+  - `BackfillArtifactManifestResult`와 CLI 출력에 pruned index entry 수를 추가
+  - `tests/test_resume.py`, `tests/test_cli.py`에 stale index prune 회귀 추가
+  - `python -m unittest tests.test_resume tests.test_cli`, `python -m compileall src/career_ops_kr/resume_pipeline src/career_ops_kr/commands/resume_build_cli.py` 통과
+  - web follow-up inbox 1차 추가
+    - `src/career_ops_kr/web/followups.py`
+    - `/follow-ups`, `/api/follow-ups`
+    - overdue / today / next-7-days / unscheduled-active / later agenda group 추가
+    - home dashboard의 follow-up 요약도 새 agenda snapshot을 재사용하도록 정리
+    - `tests/test_web.py`에 follow-up page/API 회귀 추가
+    - `python -m unittest tests.test_web`, `python -m unittest discover -s tests`, `career-ops-kr serve-web --help` 통과
+  - web follow-up inbox 2차 추가
+    - `POST /api/jobs/{job_id}/follow-up-quick` 추가
+    - follow-up 화면에서 `오늘로 / 3일 뒤 / 7일 뒤 / 미설정` quick action 지원
+    - quick action은 기존 `update_job_record()` 경로를 재사용해 `follow_up`만 빠르게 갱신
+    - `tests/test_web.py`에 quick action API와 follow-up inbox 버튼 노출 회귀 추가
+  - home dashboard follow-up preview에 quick action 확장
+    - `base.html`에 공용 `quickFollowUpAction` helper 추가
+    - `home.html` follow-up preview에서 `오늘로 / 3일 뒤 / 7일 뒤 / 미설정` 바로 실행 가능하게 정리
+    - `follow-ups.html`도 같은 공용 helper를 재사용하도록 중복 제거
+    - `tests/test_web.py`에 home dashboard quick action 버튼 노출 회귀 추가
+  - home dashboard recent jobs 신호 강화
+    - `dashboard.py`가 recent jobs도 `job_row_with_ui_state()`를 거친 payload로 노출
+    - `home.html` recent jobs 카드에 attention tag, report/resume badge, `다음 액션` 요약 추가
+    - `tests/test_web.py`에 home recent jobs attention summary 회귀 추가
+  - generated artifact inventory 신호 강화
+    - `dashboard.py`에 linked job 운영 신호 부착 helper 추가
+    - home recent generated output과 `artifacts.html`이 linked job attention tag / `다음 액션`을 같이 표시
+    - `pages.py`, `router_bindings.py`, `router_deps_factory.py`, `routers/deps.py`가 같은 helper를 artifacts page에도 재사용하도록 정리
+    - `tests/test_web.py`에 artifacts page linked-job next-action 회귀 추가
+  - artifacts attention filter 추가
+    - `artifacts.py`의 inventory filter가 `problem-only / follow-up-overdue / follow-up-missing / missing-report`를 지원
+    - `artifacts.html`에 운영 신호 select filter 추가
+    - generated artifact job signal helper를 `dashboard.py`에서 `jobs_view.py`로 옮겨 책임 정리
+    - `tests/test_web.py`에 overdue attention filter 회귀 추가
+  - tracker attention preset 확장
+    - `jobs_view.py`에 tracker attention preset/count helper를 추가해 `problem-only / missing-report / missing-resume / follow-up-overdue / follow-up-missing / unlinked-tracker`를 공통 기준으로 계산
+    - `pages.py`, `tracker.html`, `/api/jobs`가 같은 helper를 공유하도록 정리
+    - tracker summary pill과 quick filter에 `문제 있음`, `팔로업 미설정`을 추가
+    - `tests/test_web.py`에 tracker page/API preset 회귀 추가
+  - tracker bulk quick prep 추가
+    - `tracker.html`에 `문제 항목 선택 / overdue 오늘 준비 / 미설정 3일 준비 / tracker 미연결 선택` 버튼 추가
+    - attention preset을 현재 visible row selection과 bulk form prefill까지 바로 연결
+    - 기존에 정의되지 않았던 `CareerOpsTracker.selectVisible()` 호출도 실제 helper로 보강
+    - `tests/test_web.py`에 tracker quick prep UI 노출 회귀 추가
+  - browser E2E 회귀 확장과 quick-action quoting fix
+    - `tests/test_web_e2e.py`에 `search preset -> 저장 -> build -> artifacts filter -> tracker bulk quick prep -> follow-up quick action` 흐름 추가
+    - `home.html`, `follow-ups.html`, `search.html`의 inline `onclick + tojson` quoting 문제를 data-attribute helper 방식으로 정리
+    - `tests/test_web.py`에 home/follow-up quick action button wiring 회귀 추가
+    - `CAREER_OPS_RUN_BROWSER_E2E=1 python -m unittest tests.test_web_e2e` 통과
+  - web search preset 1차 추가
+    - `src/career_ops_kr/web/search_presets.py`
+    - `/api/search-presets` GET/POST/DELETE 추가
+    - `/search?preset=<key>`로 저장된 검색어 재실행 지원
+    - search 화면에서 현재 검색어 preset 저장 / 삭제 / 재실행 UI 추가
+    - settings table JSON payload로 저장해 export/import에 자동 포함되도록 유지
+    - `tests/test_web.py`에 preset CRUD와 preset-based search page 회귀 추가
+  - web search preset 2차 마감
+    - `src/career_ops_kr/web/search_presets.py`에서 preset별 `last_used_at`, `is_default`, `activity_label` metadata 추가
+    - 첫 preset 자동 기본 지정, `/api/search-presets/{preset_key}/default` 기본 preset 변경 지원
+    - `/search`가 query 없이 열렸을 때 기본 preset으로 자동 검색되도록 정리
+    - `search.html`에서 기본 preset 지정 버튼과 마지막 사용 시각을 같이 노출
+    - `tests/test_web.py`에 default preset 자동 적용과 usage timestamp 회귀 추가
+  - web 구조 개선 5차 완료
+    - `src/career_ops_kr/web/routers/deps.py`를 `PagesRouterDeps`, `JobsRouterDeps`, `SearchRouterDeps`, `ResumeRouterDeps`, `SystemRouterDeps`로 분리
+    - `src/career_ops_kr/web/app.py`는 route별 deps factory를 조합하고 `_router_deps()` bundle patch 포인트만 유지하도록 정리
+    - `tests/test_web.py`의 runtime path patch 회귀와 router wiring 검증이 계속 통과하는 상태로 유지
+  - web 구조 개선 6차 완료
+    - `src/career_ops_kr/web/router_deps_factory.py`를 추가해 router deps assembly helper를 `app.py` 밖으로 분리
+    - `src/career_ops_kr/web/app.py`는 env/path preset 설정, patchable hook 노출, FastAPI app 조립만 맡도록 축소
+    - `web_app.search_jobs`, `web_app.run_build_tailored_resume_from_url`, `web_app._router_deps()` 늦은 바인딩 patch 계약을 유지한 채 `tests/test_web.py`, `career-ops-kr serve-web --help`, `python -m unittest discover -s tests`, `career-ops-kr verify` 통과
+  - web 구조 개선 7차 완료
+    - `src/career_ops_kr/web/router_bindings.py`를 추가해 path-aware adapter method 묶음을 별도 클래스로 분리
+    - `src/career_ops_kr/web/router_deps_factory.py`는 route deps dataclass mapping만 담당하도록 축소
+    - web assembler 계층이 `app.py -> router_deps_factory.py -> router_bindings.py`로 정리된 상태에서 `tests/test_web.py`, `career-ops-kr serve-web --help` 통과
 - optional web product surface 정비
   - `career-ops-kr serve-web` command 연결
   - `src/career_ops_kr/web/app.py` 기준 FastAPI app을 공식 web entry로 정리
@@ -47,20 +137,89 @@
     - 실제 browser에서 홈 -> resume upload -> tracker 생성 -> saved job detail -> detail-based resume build -> 홈 recent generated output 흐름 검증
     - 기본 discover에서는 skip되고 `CAREER_OPS_RUN_BROWSER_E2E=1`일 때만 실행하는 선택 smoke로 유지
     - web test용 temp DB/output/tracker/JD/report 경로를 env 기반으로 분리 가능하게 정리
-  - AI 기능 비활성 기본값 정리
-    - `CAREER_OPS_WEB_ENABLE_AI`가 없으면 nav, 홈, 검색, 이력서 화면에서 AI surface를 숨김
-    - `serve-web --enable-ai`로 나중에 다시 켤 수 있게 정리
-    - AI API route는 비활성 상태에서 404로 막고, 검색/저장/build 중심 웹 흐름을 기본값으로 유지
+  - AI surface 제거 및 deterministic web flow 단순화
+    - `web/ai.py`, `assistant.html`, `/assistant`, `serve-web --enable-ai`, AI API route 제거
+    - 홈/검색/이력서/설정 화면을 검색/저장/tracker/deterministic resume build 중심 설명으로 정리
+    - web search query fallback은 입력어 그대로 유지하고, AI 번역/provider 설정 표면을 없앰
   - 한국 구직 기준으로 불필요한 Adzuna web search/provider 연동 제거
     - `web/search.py`에서 Adzuna provider 제거
-    - `web/ai.py`, `web/app.py`, `settings.html`에서 ADZUNA 설정 키 제거
+    - `web/app.py`, `settings.html`에서 ADZUNA 설정 키 제거
     - 홈/검색/README에서 Adzuna 언급 제거
-    - `tests/test_web.py`에 settings/search 화면과 invalid key rejection 회귀 추가
-  - legacy DB snapshot import/export에서도 Adzuna 설정 scrub 추가
-    - `web/db.py`에서 `ADZUNA_*` legacy setting key를 schema init 시 자동 삭제
-    - snapshot export 시 legacy setting rows 제외
-    - snapshot import 시 legacy setting rows를 무시
-    - `tests/test_web.py`에 export/import roundtrip에서 legacy key가 복원되지 않는 회귀 추가
+    - `tests/test_web.py`에 settings/search 화면 회귀 추가
+  - web DB snapshot/backup 정리 경로 추가
+    - legacy `ai_outputs` table은 schema init 시 자동 삭제
+    - backup/export/import 디렉터리는 그룹별 최신 파일만 남기도록 prune 추가
+    - `tests/test_web.py`에 backup/export/import roundtrip 회귀 유지
+  - web 구조 개선 1차 완료
+    - `src/career_ops_kr/web/common.py`
+    - `src/career_ops_kr/web/artifacts.py`
+    - `src/career_ops_kr/web/dashboard.py`
+    - `src/career_ops_kr/web/live_smoke.py`
+    - `src/career_ops_kr/web/jobs_view.py`
+    - `src/career_ops_kr/web/paths.py`
+    - `src/career_ops_kr/web/app.py`의 dashboard snapshot, artifact inventory, live smoke, tracker view helper를 위 모듈로 추출
+    - 기존 route와 JSON/HTML 응답 shape는 유지하고, `app.py`는 route + mutation helper 중심으로 정리
+    - `src/career_ops_kr/web/app.py`를 1677줄 -> 1092줄로 축소
+    - `python -m unittest tests.test_web`, `python -m unittest discover -s tests`, `career-ops-kr verify`, `career-ops-kr serve-web --help` 통과
+  - web 구조 개선 2차 완료
+    - `src/career_ops_kr/web/routers/pages.py`
+    - `src/career_ops_kr/web/routers/system.py`
+    - `src/career_ops_kr/web/routers/jobs.py`
+    - `src/career_ops_kr/web/routers/search.py`
+    - `src/career_ops_kr/web/routers/resume.py`
+    - `src/career_ops_kr/web/routers/deps.py`
+    - `src/career_ops_kr/web/app.py`의 page/API route를 router 모듈로 분리하고 app 조립 전용 include 구조로 정리
+    - 기존 테스트가 의존하던 `web_app.search_jobs`, `web_app.run_build_tailored_resume_from_url` 패치 포인트는 늦은 바인딩으로 유지
+    - `src/career_ops_kr/web/app.py`를 1092줄 -> 729줄로 축소
+    - `python -m unittest tests.test_web`, `python -m unittest discover -s tests`, `career-ops-kr verify`, `career-ops-kr serve-web --help`, `career-ops-kr --help` 통과
+  - web 구조 개선 3차 완료
+    - `src/career_ops_kr/web/job_records.py`
+    - `src/career_ops_kr/web/app.py`에서 job save/update/delete/bulk-update/tracker-sync/artifact-attach 로직을 위 모듈로 분리
+    - 기존 테스트가 의존하던 `web_app.OUTPUT_DIR`, `web_app.TRACKER_PATH`, `web_app.search_jobs`, `web_app.run_build_tailored_resume_from_url` 패치 포인트는 유지
+    - `src/career_ops_kr/web/app.py`를 729줄 -> 404줄로 축소
+    - web DB backup/export/import 경로가 현재 `OUTPUT_DIR` override를 따르도록 `_web_paths()`에서 `web_db_output_dir`를 늦게 계산하게 수정
+    - `tests/test_web.py`에 backup/export/import 경로가 temp output root 아래에 생성되는지 회귀 추가
+  - resume 구조 개선 1차 완료
+    - `src/career_ops_kr/resume_pipeline/models.py`
+    - `src/career_ops_kr/resume_pipeline/artifacts.py`
+    - `src/career_ops_kr/commands/resume.py`에서 resume/live-smoke dataclass와 artifact manifest/index/backfill helper를 위 모듈로 분리
+    - `src/career_ops_kr/commands/resume.py`는 기존 공개 import 경로와 테스트 patch 포인트를 유지하는 facade로 정리
+    - `src/career_ops_kr/commands/resume.py`를 1996줄 -> 1611줄로 축소
+    - `python -m compileall src/career_ops_kr/commands/resume.py src/career_ops_kr/resume_pipeline`, `python -m unittest tests.test_resume`, `python -m unittest tests.test_web`, `career-ops-kr verify`, `career-ops-kr --help`, `career-ops-kr serve-web --help` 통과
+  - resume 구조 개선 2차 완료
+    - `src/career_ops_kr/resume_pipeline/live_smoke.py`
+    - `src/career_ops_kr/resume_pipeline/rendering.py`
+    - `src/career_ops_kr/resume_pipeline/tailoring.py`
+    - `src/career_ops_kr/commands/resume.py`에서 live smoke target/report helper, render/pdf helper, tailoring packet helper를 위 모듈로 분리
+    - `build_tailored_resume_from_url`과 live smoke runner는 facade에 남겨 `career_ops_kr.commands.resume.fetch_job_to_markdown` patchability를 유지
+    - `src/career_ops_kr/commands/resume.py`를 1611줄 -> 466줄로 축소
+    - `python -m compileall src/career_ops_kr/commands/resume.py src/career_ops_kr/resume_pipeline`, `python -m unittest tests.test_resume`, `python -m unittest tests.test_web`, `career-ops-kr verify`, `career-ops-kr --help`, `career-ops-kr serve-web --help`, `python -m compileall src`, `python -m unittest discover -s tests` 통과
+  - resume 구조 개선 3차 완료
+    - `src/career_ops_kr/resume_pipeline/build.py`
+    - `src/career_ops_kr/resume_pipeline/smoke_runner.py`
+    - `src/career_ops_kr/commands/resume.py`에서 build/from-url와 live smoke runner 구현을 위 모듈로 분리
+    - facade wrapper가 현재 `fetch_job_to_markdown`, `create_resume_tailoring_packet`, `apply_resume_tailoring_packet`, `render_resume_html`, `generate_pdf_file`, `build_tailored_resume_from_url`를 dependency로 주입해 patchability를 유지
+    - `src/career_ops_kr/commands/resume.py`를 466줄 -> 220줄로 축소
+    - `python -m compileall src/career_ops_kr/commands/resume.py src/career_ops_kr/resume_pipeline`, `python -m unittest tests.test_resume tests.test_cli tests.test_web`, `career-ops-kr verify`, `career-ops-kr --help`, `career-ops-kr serve-web --help`, `python -m compileall src`, `python -m unittest discover -s tests` 통과
+  - CLI 구조 개선 1차 완료
+    - `src/career_ops_kr/commands/web_cli.py`
+    - `src/career_ops_kr/commands/intake_cli.py`
+    - `src/career_ops_kr/commands/research_cli.py`
+    - `src/career_ops_kr/commands/resume_cli.py`
+    - `src/career_ops_kr/commands/tracker_cli.py`
+    - `src/career_ops_kr/cli.py`는 app 생성 + registration 호출만 남기고 1265줄 -> 28줄로 축소
+    - `career_ops_kr.cli.run_live_resume_smoke`, `career_ops_kr.cli.run_batch_live_resume_smoke` patch를 유지하도록 늦은 바인딩 lambda로 registration dependency 주입
+    - `python -m compileall src/career_ops_kr/cli.py src/career_ops_kr/commands`, `python -m unittest tests.test_cli`, `python -m unittest tests.test_resume tests.test_web`, `career-ops-kr --help`, `career-ops-kr serve-web --help`, `career-ops-kr verify` 통과
+  - CLI 구조 개선 2차 완료
+    - `src/career_ops_kr/commands/resume_build_cli.py`
+    - `src/career_ops_kr/commands/resume_smoke_cli.py`
+    - `src/career_ops_kr/commands/resume_cli.py`는 build/apply registration과 live smoke/report registration을 조합하는 aggregator로 축소
+    - `career_ops_kr.cli.run_live_resume_smoke`, `career_ops_kr.cli.run_batch_live_resume_smoke` patchability를 유지하도록 smoke registration injection 구조는 그대로 유지
+  - CLI 구조 개선 3차 완료
+    - `src/career_ops_kr/commands/intake_fetch_cli.py`
+    - `src/career_ops_kr/commands/intake_pipeline_cli.py`
+    - `src/career_ops_kr/commands/intake_cli.py`는 fetch/discovery registration과 pipeline/scoring registration을 조합하는 aggregator로 축소
+    - `career_ops_kr.commands.intake.fetch_job_to_markdown` 기반 테스트 patchability는 유지
   - 미실행 검증 정리와 legacy artifact provenance 정리 경로 추가
     - `CAREER_OPS_RUN_BROWSER_E2E=1 python -m unittest tests.test_web_e2e`를 다시 실행해 통과 확인
     - tracker create/build E2E mock을 현재 `manifest_path` contract와 in-page result panel 흐름에 맞게 갱신
@@ -77,7 +236,7 @@
   - web UI 디자인 시스템 전면 개편 완료
     - `design-guidelines.md` 기준으로 gradient, blur, translucent panel, 강한 accent를 제거
     - `base.html`에서 grayscale token, 공통 form, table, badge, result-panel primitives를 재정의
-    - `home.html`, `search.html`, `resume.html`, `tracker.html`, `settings.html`, `job-detail.html`, `assistant.html`의 inline style 제거
+    - `home.html`, `search.html`, `resume.html`, `tracker.html`, `settings.html`, `job-detail.html`의 inline style 제거
     - landing-page 톤 hero와 ad hoc card 스타일을 내부 운영 화면 밀도로 재정렬
     - 기존 테스트가 묶인 홈 문구, nav 접근 이름, tracker/detail id는 유지
     - 카드와 배경이 겹쳐 보이던 문제를 줄이기 위해 page background를 한 단계 내리고 card/subcard/notice/table border 대비를 보강
@@ -681,6 +840,7 @@
 - Saramin은 공식 API discovery 경로가 들어갔지만, 실제 운영에는 여전히 승인된 `SARAMIN_ACCESS_KEY`가 필요하다.
 - README는 현재 CLI 표면 기준으로 맞춰져 있다. 이후 명령 이름이나 기본 경로가 바뀌면 문서 예시도 같이 갱신해야 한다.
 - git 초기 커밋 이후에도 새 smoke/demo 산출물이 남지 않도록 `.gitignore` 패턴과 실제 디렉터리 상태를 같이 유지해야 한다.
+- `cli.py`는 얇아졌고 command registration은 `commands/*_cli.py`로 이동했다. web app도 route/helper/mutation 분리가 한 번 더 진행됐고, `web/runtime.py`가 현재 `OUTPUT_DIR` 기준 파생 경로를 lazy resolution하도록 정리했다. `web/routers/deps.py`는 route별 bundle로, `web/router_deps_factory.py`는 deps mapping 전용으로, `web/router_bindings.py`는 path-aware adapter method 전용으로 나뉘어 app assembler와 router 사이 책임 경계가 더 선명해졌다.
 
 ## 다음 세션 시작 포인트
 
@@ -694,17 +854,21 @@
    - manifest-backed artifact inventory의 legacy 산출물 재생성 범위 결정
    - search / tracker / detail 화면의 세부 UX polish 범위 확정
    - 포털 parser drift 발생 시 live smoke와 web build-from-url 흐름을 우선 점검
-3. 직군별 scorecard 2차 tuning
+3. web/runtime 후속 구조 개선
+   - route별 deps bundle, deps mapping, adapter method 분리는 끝났으니 다음은 `router_bindings.py`를 기능 축별로 더 쪼갤 필요가 있는지 판단
+   - web test patch 포인트를 유지한 상태에서 assembler hook surface를 더 줄일 수 있는지 확인
+   - `web/app.py`, `web/router_deps_factory.py`, `web/router_bindings.py` 사이 공개 계약을 더 명확하게 문서화할지 검토
+4. 직군별 scorecard 2차 tuning
    - specialization margin 규칙 추가 정교화
    - mixed fixture를 더 늘려 phrasing variation 회귀 방지
    - realistic public-JD fixture를 더 늘려 synthetic 편향 줄이기
    - 아직 비어 있는 역할군 fixture 채우기
-4. resume tailoring 후속 흐름
+5. resume tailoring 후속 흐름
    - `tailoringGuidance`를 실제 template field에 더 반영할지 검토
    - role별 ko/en variant example을 더 늘릴지 검토
    - 경력기술서 EN variant를 둘지 검토
    - `fetch-job -> score-job -> build-tailored-resume`까지 확장할 상위 wrapper를 둘지 검토
-5. README와 실제 CLI 표면 동기화 유지
+6. README와 실제 CLI 표면 동기화 유지
    - 새 명령 추가나 경로 변경 시 초보자 가이드 예시도 함께 갱신
    - 일반 사용자 흐름과 운영자용 live smoke 기능 설명이 섞이지 않게 유지
 

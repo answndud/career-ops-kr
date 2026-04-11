@@ -9,37 +9,14 @@
     </div>
   </div>
   <p class="muted">현재 DB 경로: <code>{{ db_path }}</code></p>
-  <p class="muted">설정 페이지에 저장하면 로컬 SQLite sidecar에 보관됩니다.</p>
-  {% if ai_enabled %}
-    <p class="muted">현재 active provider: <strong>{{ active_provider }}</strong></p>
-  {% else %}
-    <div class="notice warn">AI 기능은 현재 비활성화되어 있습니다. 지금은 검색, tracker, deterministic resume build만 사용하면 됩니다.</div>
-  {% endif %}
+  <p class="muted">이 화면에서는 웹 DB 경로와 백업/가져오기만 관리합니다.</p>
+  <div class="notice warn">웹 표면은 검색, tracker, deterministic resume build만 유지합니다.</div>
   <div class="grid two">
     <section class="subcard section-stack">
       <h2>검색 연동</h2>
-      {% if allowed_search_keys %}
-        <div class="table-frame">
-        <table>
-          <thead>
-            <tr><th>키</th><th>값</th><th>액션</th></tr>
-          </thead>
-          <tbody>
-            {% for key in allowed_search_keys %}
-              <tr>
-                <td>{{ key }}</td>
-                <td><input id="setting-{{ key }}" value="{{ settings.get(key, '') }}"></td>
-                <td><button type="button" onclick="CareerOpsSettings.save('{{ key }}')">저장</button></td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        </div>
-      {% else %}
-        <div class="notice">
-          현재 기본 검색 소스는 별도 API 키가 필요하지 않습니다. 한국 채용공고를 찾을 때는 사람인, 원티드, 리멤버, 점핏과 회사 채용 페이지를 우선 사용하세요.
-        </div>
-      {% endif %}
+      <div class="notice">
+        현재 기본 검색 소스는 별도 API 키가 필요하지 않습니다. 한국 채용공고를 찾을 때는 사람인, 원티드, 리멤버, 점핏과 회사 채용 페이지를 우선 사용하세요.
+      </div>
     </section>
 
     <section class="subcard section-stack">
@@ -93,43 +70,11 @@
       <code>career-ops-kr validate-live-smoke-reports output/live-smoke --max-age-hours 24</code>를 사용합니다.
     </div>
   </section>
-  {% if ai_enabled %}
-    <section class="subcard section-stack">
-      <h2>AI 키</h2>
-      <div class="table-frame">
-      <table>
-        <thead>
-          <tr><th>키</th><th>값</th><th>액션</th></tr>
-        </thead>
-        <tbody>
-          {% for key in allowed_ai_keys %}
-            <tr>
-              <td>{{ key }}</td>
-              <td><input id="setting-{{ key }}" value="{{ settings.get(key, '') }}"></td>
-              <td><button type="button" onclick="CareerOpsSettings.save('{{ key }}')">저장</button></td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      </div>
-    </section>
-  {% endif %}
   <pre id="settings-output">아직 저장한 결과가 없습니다.</pre>
 </section>
 
 <script>
   const CareerOpsSettings = {
-    async save(key) {
-      const output = document.getElementById("settings-output");
-      const value = document.getElementById(`setting-${key}`).value;
-      const response = await fetch("/api/settings", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({key, value}),
-      });
-      const data = await response.json();
-      output.textContent = JSON.stringify({key, response: data}, null, 2);
-    },
     async backupDb() {
       const output = document.getElementById("settings-output");
       const response = await fetch("/api/system/db/backup", {method: "POST"});

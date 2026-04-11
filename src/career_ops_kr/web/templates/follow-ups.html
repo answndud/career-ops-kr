@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}팔로업 | Career Ops KR Web{% endblock %}
+{% block content %}
+<div class="page-stack">
+  <section class="hero">
+    <div class="stack hero-meta">
+      <span class="pill">Follow-up Inbox</span>
+      <span class="pill">Web Sidecar</span>
+    </div>
+    <div class="page-intro">
+      <h1>오늘 먼저 정리해야 할 팔로업만 모아보기</h1>
+      <p class="muted"><strong>overdue, today, upcoming, 미설정 active 항목을 한 화면에서 확인</strong></p>
+      <p class="lede">
+        이 화면은 web sidecar에 저장된 <code>follow_up</code> 날짜를 기준으로 다음 액션을 정리합니다.
+        markdown tracker 포맷은 그대로 두고, 일정 관리만 별도로 보조합니다.
+      </p>
+    </div>
+    <div class="actions hero-actions">
+      <a class="link" href="/tracker">트래커 열기</a>
+      <a class="link" href="/api/follow-ups">JSON 보기</a>
+    </div>
+  </section>
+
+  <section class="grid four">
+    <article class="stat">
+      <div class="label">Overdue</div>
+      <div class="value">{{ agenda.counts.get("overdue", 0) }}</div>
+      <div class="hint">먼저 갱신할 일정</div>
+    </article>
+    <article class="stat">
+      <div class="label">Today</div>
+      <div class="value">{{ agenda.counts.get("today", 0) }}</div>
+      <div class="hint">오늘 처리할 일정</div>
+    </article>
+    <article class="stat">
+      <div class="label">Next {{ agenda.horizon_days }}d</div>
+      <div class="value">{{ agenda.counts.get("upcoming", 0) }}</div>
+      <div class="hint">곧 다시 볼 일정</div>
+    </article>
+    <article class="stat">
+      <div class="label">No Date</div>
+      <div class="value">{{ agenda.counts.get("unscheduled_active", 0) }}</div>
+      <div class="hint">날짜가 필요한 active 항목</div>
+    </article>
+  </section>
+
+  <section class="callout">
+    <strong>운영 메모:</strong>
+    <span>팔로업 날짜는 web sidecar 전용 데이터입니다. 상태와 메모 정리는 여전히 <a class="link" href="/tracker">트래커</a>와 <code>data/applications.md</code> 기준으로 이어집니다.</span>
+  </section>
+
+  <section class="card section-stack">
+    <div class="section-header">
+      <div>
+        <span class="pill">Quick Action</span>
+        <h2>팔로업 날짜 빠르게 정리</h2>
+        <div class="muted">오늘로 이동, 3일 뒤, 7일 뒤, 미설정을 페이지 안에서 바로 처리합니다.</div>
+      </div>
+    </div>
+    <div id="follow-up-action-output" class="notice result-panel">아직 실행한 quick action이 없습니다.</div>
+  </section>
+
+  <div class="grid two">
+    {% for section in agenda.sections %}
+      <section class="card">
+        <div class="section-header">
+          <div>
+            <span class="pill">{{ section["label"] }}</span>
+            <h2>{{ section["label"] }}</h2>
+            <div class="muted">{{ section["description"] }}</div>
+          </div>
+          <span class="status-chip {{ section["tone"] }}">{{ section["items"] | length }}</span>
+        </div>
+        <ul class="list-compact">
+          {% for item in section["items"] %}
+            <li>
+              <div class="title">
+                {% if item.detail_url %}
+                  <a class="link" href="{{ item.detail_url }}">{{ item.company }} · {{ item.position }}</a>
+                {% else %}
+                  {{ item.company }} · {{ item.position }}
+                {% endif %}
+              </div>
+              <div class="meta">
+                상태 {{ item.status }}
+                {% if item.follow_up %} · {{ item.follow_up }}{% endif %}
+                · {{ item.follow_up_label }}
+              </div>
+              <div class="mini-pills">
+                {% if item.source %}<span class="status-chip">{{ item.source }}</span>{% endif %}
+                {% if item.id %}<span class="status-chip">#{{ item.id }}</span>{% endif %}
+              </div>
+              {% if item.notes %}
+                <div class="meta">{{ item.notes }}</div>
+              {% endif %}
+              {% if item.id %}
+                <div class="actions">
+                  {% if item.follow_up != agenda.today %}
+                    <button type="button" class="ghost" data-job-id="{{ item.id }}" data-action="today" data-label="{{ item.company }} · {{ item.position }}" onclick="CareerOpsFollowUps.quickActionButton(this)">오늘로</button>
+                  {% endif %}
+                  <button type="button" class="ghost" data-job-id="{{ item.id }}" data-action="plus3" data-label="{{ item.company }} · {{ item.position }}" onclick="CareerOpsFollowUps.quickActionButton(this)">3일 뒤</button>
+                  <button type="button" class="ghost" data-job-id="{{ item.id }}" data-action="plus7" data-label="{{ item.company }} · {{ item.position }}" onclick="CareerOpsFollowUps.quickActionButton(this)">7일 뒤</button>
+                  {% if item.follow_up %}
+                    <button type="button" class="ghost" data-job-id="{{ item.id }}" data-action="clear" data-label="{{ item.company }} · {{ item.position }}" onclick="CareerOpsFollowUps.quickActionButton(this)">미설정</button>
+                  {% endif %}
+                </div>
+              {% endif %}
+            </li>
+          {% else %}
+            <li class="muted">해당 항목이 없습니다.</li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endfor %}
+  </div>
+</div>
+<script>
+  const CareerOpsFollowUps = {
+    async quickActionButton(button) {
+      if (!button) return;
+      await CareerOpsFollowUps.quickAction(button.dataset.jobId, button.dataset.action, button.dataset.label);
+    },
+    async quickAction(jobId, action, label) {
+      await CareerOpsWeb.quickFollowUpAction("follow-up-action-output", jobId, action, label, true);
+    },
+  };
+</script>
+{% endblock %}

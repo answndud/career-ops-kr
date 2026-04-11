@@ -19,31 +19,65 @@
       <input type="hidden" name="source" value="전체">
       <button type="submit">검색</button>
     </form>
-    {% if ai_enabled %}
-      <p class="muted">현재 AI provider: <strong>{{ provider }}</strong></p>
-    {% else %}
-      <p class="muted">AI 기능은 현재 꺼져 있습니다. 검색, 저장, 이력서 생성은 그대로 사용할 수 있습니다.</p>
+    {% if selected_preset %}
+      <div class="notice ok">
+        <div><strong>{% if selected_preset_source == "default" %}기본 preset으로 검색 중{% else %}저장된 preset으로 검색 중{% endif %}</strong></div>
+        <div class="muted">{{ selected_preset.name }} · {{ selected_preset.query }}</div>
+        <div class="mini-pills">
+          {% if selected_preset.is_default %}<span class="status-chip ok">기본 preset</span>{% endif %}
+          <span class="status-chip">{{ selected_preset.activity_label }}</span>
+        </div>
+      </div>
     {% endif %}
+    <p class="muted">검색, 저장, 이력서 생성 중심의 단순한 운영 화면입니다.</p>
   </section>
   <section class="card section-stack">
     <div class="section-header">
       <div>
-        <span class="pill">빠른 액션</span>
-        <h2>검색 결과에서 바로 할 수 있는 일</h2>
+        <span class="pill">검색 preset</span>
+        <h2>자주 쓰는 검색어 저장</h2>
       </div>
     </div>
-    <ul class="plain-list">
-      {% if ai_enabled %}
-        <li>공고 분석: <code>POST /api/search/analyze</code></li>
-      {% endif %}
-      <li>트래커 저장: <code>POST /api/import</code></li>
-      <li>맞춤 이력서 HTML/PDF 생성: <code>POST /api/resume/build-from-url</code></li>
-      <li>외부 공고 URL 복사 후 다른 곳에서 직접 검토</li>
-    </ul>
+    <div class="field">
+      <label for="search-preset-name">Preset 이름</label>
+      <input id="search-preset-name" placeholder="예: 플랫폼 기본, 백엔드 영어, data ai">
+    </div>
     <div class="actions">
+      <button type="button" class="secondary" onclick="CareerOpsSearch.savePreset()">현재 검색어 저장</button>
+      <button type="button" class="secondary" onclick="CareerOpsSearch.savePreset(true)">현재 검색어를 기본으로 저장</button>
       <a class="link" href="/artifacts">산출물 inventory 보기</a>
       <a class="link" href="/tracker">트래커 보기</a>
     </div>
+    <div id="search-preset-output" class="notice result-panel">
+      {% if search_presets %}
+        저장된 검색 preset {{ search_presets | length }}개가 있습니다.
+      {% else %}
+        아직 저장한 검색 preset이 없습니다.
+      {% endif %}
+    </div>
+    <ul id="search-preset-list" class="list-compact">
+      {% for preset in search_presets %}
+        <li>
+          <div class="title">
+            <a class="link" href="/search?preset={{ preset.key | urlencode }}">{{ preset.name }}</a>
+          </div>
+          <div class="meta">{{ preset.query }}</div>
+          <div class="mini-pills">
+            {% if preset.is_default %}<span class="status-chip ok">기본 preset</span>{% endif %}
+            <span class="status-chip">{{ preset.activity_label }}</span>
+          </div>
+            <div class="actions">
+              <a class="link" href="/search?preset={{ preset.key | urlencode }}">실행</a>
+            {% if not preset.is_default %}
+              <button type="button" class="ghost" data-preset-key="{{ preset.key }}" onclick="CareerOpsSearch.setDefaultPresetFromButton(this)">기본으로 지정</button>
+            {% endif %}
+            <button type="button" class="ghost" data-preset-key="{{ preset.key }}" onclick="CareerOpsSearch.deletePresetFromButton(this)">삭제</button>
+          </div>
+        </li>
+      {% else %}
+        <li class="muted">저장된 검색 preset이 없습니다. 검색어를 입력한 뒤 저장해 두세요.</li>
+      {% endfor %}
+    </ul>
     <div class="field">
       <label for="resume-preset">맞춤 이력서 preset</label>
       <select id="resume-preset">
@@ -154,23 +188,11 @@
                         <a class="link" href="{{ item.saved_job.detail_url }}">저장된 공고</a>
                       {% endif %}
                     </span>
-                    {% if ai_enabled %}
-                      <button
-                        type="button"
-                        data-title="{{ item.title }}"
-                        data-company="{{ item.company }}"
-                        data-location="{{ item.location }}"
-                        data-source="{{ item.source }}"
-                        data-url="{{ item.url }}"
-                        onclick="CareerOpsSearch.analyze(this)"
-                      >
-                        분석
-                      </button>
-                    {% endif %}
                     <button
                       type="button"
                       class="secondary"
-                      onclick="CareerOpsSearch.copyUrl({{ item.url | tojson }})"
+                      data-url="{{ item.url }}"
+                      onclick="CareerOpsSearch.copyUrlFromButton(this)"
                     >
                       URL 복사
                     </button>
@@ -215,17 +237,10 @@
     <span class="pill">저장</span>
     <div id="search-save-output" class="notice result-panel">아직 저장한 공고가 없습니다.</div>
   </section>
-  {% if ai_enabled %}
-    <section class="card section-stack">
-      <span class="pill">공고 분석</span>
-      <pre id="search-analysis-output">아직 분석한 결과가 없습니다.</pre>
-    </section>
-  {% else %}
-    <section class="card section-stack">
-      <span class="pill">안내</span>
-      <div class="notice warn">AI 분석은 현재 사용하지 않습니다. 저장 또는 이력서 생성만 사용하세요.</div>
-    </section>
-  {% endif %}
+  <section class="card section-stack">
+    <span class="pill">안내</span>
+    <div class="notice warn">공고 분석 기능은 제거되었습니다. 저장 또는 이력서 생성만 사용하세요.</div>
+  </section>
   <section class="card section-stack">
     <span class="pill">이력서 생성</span>
     <div id="search-build-output" class="notice result-panel">아직 생성한 이력서가 없습니다.</div>
@@ -302,23 +317,9 @@
         output.textContent = error.message;
       }
     },
-    async analyze(button) {
-      const payload = {
-        title: button.dataset.title,
-        company: button.dataset.company,
-        location: button.dataset.location,
-        source: button.dataset.source,
-        url: button.dataset.url,
-      };
-      const output = document.getElementById("search-analysis-output");
-      output.textContent = "분석 중...";
-      const response = await fetch("/api/search/analyze", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(payload),
-      });
-      const data = await response.json();
-      output.textContent = JSON.stringify(data, null, 2);
+    async copyUrlFromButton(button) {
+      if (!button) return;
+      await CareerOpsSearch.copyUrl(button.dataset.url || "");
     },
     async save(button) {
       const payload = {
@@ -345,6 +346,108 @@
       }
       CareerOpsSearch.renderSaveResult(data);
       CareerOpsSearch.syncSavedRow(button.dataset.rowKey, data);
+    },
+    renderPresetResult(message, tone = "ok") {
+      const output = document.getElementById("search-preset-output");
+      output.className = `notice ${tone} result-panel`;
+      output.innerHTML = `<div><strong>${CareerOpsWeb.escapeHtml(message)}</strong></div>`;
+    },
+    presetChips(preset) {
+      const chips = [];
+      if (preset.is_default) {
+        chips.push('<span class="status-chip ok">기본 preset</span>');
+      }
+      if (preset.activity_label) {
+        chips.push(`<span class="status-chip">${CareerOpsWeb.escapeHtml(preset.activity_label)}</span>`);
+      }
+      return chips.join("");
+    },
+    renderPresetList(presets) {
+      const target = document.getElementById("search-preset-list");
+      if (!presets || presets.length === 0) {
+        target.innerHTML = '<li class="muted">저장된 검색 preset이 없습니다. 검색어를 입력한 뒤 저장해 두세요.</li>';
+        return;
+      }
+      target.innerHTML = presets.map((preset) => {
+        const encodedKey = encodeURIComponent(preset.key);
+        const deleteCall = `CareerOpsSearch.deletePreset(${JSON.stringify(preset.key)}); return false;`;
+        const defaultCall = `CareerOpsSearch.setDefaultPreset(${JSON.stringify(preset.key)}); return false;`;
+        return `
+          <li>
+            <div class="title"><a class="link" href="/search?preset=${encodedKey}">${CareerOpsWeb.escapeHtml(preset.name)}</a></div>
+            <div class="meta">${CareerOpsWeb.escapeHtml(preset.query)}</div>
+            <div class="mini-pills">${CareerOpsSearch.presetChips(preset)}</div>
+            <div class="actions">
+              <a class="link" href="/search?preset=${encodedKey}">실행</a>
+              ${preset.is_default ? "" : `<button type="button" class="ghost" onclick='${defaultCall}'>기본으로 지정</button>`}
+              <button type="button" class="ghost" onclick='${deleteCall}'>삭제</button>
+            </div>
+          </li>
+        `;
+      }).join("");
+    },
+    async savePreset(makeDefault = false) {
+      const queryInput = document.querySelector('input[name="q"]');
+      const query = queryInput ? queryInput.value.trim() : "";
+      const nameInput = document.getElementById("search-preset-name");
+      const name = nameInput ? nameInput.value.trim() : "";
+      if (!query) {
+        CareerOpsSearch.renderPresetResult("검색어를 먼저 입력하세요.", "warn");
+        return;
+      }
+      CareerOpsSearch.renderPresetResult(makeDefault ? "기본 검색 preset 저장 중..." : "검색 preset 저장 중...", "warn");
+      const response = await fetch("/api/search-presets", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({name, query, make_default: makeDefault}),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        CareerOpsSearch.renderPresetResult(data.detail || "preset 저장 실패", "error");
+        return;
+      }
+      CareerOpsSearch.renderPresetResult(
+        makeDefault
+          ? `기본 검색 preset을 저장했습니다: ${data.preset.name}`
+          : `검색 preset을 저장했습니다: ${data.preset.name}`,
+        "ok",
+      );
+      CareerOpsSearch.renderPresetList(data.presets || []);
+      if (nameInput) {
+        nameInput.value = "";
+      }
+    },
+    async setDefaultPreset(presetKey) {
+      if (!presetKey) return;
+      CareerOpsSearch.renderPresetResult("기본 검색 preset 지정 중...", "warn");
+      const response = await fetch(`/api/search-presets/${encodeURIComponent(presetKey)}/default`, {method: "POST"});
+      const data = await response.json();
+      if (!response.ok) {
+        CareerOpsSearch.renderPresetResult(data.detail || "기본 preset 지정 실패", "error");
+        return;
+      }
+      CareerOpsSearch.renderPresetResult(`기본 검색 preset을 지정했습니다: ${data.preset.name}`, "ok");
+      CareerOpsSearch.renderPresetList(data.presets || []);
+    },
+    async setDefaultPresetFromButton(button) {
+      if (!button) return;
+      await CareerOpsSearch.setDefaultPreset(button.dataset.presetKey || "");
+    },
+    async deletePreset(presetKey) {
+      if (!presetKey) return;
+      CareerOpsSearch.renderPresetResult("검색 preset 삭제 중...", "warn");
+      const response = await fetch(`/api/search-presets/${encodeURIComponent(presetKey)}`, {method: "DELETE"});
+      const data = await response.json();
+      if (!response.ok) {
+        CareerOpsSearch.renderPresetResult(data.detail || "preset 삭제 실패", "error");
+        return;
+      }
+      CareerOpsSearch.renderPresetResult("검색 preset을 삭제했습니다.", "ok");
+      CareerOpsSearch.renderPresetList(data.presets || []);
+    },
+    async deletePresetFromButton(button) {
+      if (!button) return;
+      await CareerOpsSearch.deletePreset(button.dataset.presetKey || "");
     },
     async buildResume(button) {
       const output = document.getElementById("search-build-output");

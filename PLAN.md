@@ -25,44 +25,111 @@
   - 기본 discover에서는 skip되고 `CAREER_OPS_RUN_BROWSER_E2E=1`일 때만 실행
   - 기본 회귀 기준은 `tests.test_web`, `unittest discover`, `verify`
 - tracker, report, output 디렉터리 워크플로우 유지
+- tracker audit helper 1차 완료
+  - `career-ops-kr audit-jobs`
+  - tracker row 기준 report/resume 누락과 `output/` 아래 legacy HTML, manifest path drift, artifact-index drift를 함께 점검
+  - `--json`, `--strict` 지원
 - README, docs, AGENTS 문서 동기화
   - 초보자용 전체 README 가이드 작성 완료
-  - README에 웹 3단계 시작 루트, AI 없이 쓰는 기본 루트, DB backup/export/import 설명 보강 완료
+  - README에 웹 3단계 시작 루트, 웹 기본 루트, DB backup/export/import 설명 보강 완료
   - 이후 CLI 표면이 바뀌면 README 예시 명령도 함께 갱신
 - git hygiene 유지
   - 생성 산출물은 `.gitignore`와 `.gitkeep` 기준으로 버전 관리에서 제외
   - commit 전 smoke/demo 산출물이 남아 있지 않게 유지
   - optional web surface 유지
   - `career-ops-kr serve-web`
-  - home dashboard / search / settings / resume upload / tracker / saved job detail / deterministic resume build-from-url
+  - home dashboard / search / follow-up inbox / settings / resume upload / tracker / saved job detail / deterministic resume build-from-url
   - home dashboard는 최근 공고 / 최근 이력서 / 최근 생성 웹 HTML/PDF / preset 경로를 함께 보여주는 입구로 유지
+  - home dashboard의 recent jobs는 attention tag / artifact 상태 / 다음 액션 요약까지 같이 보여주는 운영 entry로 유지
+  - artifacts inventory와 home recent generated output은 linked job이 있으면 그 공고의 attention tag / 다음 액션도 같이 보여주는 운영 entry로 유지
+  - artifacts inventory는 `문제 있음 / 팔로업 overdue / 팔로업 미설정 / 리포트 없음` filter로 attention 높은 산출물만 바로 좁힐 수 있게 유지
   - home dashboard는 웹과 CLI에서 만든 최근 HTML/PDF 산출물을 함께 보여주고, linked saved job이 있으면 detail entry로 이어지게 유지
+  - follow-up inbox는 overdue / today / next-7-days / unscheduled-active agenda를 보여주는 별도 화면으로 유지
+  - follow-up inbox는 today / 3일 뒤 / 7일 뒤 / 미설정 quick action으로 follow_up 날짜를 바로 조정할 수 있게 유지
+  - home dashboard의 follow-up preview도 같은 quick action으로 가장 급한 일정만 바로 조정할 수 있게 유지
   - home은 최근 saved live smoke 상태를 compact summary로만 보여주고, settings는 detailed health/report metadata를 유지
   - saved job detail은 tracker 상태와 연결된 JD / report / context / HTML / PDF, related match activity를 다시 확인하고, 저장된 공고 URL이 있으면 같은 화면에서 resume build를 다시 시작하는 entry point로 유지
   - saved job detail은 context에 저장된 tailoring guidance도 다시 확인할 수 있게 유지
   - search는 provider runtime status strip과 canonical URL 기준 import dedupe를 유지
+  - search는 saved search preset 저장/재실행, 기본 preset 지정, 마지막 사용 시각 표시를 지원
   - search provider status는 `정상 / 결과 없음 / 실패`를 구분하고, duplicate-save 결과는 새 row 생성 여부를 in-page에서 바로 설명하도록 유지
   - tracker 목록에서 선택한 항목에 대한 bulk status/source/follow-up 변경을 지원하고, status/source는 markdown tracker sync를 유지
   - tracker-linked bulk update는 `tracker_id`가 없는 row를 먼저 막아 잘못된 markdown fallback 매칭을 피함
+  - tracker attention preset은 `문제 있음 / 리포트 없음 / 이력서 없음 / 팔로업 overdue / 팔로업 미설정 / tracker 미연결`을 공통 helper 기준으로 유지
+  - tracker attention preset은 bulk quick prep 버튼과 연결해 보이는 row 선택과 follow-up 기본값 준비를 바로 이어주도록 유지
   - job detail drift 경고는 status뿐 아니라 source mismatch도 포함
   - tracker 단일 row 저장은 full table refetch 없이 부분 갱신하고, bulk update는 메모/위치 미저장 draft가 있으면 먼저 막아 입력 손실을 피함
   - tracker/detail은 `다음에 할 일`, attention preset, tracker/web drift 같은 read-only operational hint를 유지
-  - AI surface는 기본 비활성화로 유지하고 필요할 때만 `serve-web --enable-ai`로 노출
+  - AI surface는 제거하고 web 표면은 검색/저장/deterministic resume build 중심으로 유지
   - settings 화면에서 web DB backup/export/import를 지원
   - search / tracker 화면은 alert 대신 in-page result panel과 artifact badge 중심으로 유지
   - 국내 구직 기준으로 불필요한 Adzuna web search/provider 연동 제거 완료
-  - legacy DB snapshot import/export에서도 Adzuna 설정이 복원되지 않도록 scrub 완료
   - `design-guidelines.md` 기준 grayscale-first admin dashboard 전면 개편 완료
     - shared design tokens 정의 완료
     - base layout / shared primitives / tables / forms / badges 통일 완료
     - 각 화면에서 inline style 제거 완료
+  - web 구조 개선 1차 완료
+    - `web/app.py`의 dashboard / artifact inventory / live smoke / tracker view helper를 service 모듈로 추출
+    - 신규 모듈 `web/common.py`, `web/artifacts.py`, `web/dashboard.py`, `web/live_smoke.py`, `web/jobs_view.py`, `web/paths.py` 추가
+    - `web/app.py`는 route + mutation helper 중심으로 축소
+  - web 구조 개선 2차 완료
+    - `web/app.py` route를 `web/routers/`로 분리
+    - 신규 모듈 `web/routers/pages.py`, `web/routers/system.py`, `web/routers/jobs.py`, `web/routers/search.py`, `web/routers/resume.py`, `web/routers/deps.py` 추가
+    - `web/app.py`는 app 조립, router deps wiring, mutation helper 중심으로 축소
+  - web 구조 개선 3차 완료
+    - `web/job_records.py`로 job 저장/수정/삭제/bulk update/tracker sync/artifact attach helper 분리
+    - `web/app.py`는 path/preset 설정, router deps wiring, patch 포인트 유지 중심으로 축소
+    - web DB backup/export/import 경로는 import 시점 상수가 아니라 현재 `OUTPUT_DIR` 기준으로 파생되게 유지
+  - web 구조 개선 4차 완료
+    - `web/runtime.py`로 output-root 기반 파생 경로 해석 분리
+    - `web-resumes`, `live-smoke`, `web-db` 경로를 현재 `OUTPUT_DIR` 기준 lazy resolution으로 통일
+    - `web/app.py`는 현재 runtime snapshot을 읽어 router deps와 static mount를 구성
+  - web 구조 개선 5차 완료
+    - `web/routers/deps.py`를 pages / jobs / search / resume / system route별 dependency bundle로 분리
+    - `web_app._router_deps()` patch 포인트는 유지하면서 router별 wiring 책임을 축소
+    - `web/app.py`는 route별 deps factory를 조합하는 app assembler 역할로 더 분명하게 정리
+  - web 구조 개선 6차 완료
+    - `web/router_deps_factory.py`로 router deps assembly helper를 분리
+    - `web/app.py`는 env/path preset 설정, patchable hook 노출, FastAPI app 조립만 맡도록 축소
+    - `web_app.search_jobs`, `web_app.run_build_tailored_resume_from_url`, `web_app._router_deps()` 늦은 바인딩 patch 계약은 유지
+  - web 구조 개선 7차 완료
+    - `web/router_bindings.py`로 path-aware adapter method 묶음을 분리
+    - `web/router_deps_factory.py`는 route deps dataclass mapping 전용으로 더 축소
+    - web assembler 계층을 `app.py -> router_deps_factory.py -> router_bindings.py`로 정리
+- resume 구조 개선 1차 완료
+    - `resume_pipeline/models.py`로 resume/live-smoke dataclass 분리
+    - `resume_pipeline/artifacts.py`로 manifest/index/backfill helper 분리
+    - `commands/resume.py`는 기존 공개 import 경로를 유지하는 facade로 축소
+  - resume 구조 개선 2차 완료
+    - `resume_pipeline/live_smoke.py`로 target registry/report helper 분리
+    - `resume_pipeline/rendering.py`로 HTML/PDF helper 분리
+    - `resume_pipeline/tailoring.py`로 tailoring packet helper 분리
+    - `commands/resume.py`는 build/live smoke runner 중심으로 축소
+  - resume 구조 개선 3차 완료
+    - `resume_pipeline/build.py`로 resume build/from-url 구현 분리
+    - `resume_pipeline/smoke_runner.py`로 live smoke runner 구현 분리
+    - `commands/resume.py`는 facade wrapper + 공개 re-export 중심으로 축소
+  - CLI 구조 개선 1차 완료
+    - `commands/web_cli.py`, `commands/intake_cli.py`, `commands/research_cli.py`, `commands/resume_cli.py`, `commands/tracker_cli.py`로 command registration 분리
+    - `cli.py`는 app 생성과 registration 호출만 담당
+    - smoke CLI patchability를 위해 `run_live_resume_smoke`, `run_batch_live_resume_smoke`는 cli module 이름을 유지한 채 늦은 바인딩으로 주입
+  - CLI 구조 개선 2차 완료
+    - `commands/resume_build_cli.py`로 render/build/apply/backfill command registration 분리
+    - `commands/resume_smoke_cli.py`로 live smoke/report command registration 분리
+    - `commands/resume_cli.py`는 두 registration을 조합하는 얇은 aggregator로 축소
+  - CLI 구조 개선 3차 완료
+    - `commands/intake_fetch_cli.py`로 fetch/discovery command registration 분리
+    - `commands/intake_pipeline_cli.py`로 process-pipeline/score-job registration 분리
+    - `commands/intake_cli.py`는 두 registration을 조합하는 얇은 aggregator로 축소
 - AI harness 로컬 설정 추가 설계
   - Codex: `AGENTS.md`, `.codex/config.toml`, `.codex/agents/`, `.agents/skills/`
   - command surface는 skill 우선으로 통일하고, 별도 command 계층은 만들지 않음
-- optional web surface browser E2E는 선택 검증으로 유지
+  - optional web surface browser E2E는 선택 검증으로 유지
   - Python Playwright 기반 `tests/test_web_e2e.py`
   - 홈 -> resume upload -> tracker 생성 -> saved job detail -> resume build 기본 흐름을 필요할 때만 실제 브라우저에서 점검
+  - search preset 저장/기본 적용, artifacts attention filter, tracker bulk quick prep, follow-up quick action도 선택 browser E2E에서 함께 점검
   - resume manifest는 `build_run_id`, `inventory_key`, derived `artifact-index.json`까지 같이 유지
+  - `backfill-artifact-manifests`는 stale `artifact-index.json` orphan entry도 같이 정리
 
 ### P0.5
 

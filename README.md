@@ -103,7 +103,9 @@ career-ops-kr serve-web
 - 무엇부터 해야 하는지 순서
 - 업로드된 이력서 수
 - 저장된 공고 수
+- 최근 공고의 attention 요약과 다음 액션
 - 최근 생성한 HTML/PDF 이력서 다시 열기
+- 최근 생성 산출물에 연결된 공고의 다음 액션 다시 확인
 - web/CLI 산출물 구분
 - resume preset 시작점
 - 최근 saved live smoke 상태 요약
@@ -120,6 +122,8 @@ career-ops-kr serve-web
   - URL에서 맞춤 이력서 HTML/PDF 생성
 - **산출물**
   - 웹과 CLI에서 생성한 HTML/PDF 이력서 inventory 확인
+  - 연결된 공고가 있으면 산출물 카드에서 그 공고의 다음 액션도 함께 확인
+  - `문제 있음 / 팔로업 overdue / 팔로업 미설정 / 리포트 없음` 기준으로 바로 좁혀 보기
   - 새 산출물은 HTML 옆 `.manifest.json`까지 같이 남겨 provenance를 추적
   - 같은 output root에는 `artifact-index.json` derived cache도 같이 갱신되어 build run 기준 inventory lookup을 돕습니다.
   - manifest에는 `build_run_id`와 `inventory_key`가 같이 기록됩니다.
@@ -128,6 +132,8 @@ career-ops-kr serve-web
   - 연결된 공고가 있으면 바로 상세 화면으로 이동
 - **검색**
   - 사람인 / 원티드 / eFinancial 통합 검색
+  - 자주 쓰는 검색어를 search preset으로 저장하고 다시 실행
+  - preset별 기본 검색 지정과 마지막 사용 시각 확인
   - 검색 source 상태 strip에서 provider별 `정상 / 결과 없음 / 실패`와 실제 사용 검색어를 바로 확인
   - 검색 결과 저장
   - 같은 공고를 다시 저장해도 canonical URL 기준으로 기존 항목을 다시 열고 중복 row를 만들지 않음
@@ -135,7 +141,8 @@ career-ops-kr serve-web
   - 검색 결과에서 바로 맞춤 이력서 HTML/PDF 생성
 - **트래커**
   - 저장된 공고 목록 확인
-  - `리포트 없음 / 이력서 없음 / 팔로업 overdue / tracker 미연결` attention preset으로 바로 좁혀 보기
+  - `문제 있음 / 리포트 없음 / 이력서 없음 / 팔로업 overdue / 팔로업 미설정 / tracker 미연결` attention preset으로 바로 좁혀 보기
+  - attention preset에서 바로 `보이는 항목 선택`과 bulk 값 미리 채우기까지 이어지는 quick prep 버튼 사용
   - 보이는 항목을 선택해서 상태 / 팔로업 / 출처를 일괄 변경
   - 선택한 항목 중 메모/위치에 미저장 변경이 있으면 먼저 개별 저장 후 bulk를 실행
   - 저장된 공고 상세 화면에서 tracker 상태와 생성 산출물 확인
@@ -143,6 +150,12 @@ career-ops-kr serve-web
   - 저장된 공고 상세 화면에서 같은 URL로 맞춤 이력서 HTML/PDF 다시 생성
   - 수동 추가 / 상태 수정 / 삭제
   - `data/applications.md` 기준 tracker sync
+- **팔로업**
+  - overdue / 오늘 / 앞으로 7일 / 날짜 미설정 active 항목을 전용 inbox에서 확인
+  - 오늘로 이동 / 3일 뒤 / 7일 뒤 / 미설정 quick action으로 팔로업 날짜를 바로 조정
+  - 홈 대시보드의 팔로업 preview에서도 같은 quick action 지원
+  - tracker 상세로 바로 이동해 상태와 메모를 갱신
+  - 팔로업 날짜는 web sidecar 전용이며 tracker markdown 포맷은 바꾸지 않음
 
 화면 구성 원칙:
 
@@ -155,26 +168,24 @@ career-ops-kr serve-web
 - 이 웹 화면은 **선택 기능**입니다.
 - 기본 CLI/file workflow는 그대로 유지됩니다.
 - 웹 화면은 편한 사용을 위해 로컬 SQLite 파일 `data/career-ops-web.db`를 같이 씁니다.
-- AI 기능은 지금 기본으로 꺼져 있습니다.
-- 나중에 필요하면 `career-ops-kr serve-web --enable-ai`로 다시 켤 수 있습니다.
 - 웹에서 공고를 추가/수정/삭제하면 tracker markdown도 같이 맞추고, 필요하면 `트래커` 화면에서 다시 sync할 수 있습니다.
-- `트래커`에서 저장된 공고 상세 화면으로 들어가면 JD/report/context/HTML/PDF 연결 상태를 다시 확인할 수 있고, 저장된 공고 URL이 있으면 그 자리에서 다시 맞춤 이력서를 생성할 수 있습니다.
+  - `트래커`에서 저장된 공고 상세 화면으로 들어가면 JD/report/context/HTML/PDF 연결 상태를 다시 확인할 수 있고, 저장된 공고 URL이 있으면 그 자리에서 다시 맞춤 이력서를 생성할 수 있습니다.
+  - `트래커` attention preset은 홈/산출물 화면과 같은 운영 신호를 공유해서 문제 항목과 팔로업 미설정 항목을 같은 기준으로 바로 좁힙니다.
 - 최종 HTML/PDF 이력서 산출은 기존 Python resume pipeline을 그대로 호출합니다.
 - 웹에서 방금 만든 HTML/PDF는 `홈` 화면의 최근 생성 결과에서 다시 열 수 있습니다.
 - `산출물` 화면에서는 웹에서 만든 결과와 CLI에서 만든 결과를 함께 다시 볼 수 있습니다.
 - `홈` 화면의 최근 생성 결과는 웹과 CLI에서 만든 HTML/PDF 산출물을 함께 보여줍니다.
 - `홈`은 live smoke 상태를 짧게 요약해서 보여주고, 자세한 target 상태와 report 정보는 `설정`에서 봅니다.
 
-### 웹에서 AI 없이 쓰는 기본 루트
+### 웹에서 쓰는 기본 루트
 
 지금 이 프로젝트의 웹 화면은 아래 4가지만 써도 충분합니다.
 
 1. `이력서`에서 이력서 업로드
-2. `검색`에서 공고 저장
-3. `트래커`에서 상태와 메모 정리
+2. `검색`에서 공고 저장과 search preset 저장, 기본 preset 지정
+3. `팔로업`과 `트래커`에서 다음 액션 정리
 4. `검색` 또는 `트래커 상세`에서 맞춤 이력서 HTML/PDF 생성
 
-즉, 처음에는 AI 기능을 신경 쓰지 않아도 됩니다.
 같은 공고를 저장 버튼으로 다시 눌러도 duplicate row를 만들지 않고, 이미 저장된 항목이면 기존 항목으로 연결됩니다.
 
 ## 3. 가장 먼저 해야 할 일
@@ -203,7 +214,7 @@ career-ops-kr backfill-artifact-manifests
 ```
 
 이 명령은 기존 HTML 옆에 `.manifest.json`을 만들어서 웹 `산출물` 화면과 provenance 표시를 최신 기준으로 맞춰 줍니다.
-이미 manifest가 있는 HTML도 같은 실행에서 `artifact-index.json` entry를 같이 맞춥니다.
+이미 manifest가 있는 HTML도 같은 실행에서 `artifact-index.json` entry를 같이 맞추고, stale orphan entry가 있으면 함께 정리합니다.
 
 역할별 이력서 예시:
 
@@ -316,6 +327,7 @@ career-ops-kr process-pipeline --limit 3 --score --profile-path config/profile.e
 ```bash
 source .venv/bin/activate
 career-ops-kr finalize-tracker
+career-ops-kr audit-jobs
 ```
 
 이 명령은 보통 아래를 한 번에 처리합니다.
@@ -323,6 +335,16 @@ career-ops-kr finalize-tracker
 - additions 병합
 - 상태값 정리
 - 기본 검증
+
+`career-ops-kr audit-jobs`는 tracker row와 `output/` 산출물을 같이 점검해서 아래 같은 운영 이슈를 바로 보여줍니다.
+
+- report 경로 누락
+- report 파일 누락
+- active row의 resume 경로 누락
+- resume 파일 누락
+- sibling manifest가 없는 legacy HTML 산출물
+- manifest가 가리키는 context/report/pdf/html 같은 파일 누락
+- `artifact-index.json` 누락 또는 manifest/index drift
 
 지원 현황 원본 파일은 `data/applications.md`입니다.
 
@@ -404,6 +426,8 @@ career-ops-kr prepare-company-followup research/<brief>.md --mode summary
   모아둔 공고 여러 개 처리
 - `career-ops-kr finalize-tracker`
   tracker 반영
+- `career-ops-kr audit-jobs`
+  tracker와 산출물의 운영 이슈 점검
 - `career-ops-kr build-tailored-resume-from-url ...`
   공고 URL 하나로 바로 이력서 만들기
 - `career-ops-kr prepare-company-research <company>`
@@ -462,6 +486,7 @@ career-ops-kr --help
 ```bash
 source .venv/bin/activate
 career-ops-kr verify
+career-ops-kr audit-jobs
 ```
 
 ### 웹 DB를 백업하거나 옮기고 싶을 때

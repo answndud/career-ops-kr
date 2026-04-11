@@ -6,8 +6,6 @@ from typing import Any
 
 import httpx
 
-from career_ops_kr.web.ai import translate_query
-
 
 SEARCH_HEADERS = {
     "User-Agent": (
@@ -56,11 +54,8 @@ def has_korean(text: str) -> bool:
 
 
 def _query_pair(query: str) -> tuple[str, str, str | None]:
-    if has_korean(query):
-        english = translate_query(query, target_language="en")
-        return query, english, f"EN: {english}" if english != query else None
-    korean = translate_query(query, target_language="ko")
-    return korean, query, f"KR: {korean}" if korean != query else None
+    normalized = query.strip()
+    return normalized, normalized, None
 
 
 def _provider_query_label(original_query: str, provider_query: str) -> str:

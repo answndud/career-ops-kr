@@ -17,9 +17,10 @@
   </div>
   <div class="actions hero-actions">
     <a class="link" href="/search">공고 검색</a>
+    <a class="link" href="/follow-ups">팔로업 inbox</a>
     <a class="link" href="/resume">이력서 업로드</a>
     <a class="link" href="/tracker">트래커 확인</a>
-    <a class="link" href="/settings">설정 저장</a>
+    <a class="link" href="/settings">설정/백업</a>
   </div>
 </section>
 
@@ -39,13 +40,6 @@
     <div class="value">{{ dashboard.generatedResumeCount }}</div>
     <div class="hint">웹 {{ dashboard.generatedWebResumeCount }} · CLI {{ dashboard.generatedCliResumeCount }}</div>
   </article>
-  {% if ai_enabled %}
-    <article class="stat">
-      <div class="label">AI outputs</div>
-      <div class="value">{{ dashboard.totalAiOutputs }}</div>
-      <div class="hint">어시스턴트 출력 수</div>
-    </article>
-  {% endif %}
 </section>
 
 <section class="card section-stack">
@@ -63,7 +57,7 @@
     </article>
     <article class="subcard">
       <h3>2. 이력서 업로드</h3>
-      <p class="muted">PDF/TXT/MD 이력서를 넣으면 매칭과 재작성이 가능합니다.</p>
+      <p class="muted">PDF/TXT/MD 이력서를 넣어 두면 URL 기반 맞춤 이력서 생성을 바로 이어갈 수 있습니다.</p>
       <div class="actions"><a class="link" href="/resume">이력서 열기</a></div>
     </article>
     <article class="subcard">
@@ -94,7 +88,15 @@
       {% for row in dashboard.recentJobs %}
         <li>
           <div class="title"><a class="link" href="/tracker/{{ row.id }}">#{{ row.id }} · {{ row.company }} · {{ row.position }}</a></div>
-          <div class="meta">상태: {{ row.status }} · 업데이트: {{ row.updated_at }}</div>
+          <div class="meta">상태: {{ row.status }}{% if row.source %} · 출처: {{ row.source }}{% endif %} · 업데이트: {{ row.updated_at }}</div>
+          <div class="mini-pills">
+            {% for tag in row.attention.tags %}
+              <span class="status-chip {% if tag.tone == 'error' %}error{% elif tag.tone == 'warn' %}warn{% endif %}">{{ tag.label }}</span>
+            {% endfor %}
+            {% if row.artifact_summary.report %}<span class="status-chip">Report</span>{% endif %}
+            {% if row.artifact_summary.html %}<span class="status-chip ok">Resume</span>{% endif %}
+          </div>
+          <div class="meta">다음 액션: {{ row.attention.summary }}</div>
         </li>
       {% else %}
         <li class="muted">아직 저장된 공고가 없습니다. 검색에서 공고를 저장해 보세요.</li>
@@ -105,16 +107,41 @@
   <section class="card">
     <span class="pill">Follow-up</span>
     <h2>다가오는 팔로업</h2>
+    <div class="mini-pills">
+      <span class="status-chip error">overdue {{ follow_up_agenda.counts.get("overdue", 0) }}</span>
+      <span class="status-chip warn">today {{ follow_up_agenda.counts.get("today", 0) }}</span>
+      <span class="status-chip ok">next {{ follow_up_agenda.counts.get("upcoming", 0) }}</span>
+      <span class="status-chip warn">미설정 {{ follow_up_agenda.counts.get("unscheduled_active", 0) }}</span>
+    </div>
+    <div id="home-follow-up-output" class="notice result-panel">홈에서 바로 일정 조정이 가능합니다.</div>
     <ul class="list-compact">
       {% for row in dashboard.upcomingFollowUps %}
         <li>
-          <div class="title"><a class="link" href="/tracker/{{ row.id }}">{{ row.follow_up }} · {{ row.company }} · {{ row.position }}</a></div>
-          <div class="meta">항목 #{{ row.id }}</div>
+          <div class="title"><a class="link" href="/tracker/{{ row.id }}">{{ row.company }} · {{ row.position }}</a></div>
+          <div class="meta">
+            {% if row.follow_up %}{{ row.follow_up }} · {% endif %}
+            {{ row.follow_up_label }} · 상태 {{ row.status }}
+          </div>
+          {% if row.id %}
+            <div class="actions">
+              {% if row.follow_up != follow_up_agenda.today %}
+                <button type="button" class="ghost" data-job-id="{{ row.id }}" data-action="today" data-label="{{ row.company }} · {{ row.position }}" onclick="CareerOpsHome.quickActionButton(this)">오늘로</button>
+              {% endif %}
+              <button type="button" class="ghost" data-job-id="{{ row.id }}" data-action="plus3" data-label="{{ row.company }} · {{ row.position }}" onclick="CareerOpsHome.quickActionButton(this)">3일 뒤</button>
+              <button type="button" class="ghost" data-job-id="{{ row.id }}" data-action="plus7" data-label="{{ row.company }} · {{ row.position }}" onclick="CareerOpsHome.quickActionButton(this)">7일 뒤</button>
+              {% if row.follow_up %}
+                <button type="button" class="ghost" data-job-id="{{ row.id }}" data-action="clear" data-label="{{ row.company }} · {{ row.position }}" onclick="CareerOpsHome.quickActionButton(this)">미설정</button>
+              {% endif %}
+            </div>
+          {% endif %}
         </li>
       {% else %}
         <li class="muted">다가오는 팔로업이 없습니다.</li>
       {% endfor %}
     </ul>
+    <div class="actions">
+      <a class="link" href="/follow-ups">팔로업 inbox 열기</a>
+    </div>
   </section>
 </div>
 
@@ -160,6 +187,16 @@
               <a class="link" href="{{ item.job_detail_url }}">저장된 공고</a>
             {% endif %}
           </div>
+          {% if item.job_attention_tags %}
+            <div class="mini-pills">
+              {% for tag in item.job_attention_tags %}
+                <span class="status-chip {% if tag.tone == 'error' %}error{% elif tag.tone == 'warn' %}warn{% endif %}">{{ tag.label }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+          {% if item.job_attention_summary %}
+            <div class="meta">연결 공고 다음 액션: {{ item.job_attention_summary }}</div>
+          {% endif %}
           {% if item.guidance and item.guidance.selection and item.guidance.selection.selected_role_profile %}
             <div class="meta">
               선택 프로필: {{ item.guidance.selection.selected_role_profile }}
@@ -243,26 +280,16 @@
   </section>
 </div>
 
-{% if ai_enabled %}
-  <section class="card">
-    <span class="pill">AI</span>
-    <h2>최근 AI 출력</h2>
-    <ul class="list-compact">
-      {% for item in dashboard.recentAiOutputs %}
-        <li>
-          <div class="title">#{{ item.id }} · {{ item.type }}</div>
-          <div class="meta">{{ item.created_at }}</div>
-          <div class="meta">{{ item.preview }}</div>
-        </li>
-      {% else %}
-        <li class="muted">아직 AI 출력이 없습니다.</li>
-      {% endfor %}
-    </ul>
-  </section>
-{% else %}
-  <section class="notice warn">
-    AI 기능은 현재 기본 비활성화 상태입니다. 지금은 검색, 저장, tracker, deterministic resume build만 사용하면 됩니다.
-  </section>
-{% endif %}
 </div>
+<script>
+  const CareerOpsHome = {
+    async quickActionButton(button) {
+      if (!button) return;
+      await CareerOpsHome.quickAction(button.dataset.jobId, button.dataset.action, button.dataset.label);
+    },
+    async quickAction(jobId, action, label) {
+      await CareerOpsWeb.quickFollowUpAction("home-follow-up-output", jobId, action, label, true);
+    },
+  };
+</script>
 {% endblock %}
