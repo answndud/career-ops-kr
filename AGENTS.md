@@ -56,6 +56,7 @@ career-ops-kr show-live-smoke-report output/live-smoke-report.json
 career-ops-kr compare-live-smoke-reports output/previous-live-smoke-report.json output/live-smoke-report.json
 career-ops-kr compare-live-smoke-reports --latest-from output --type batch --target remember_platform_ko
 career-ops-kr finalize-tracker
+career-ops-kr audit-jobs
 career-ops-kr merge-tracker
 career-ops-kr normalize-statuses
 career-ops-kr verify

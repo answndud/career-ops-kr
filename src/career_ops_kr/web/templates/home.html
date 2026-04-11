@@ -17,6 +17,7 @@
   </div>
   <div class="actions hero-actions">
     <a class="link" href="/search">공고 검색</a>
+    <a class="link" href="/follow-ups">팔로업 inbox</a>
     <a class="link" href="/resume">이력서 업로드</a>
     <a class="link" href="/tracker">트래커 확인</a>
     <a class="link" href="/settings">설정/백업</a>
@@ -98,16 +99,28 @@
   <section class="card">
     <span class="pill">Follow-up</span>
     <h2>다가오는 팔로업</h2>
+    <div class="mini-pills">
+      <span class="status-chip error">overdue {{ follow_up_agenda.counts.get("overdue", 0) }}</span>
+      <span class="status-chip warn">today {{ follow_up_agenda.counts.get("today", 0) }}</span>
+      <span class="status-chip ok">next {{ follow_up_agenda.counts.get("upcoming", 0) }}</span>
+      <span class="status-chip warn">미설정 {{ follow_up_agenda.counts.get("unscheduled_active", 0) }}</span>
+    </div>
     <ul class="list-compact">
       {% for row in dashboard.upcomingFollowUps %}
         <li>
-          <div class="title"><a class="link" href="/tracker/{{ row.id }}">{{ row.follow_up }} · {{ row.company }} · {{ row.position }}</a></div>
-          <div class="meta">항목 #{{ row.id }}</div>
+          <div class="title"><a class="link" href="/tracker/{{ row.id }}">{{ row.company }} · {{ row.position }}</a></div>
+          <div class="meta">
+            {% if row.follow_up %}{{ row.follow_up }} · {% endif %}
+            {{ row.follow_up_label }} · 상태 {{ row.status }}
+          </div>
         </li>
       {% else %}
         <li class="muted">다가오는 팔로업이 없습니다.</li>
       {% endfor %}
     </ul>
+    <div class="actions">
+      <a class="link" href="/follow-ups">팔로업 inbox 열기</a>
+    </div>
   </section>
 </div>
 

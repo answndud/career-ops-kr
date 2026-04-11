@@ -25,6 +25,10 @@
   - 기본 discover에서는 skip되고 `CAREER_OPS_RUN_BROWSER_E2E=1`일 때만 실행
   - 기본 회귀 기준은 `tests.test_web`, `unittest discover`, `verify`
 - tracker, report, output 디렉터리 워크플로우 유지
+- tracker audit helper 1차 완료
+  - `career-ops-kr audit-jobs`
+  - tracker row 기준 report/resume 누락과 `output/` 아래 legacy HTML, manifest path drift, artifact-index drift를 함께 점검
+  - `--json`, `--strict` 지원
 - README, docs, AGENTS 문서 동기화
   - 초보자용 전체 README 가이드 작성 완료
   - README에 웹 3단계 시작 루트, 웹 기본 루트, DB backup/export/import 설명 보강 완료
@@ -34,13 +38,15 @@
   - commit 전 smoke/demo 산출물이 남아 있지 않게 유지
   - optional web surface 유지
   - `career-ops-kr serve-web`
-  - home dashboard / search / settings / resume upload / tracker / saved job detail / deterministic resume build-from-url
+  - home dashboard / search / follow-up inbox / settings / resume upload / tracker / saved job detail / deterministic resume build-from-url
   - home dashboard는 최근 공고 / 최근 이력서 / 최근 생성 웹 HTML/PDF / preset 경로를 함께 보여주는 입구로 유지
   - home dashboard는 웹과 CLI에서 만든 최근 HTML/PDF 산출물을 함께 보여주고, linked saved job이 있으면 detail entry로 이어지게 유지
+  - follow-up inbox는 overdue / today / next-7-days / unscheduled-active agenda를 보여주는 별도 화면으로 유지
   - home은 최근 saved live smoke 상태를 compact summary로만 보여주고, settings는 detailed health/report metadata를 유지
   - saved job detail은 tracker 상태와 연결된 JD / report / context / HTML / PDF, related match activity를 다시 확인하고, 저장된 공고 URL이 있으면 같은 화면에서 resume build를 다시 시작하는 entry point로 유지
   - saved job detail은 context에 저장된 tailoring guidance도 다시 확인할 수 있게 유지
   - search는 provider runtime status strip과 canonical URL 기준 import dedupe를 유지
+  - search는 saved search preset 저장/재실행을 지원
   - search provider status는 `정상 / 결과 없음 / 실패`를 구분하고, duplicate-save 결과는 새 row 생성 여부를 in-page에서 바로 설명하도록 유지
   - tracker 목록에서 선택한 항목에 대한 bulk status/source/follow-up 변경을 지원하고, status/source는 markdown tracker sync를 유지
   - tracker-linked bulk update는 `tracker_id`가 없는 row를 먼저 막아 잘못된 markdown fallback 매칭을 피함
@@ -67,6 +73,22 @@
     - `web/job_records.py`로 job 저장/수정/삭제/bulk update/tracker sync/artifact attach helper 분리
     - `web/app.py`는 path/preset 설정, router deps wiring, patch 포인트 유지 중심으로 축소
     - web DB backup/export/import 경로는 import 시점 상수가 아니라 현재 `OUTPUT_DIR` 기준으로 파생되게 유지
+  - web 구조 개선 4차 완료
+    - `web/runtime.py`로 output-root 기반 파생 경로 해석 분리
+    - `web-resumes`, `live-smoke`, `web-db` 경로를 현재 `OUTPUT_DIR` 기준 lazy resolution으로 통일
+    - `web/app.py`는 현재 runtime snapshot을 읽어 router deps와 static mount를 구성
+  - web 구조 개선 5차 완료
+    - `web/routers/deps.py`를 pages / jobs / search / resume / system route별 dependency bundle로 분리
+    - `web_app._router_deps()` patch 포인트는 유지하면서 router별 wiring 책임을 축소
+    - `web/app.py`는 route별 deps factory를 조합하는 app assembler 역할로 더 분명하게 정리
+  - web 구조 개선 6차 완료
+    - `web/router_deps_factory.py`로 router deps assembly helper를 분리
+    - `web/app.py`는 env/path preset 설정, patchable hook 노출, FastAPI app 조립만 맡도록 축소
+    - `web_app.search_jobs`, `web_app.run_build_tailored_resume_from_url`, `web_app._router_deps()` 늦은 바인딩 patch 계약은 유지
+  - web 구조 개선 7차 완료
+    - `web/router_bindings.py`로 path-aware adapter method 묶음을 분리
+    - `web/router_deps_factory.py`는 route deps dataclass mapping 전용으로 더 축소
+    - web assembler 계층을 `app.py -> router_deps_factory.py -> router_bindings.py`로 정리
 - resume 구조 개선 1차 완료
     - `resume_pipeline/models.py`로 resume/live-smoke dataclass 분리
     - `resume_pipeline/artifacts.py`로 manifest/index/backfill helper 분리

@@ -5,10 +5,10 @@ from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from career_ops_kr.web.routers.deps import WebRouterDeps
+from career_ops_kr.web.routers.deps import SystemRouterDeps
 
 
-def build_system_router(deps: WebRouterDeps) -> APIRouter:
+def build_system_router(deps: SystemRouterDeps) -> APIRouter:
     router = APIRouter()
 
     @router.post("/api/system/db/backup")

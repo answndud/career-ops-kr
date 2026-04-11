@@ -21,6 +21,46 @@
   - live smoke/report tooling은 일반 사용자 흐름과 분리해 고급 기능으로 안내
   - Playwright 설치를 선택 항목으로 내리고, 웹 3단계 시작 루트와 웹 기본 루트를 추가
   - settings 화면의 DB backup / JSON export / JSON import를 언제 쓰는지 쉬운 문장으로 보강
+  - tracker audit helper 1차 추가
+  - `career-ops-kr audit-jobs`
+  - `src/career_ops_kr/tracker.py`, `src/career_ops_kr/commands/tracker.py`, `src/career_ops_kr/commands/tracker_cli.py`
+  - tracker row 기준 `missing_report`, `missing_report_file`, `missing_resume`, `missing_resume_file`를 점검
+  - `output/**/*.html` 중 sibling `.manifest.json`이 없는 legacy HTML도 같이 점검
+  - `--json`, `--strict` 지원
+  - `tests/test_tracker.py`, `tests/test_cli.py`에 helper/CLI 회귀 추가
+  - `python -m unittest tests.test_tracker tests.test_cli`, `python -m unittest discover -s tests`, `career-ops-kr audit-jobs --help`, `career-ops-kr verify` 통과
+  - tracker audit helper 2차 확장
+  - `career-ops-kr audit-jobs`
+  - manifest가 참조하는 `job/report/tailoring/context/pdf/html` 경로 누락을 추가 점검
+  - `artifact-index.json` 누락, manifest/index entry mismatch, orphan index entry를 추가 점검
+  - `tests/test_tracker.py`, `tests/test_cli.py`에 manifest/index drift 회귀 추가
+  - `python -m unittest tests.test_tracker tests.test_cli`, `career-ops-kr audit-jobs --help` 통과
+  - web follow-up inbox 1차 추가
+    - `src/career_ops_kr/web/followups.py`
+    - `/follow-ups`, `/api/follow-ups`
+    - overdue / today / next-7-days / unscheduled-active / later agenda group 추가
+    - home dashboard의 follow-up 요약도 새 agenda snapshot을 재사용하도록 정리
+    - `tests/test_web.py`에 follow-up page/API 회귀 추가
+    - `python -m unittest tests.test_web`, `python -m unittest discover -s tests`, `career-ops-kr serve-web --help` 통과
+  - web search preset 1차 추가
+    - `src/career_ops_kr/web/search_presets.py`
+    - `/api/search-presets` GET/POST/DELETE 추가
+    - `/search?preset=<key>`로 저장된 검색어 재실행 지원
+    - search 화면에서 현재 검색어 preset 저장 / 삭제 / 재실행 UI 추가
+    - settings table JSON payload로 저장해 export/import에 자동 포함되도록 유지
+    - `tests/test_web.py`에 preset CRUD와 preset-based search page 회귀 추가
+  - web 구조 개선 5차 완료
+    - `src/career_ops_kr/web/routers/deps.py`를 `PagesRouterDeps`, `JobsRouterDeps`, `SearchRouterDeps`, `ResumeRouterDeps`, `SystemRouterDeps`로 분리
+    - `src/career_ops_kr/web/app.py`는 route별 deps factory를 조합하고 `_router_deps()` bundle patch 포인트만 유지하도록 정리
+    - `tests/test_web.py`의 runtime path patch 회귀와 router wiring 검증이 계속 통과하는 상태로 유지
+  - web 구조 개선 6차 완료
+    - `src/career_ops_kr/web/router_deps_factory.py`를 추가해 router deps assembly helper를 `app.py` 밖으로 분리
+    - `src/career_ops_kr/web/app.py`는 env/path preset 설정, patchable hook 노출, FastAPI app 조립만 맡도록 축소
+    - `web_app.search_jobs`, `web_app.run_build_tailored_resume_from_url`, `web_app._router_deps()` 늦은 바인딩 patch 계약을 유지한 채 `tests/test_web.py`, `career-ops-kr serve-web --help`, `python -m unittest discover -s tests`, `career-ops-kr verify` 통과
+  - web 구조 개선 7차 완료
+    - `src/career_ops_kr/web/router_bindings.py`를 추가해 path-aware adapter method 묶음을 별도 클래스로 분리
+    - `src/career_ops_kr/web/router_deps_factory.py`는 route deps dataclass mapping만 담당하도록 축소
+    - web assembler 계층이 `app.py -> router_deps_factory.py -> router_bindings.py`로 정리된 상태에서 `tests/test_web.py`, `career-ops-kr serve-web --help` 통과
 - optional web product surface 정비
   - `career-ops-kr serve-web` command 연결
   - `src/career_ops_kr/web/app.py` 기준 FastAPI app을 공식 web entry로 정리
@@ -750,7 +790,7 @@
 - Saramin은 공식 API discovery 경로가 들어갔지만, 실제 운영에는 여전히 승인된 `SARAMIN_ACCESS_KEY`가 필요하다.
 - README는 현재 CLI 표면 기준으로 맞춰져 있다. 이후 명령 이름이나 기본 경로가 바뀌면 문서 예시도 같이 갱신해야 한다.
 - git 초기 커밋 이후에도 새 smoke/demo 산출물이 남지 않도록 `.gitignore` 패턴과 실제 디렉터리 상태를 같이 유지해야 한다.
-- `cli.py`는 얇아졌고 command registration은 `commands/*_cli.py`로 이동했다. web app도 route/helper/mutation 분리가 한 번 더 진행됐고, 다음 구조 개선 후보는 `web/app.py`의 path/preset/deps wiring 묶음을 별도 runtime module로 옮길지 판단하는 일이다.
+- `cli.py`는 얇아졌고 command registration은 `commands/*_cli.py`로 이동했다. web app도 route/helper/mutation 분리가 한 번 더 진행됐고, `web/runtime.py`가 현재 `OUTPUT_DIR` 기준 파생 경로를 lazy resolution하도록 정리했다. `web/routers/deps.py`는 route별 bundle로, `web/router_deps_factory.py`는 deps mapping 전용으로, `web/router_bindings.py`는 path-aware adapter method 전용으로 나뉘어 app assembler와 router 사이 책임 경계가 더 선명해졌다.
 
 ## 다음 세션 시작 포인트
 
@@ -764,10 +804,10 @@
    - manifest-backed artifact inventory의 legacy 산출물 재생성 범위 결정
    - search / tracker / detail 화면의 세부 UX polish 범위 확정
    - 포털 parser drift 발생 시 live smoke와 web build-from-url 흐름을 우선 점검
-3. web/runtime 구조 개선 검토
-   - `web/app.py`의 path/preset/deps wiring을 별도 runtime module로 옮길지 판단
-   - `web/routers/deps.py`가 너무 비대해지지 않도록 deps group 분리 필요성을 검토
-   - web test patch 포인트를 유지한 상태에서 더 줄일 수 있는지 확인
+3. web/runtime 후속 구조 개선
+   - route별 deps bundle, deps mapping, adapter method 분리는 끝났으니 다음은 `router_bindings.py`를 기능 축별로 더 쪼갤 필요가 있는지 판단
+   - web test patch 포인트를 유지한 상태에서 assembler hook surface를 더 줄일 수 있는지 확인
+   - `web/app.py`, `web/router_deps_factory.py`, `web/router_bindings.py` 사이 공개 계약을 더 명확하게 문서화할지 검토
 4. 직군별 scorecard 2차 tuning
    - specialization margin 규칙 추가 정교화
    - mixed fixture를 더 늘려 phrasing variation 회귀 방지

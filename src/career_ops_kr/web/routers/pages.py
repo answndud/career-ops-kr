@@ -5,19 +5,21 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 
-from career_ops_kr.web.routers.deps import WebRouterDeps
+from career_ops_kr.web.routers.deps import PagesRouterDeps
 
 
-def build_pages_router(deps: WebRouterDeps) -> APIRouter:
+def build_pages_router(deps: PagesRouterDeps) -> APIRouter:
     router = APIRouter()
 
     @router.get("/", response_class=HTMLResponse)
     def home(request: Request) -> HTMLResponse:
+        dashboard = deps.get_dashboard_snapshot()
         return deps.templates.TemplateResponse(
             request,
             "home.html",
             deps.template_context(
-                dashboard=deps.get_dashboard_snapshot(),
+                dashboard=dashboard,
+                follow_up_agenda=dashboard.get("followUpAgenda") or deps.get_follow_up_agenda(),
                 live_smoke=deps.get_live_smoke_status_snapshot(),
                 resume_presets=deps.resume_preset_options(),
             ),
@@ -27,14 +29,18 @@ def build_pages_router(deps: WebRouterDeps) -> APIRouter:
     def search_page(
         request: Request,
         q: str | None = None,
+        preset: str | None = None,
         source: str = "전체",
     ) -> HTMLResponse:
         results: dict[str, Any] | None = None
         visible_results: list[dict[str, Any]] = []
+        saved_presets = deps.list_search_presets()
+        selected_preset = deps.get_search_preset(preset or "") if preset else None
+        resolved_query = q or (selected_preset["query"] if selected_preset else "")
         active_source = source or "전체"
-        if q:
+        if resolved_query:
             try:
-                results = deps.search_jobs(q)
+                results = deps.search_jobs(resolved_query)
                 results["results"] = deps.enrich_search_results(results.get("results", []))
                 source_counts = results.get("sources", {})
                 if active_source != "전체" and active_source not in source_counts:
@@ -51,7 +57,9 @@ def build_pages_router(deps: WebRouterDeps) -> APIRouter:
             request,
             "search.html",
             deps.template_context(
-                query=q or "",
+                query=resolved_query,
+                selected_preset=selected_preset,
+                search_presets=saved_presets,
                 results=results,
                 visible_results=visible_results,
                 active_source=active_source,
@@ -122,6 +130,18 @@ def build_pages_router(deps: WebRouterDeps) -> APIRouter:
                     ("follow-up-overdue", "팔로업 overdue"),
                     ("unlinked-tracker", "tracker 미연결"),
                 ],
+            ),
+        )
+
+    @router.get("/follow-ups", response_class=HTMLResponse)
+    def follow_up_page(request: Request) -> HTMLResponse:
+        agenda = deps.get_follow_up_agenda()
+        return deps.templates.TemplateResponse(
+            request,
+            "follow-ups.html",
+            deps.template_context(
+                agenda=agenda,
+                dashboard=deps.get_dashboard_snapshot(),
             ),
         )
 

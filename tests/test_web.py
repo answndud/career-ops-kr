@@ -4,6 +4,7 @@ import os
 import json
 import tempfile
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -66,7 +67,7 @@ class WebAppTests(unittest.TestCase):
         self.client = TestClient(web_app.create_app())
 
     def test_pages_render(self) -> None:
-        for route in ("/", "/search", "/settings", "/resume", "/tracker", "/artifacts"):
+        for route in ("/", "/search", "/follow-ups", "/settings", "/resume", "/tracker", "/artifacts"):
             response = self.client.get(route)
             self.assertEqual(response.status_code, 200, route)
         home = self.client.get("/")
@@ -79,6 +80,93 @@ class WebAppTests(unittest.TestCase):
         tracker = self.client.get("/tracker")
         self.assertIn("선택 항목 일괄 변경", tracker.text)
         self.assertIn("보이는 항목 전체 선택", tracker.text)
+
+    def test_runtime_paths_follow_current_output_root_when_overrides_are_unset(self) -> None:
+        with (
+            patch.object(web_app, "WEB_RESUME_OUTPUT_DIR", None),
+            patch.object(web_app, "LIVE_SMOKE_REPORT_DIR", None),
+        ):
+            paths = web_app._web_paths()
+            deps = web_app._router_deps()
+
+        self.assertEqual(paths.output_dir, self.output_dir)
+        self.assertEqual(paths.web_resume_output_dir, self.output_dir / "web-resumes")
+        self.assertEqual(paths.live_smoke_report_dir, self.output_dir / "live-smoke")
+        self.assertEqual(paths.web_db_output_dir, self.output_dir / "web-db")
+        self.assertEqual(deps.output_dir, self.output_dir)
+        self.assertEqual(deps.web_resume_output_dir, self.output_dir / "web-resumes")
+
+    def test_follow_up_agenda_page_and_api(self) -> None:
+        today = date.today()
+        overdue = (today - timedelta(days=2)).isoformat()
+        due_today = today.isoformat()
+        upcoming = (today + timedelta(days=3)).isoformat()
+        later = (today + timedelta(days=10)).isoformat()
+        self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Overdue Co",
+                "position": "Backend Engineer",
+                "status": "지원예정",
+                "follow_up": overdue,
+                "source": "web",
+            },
+        )
+        self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Today Co",
+                "position": "Platform Engineer",
+                "status": "검토중",
+                "follow_up": due_today,
+                "source": "web",
+            },
+        )
+        self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Upcoming Co",
+                "position": "Data Engineer",
+                "status": "지원완료",
+                "follow_up": upcoming,
+                "source": "web",
+            },
+        )
+        self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Later Co",
+                "position": "SRE",
+                "status": "지원완료",
+                "follow_up": later,
+                "source": "web",
+            },
+        )
+        self.client.post(
+            "/api/jobs",
+            json={
+                "company": "No Date Co",
+                "position": "Platform Engineer",
+                "status": "검토중",
+                "source": "web",
+            },
+        )
+
+        page = self.client.get("/follow-ups")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("오늘 먼저 정리해야 할 팔로업만 모아보기", page.text)
+        self.assertIn("Overdue Co", page.text)
+        self.assertIn("Today Co", page.text)
+        self.assertIn("Upcoming Co", page.text)
+        self.assertIn("No Date Co", page.text)
+
+        payload = self.client.get("/api/follow-ups").json()
+        self.assertEqual(payload["counts"]["overdue"], 1)
+        self.assertEqual(payload["counts"]["today"], 1)
+        self.assertEqual(payload["counts"]["upcoming"], 1)
+        self.assertEqual(payload["counts"]["later"], 1)
+        self.assertEqual(payload["counts"]["unscheduled_active"], 1)
+        self.assertEqual(payload["preview_items"][0]["company"], "Overdue Co")
 
     def test_jobs_crud_updates_tracker_file(self) -> None:
         create_response = self.client.post(
@@ -546,6 +634,62 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("중복 저장 방지", response.text)
         self.assertIn("canonical URL 기준으로 이미 저장된 항목입니다.", response.text)
         self.assertIn(f"/tracker/{created['id']}", response.text)
+
+    def test_search_presets_can_be_saved_reused_and_deleted(self) -> None:
+        save_response = self.client.post(
+            "/api/search-presets",
+            json={"name": "플랫폼 기본", "query": "platform engineer"},
+        )
+        self.assertEqual(save_response.status_code, 200)
+        payload = save_response.json()
+        preset = payload["preset"]
+        self.assertEqual(preset["name"], "플랫폼 기본")
+        self.assertEqual(preset["query"], "platform engineer")
+        self.assertEqual(len(payload["presets"]), 1)
+
+        list_response = self.client.get("/api/search-presets")
+        self.assertEqual(list_response.status_code, 200)
+        self.assertEqual(list_response.json()["presets"][0]["key"], preset["key"])
+
+        mocked = {
+            "results": [
+                {
+                    "id": "wanted-1",
+                    "title": "Platform Engineer",
+                    "company": "Preset Co",
+                    "location": "Seoul",
+                    "source": "원티드",
+                    "url": "https://www.wanted.co.kr/wd/54321",
+                    "type": "-",
+                    "experience": "-",
+                    "salary": "-",
+                    "deadline": "-",
+                    "description": "",
+                }
+            ],
+            "count": 1,
+            "translated_query": None,
+            "provider_statuses": [],
+            "provider_summary": None,
+            "degraded": False,
+            "sources": {"전체": 1, "원티드": 1},
+        }
+        with patch("career_ops_kr.web.app.search_jobs", return_value=mocked) as search_mock:
+            page_response = self.client.get("/search", params={"preset": preset["key"]})
+        self.assertEqual(page_response.status_code, 200)
+        self.assertIn("저장된 preset으로 검색 중", page_response.text)
+        self.assertIn("platform engineer", page_response.text)
+        self.assertIn("플랫폼 기본", page_response.text)
+        search_mock.assert_called_once_with("platform engineer")
+
+        delete_response = self.client.delete(f"/api/search-presets/{preset['key']}")
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertEqual(delete_response.json()["presets"], [])
+
+    def test_search_preset_save_rejects_empty_query(self) -> None:
+        response = self.client.post("/api/search-presets", json={"name": "빈 검색", "query": "   "})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("검색어가 비어 있습니다.", response.json()["detail"])
 
     def test_home_dashboard_surfaces_recent_outputs(self) -> None:
         self.client.post(

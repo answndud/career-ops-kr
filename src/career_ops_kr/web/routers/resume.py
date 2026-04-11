@@ -4,10 +4,10 @@ from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
-from career_ops_kr.web.routers.deps import WebRouterDeps
+from career_ops_kr.web.routers.deps import ResumeRouterDeps
 
 
-def build_resume_router(deps: WebRouterDeps) -> APIRouter:
+def build_resume_router(deps: ResumeRouterDeps) -> APIRouter:
     router = APIRouter()
 
     @router.get("/api/resume/presets")

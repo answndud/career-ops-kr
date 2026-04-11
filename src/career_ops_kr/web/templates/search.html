@@ -19,24 +19,53 @@
       <input type="hidden" name="source" value="전체">
       <button type="submit">검색</button>
     </form>
+    {% if selected_preset %}
+      <div class="notice ok">
+        <div><strong>저장된 preset으로 검색 중</strong></div>
+        <div class="muted">{{ selected_preset.name }} · {{ selected_preset.query }}</div>
+      </div>
+    {% endif %}
     <p class="muted">검색, 저장, 이력서 생성 중심의 단순한 운영 화면입니다.</p>
   </section>
   <section class="card section-stack">
     <div class="section-header">
       <div>
-        <span class="pill">빠른 액션</span>
-        <h2>검색 결과에서 바로 할 수 있는 일</h2>
+        <span class="pill">검색 preset</span>
+        <h2>자주 쓰는 검색어 저장</h2>
       </div>
     </div>
-    <ul class="plain-list">
-      <li>트래커 저장: <code>POST /api/import</code></li>
-      <li>맞춤 이력서 HTML/PDF 생성: <code>POST /api/resume/build-from-url</code></li>
-      <li>외부 공고 URL 복사 후 다른 곳에서 직접 검토</li>
-    </ul>
+    <div class="field">
+      <label for="search-preset-name">Preset 이름</label>
+      <input id="search-preset-name" placeholder="예: 플랫폼 기본, 백엔드 영어, data ai">
+    </div>
     <div class="actions">
+      <button type="button" class="secondary" onclick="CareerOpsSearch.savePreset()">현재 검색어 저장</button>
       <a class="link" href="/artifacts">산출물 inventory 보기</a>
       <a class="link" href="/tracker">트래커 보기</a>
     </div>
+    <div id="search-preset-output" class="notice result-panel">
+      {% if search_presets %}
+        저장된 검색 preset {{ search_presets | length }}개가 있습니다.
+      {% else %}
+        아직 저장한 검색 preset이 없습니다.
+      {% endif %}
+    </div>
+    <ul id="search-preset-list" class="list-compact">
+      {% for preset in search_presets %}
+        <li>
+          <div class="title">
+            <a class="link" href="/search?preset={{ preset.key | urlencode }}">{{ preset.name }}</a>
+          </div>
+          <div class="meta">{{ preset.query }}</div>
+          <div class="actions">
+            <a class="link" href="/search?preset={{ preset.key | urlencode }}">실행</a>
+            <button type="button" class="ghost" onclick="CareerOpsSearch.deletePreset({{ preset.key | tojson }})">삭제</button>
+          </div>
+        </li>
+      {% else %}
+        <li class="muted">저장된 검색 preset이 없습니다. 검색어를 입력한 뒤 저장해 두세요.</li>
+      {% endfor %}
+    </ul>
     <div class="field">
       <label for="resume-preset">맞춤 이력서 preset</label>
       <select id="resume-preset">
@@ -300,6 +329,70 @@
       }
       CareerOpsSearch.renderSaveResult(data);
       CareerOpsSearch.syncSavedRow(button.dataset.rowKey, data);
+    },
+    renderPresetResult(message, tone = "ok") {
+      const output = document.getElementById("search-preset-output");
+      output.className = `notice ${tone} result-panel`;
+      output.innerHTML = `<div><strong>${CareerOpsWeb.escapeHtml(message)}</strong></div>`;
+    },
+    renderPresetList(presets) {
+      const target = document.getElementById("search-preset-list");
+      if (!presets || presets.length === 0) {
+        target.innerHTML = '<li class="muted">저장된 검색 preset이 없습니다. 검색어를 입력한 뒤 저장해 두세요.</li>';
+        return;
+      }
+      target.innerHTML = presets.map((preset) => {
+        const encodedKey = encodeURIComponent(preset.key);
+        const deleteCall = `CareerOpsSearch.deletePreset(${JSON.stringify(preset.key)}); return false;`;
+        return `
+          <li>
+            <div class="title"><a class="link" href="/search?preset=${encodedKey}">${CareerOpsWeb.escapeHtml(preset.name)}</a></div>
+            <div class="meta">${CareerOpsWeb.escapeHtml(preset.query)}</div>
+            <div class="actions">
+              <a class="link" href="/search?preset=${encodedKey}">실행</a>
+              <button type="button" class="ghost" onclick='${deleteCall}'>삭제</button>
+            </div>
+          </li>
+        `;
+      }).join("");
+    },
+    async savePreset() {
+      const queryInput = document.querySelector('input[name="q"]');
+      const query = queryInput ? queryInput.value.trim() : "";
+      const nameInput = document.getElementById("search-preset-name");
+      const name = nameInput ? nameInput.value.trim() : "";
+      if (!query) {
+        CareerOpsSearch.renderPresetResult("검색어를 먼저 입력하세요.", "warn");
+        return;
+      }
+      CareerOpsSearch.renderPresetResult("검색 preset 저장 중...", "warn");
+      const response = await fetch("/api/search-presets", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({name, query}),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        CareerOpsSearch.renderPresetResult(data.detail || "preset 저장 실패", "error");
+        return;
+      }
+      CareerOpsSearch.renderPresetResult(`검색 preset을 저장했습니다: ${data.preset.name}`, "ok");
+      CareerOpsSearch.renderPresetList(data.presets || []);
+      if (nameInput) {
+        nameInput.value = "";
+      }
+    },
+    async deletePreset(presetKey) {
+      if (!presetKey) return;
+      CareerOpsSearch.renderPresetResult("검색 preset 삭제 중...", "warn");
+      const response = await fetch(`/api/search-presets/${encodeURIComponent(presetKey)}`, {method: "DELETE"});
+      const data = await response.json();
+      if (!response.ok) {
+        CareerOpsSearch.renderPresetResult(data.detail || "preset 삭제 실패", "error");
+        return;
+      }
+      CareerOpsSearch.renderPresetResult("검색 preset을 삭제했습니다.", "ok");
+      CareerOpsSearch.renderPresetList(data.presets || []);
     },
     async buildResume(button) {
       const output = document.getElementById("search-build-output");

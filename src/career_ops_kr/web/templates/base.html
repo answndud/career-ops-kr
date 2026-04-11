@@ -550,6 +550,7 @@
         <nav>
           <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">홈</a>
           <a href="/search" class="{% if request.url.path.startswith('/search') %}active{% endif %}">검색</a>
+          <a href="/follow-ups" class="{% if request.url.path.startswith('/follow-ups') %}active{% endif %}">팔로업</a>
           <a href="/resume" class="{% if request.url.path.startswith('/resume') %}active{% endif %}">이력서</a>
           <a href="/artifacts" class="{% if request.url.path.startswith('/artifacts') %}active{% endif %}">산출물</a>
           <a href="/tracker" class="{% if request.url.path.startswith('/tracker') %}active{% endif %}">트래커</a>

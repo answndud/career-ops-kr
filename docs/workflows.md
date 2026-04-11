@@ -8,6 +8,7 @@
 4. 생성된 리포트를 Codex가 읽고 정성 코멘트를 보강합니다.
 5. 기본 경로는 `career-ops-kr finalize-tracker`입니다. additions 병합, 상태 정규화, 선택적 verify까지 한 번에 수행합니다.
 6. 더 세밀한 제어가 필요할 때만 `career-ops-kr merge-tracker`, `career-ops-kr normalize-statuses`, `career-ops-kr verify`를 개별 실행합니다.
+7. tracker와 산출물을 운영 관점에서 다시 점검하고 싶으면 `career-ops-kr audit-jobs`를 실행합니다. report/resume 누락뿐 아니라 sibling manifest가 없는 legacy HTML, manifest가 가리키는 파일 누락, `artifact-index.json` drift도 같이 보여줍니다.
 
 같은 pipeline 파일에 대해 동시에 `process-pipeline`를 실행하면 `*.lock` sidecar 때문에 즉시 실패합니다. stale lock은 자동 회수하고, metadata가 손상된 오래된 lock도 age fallback으로 정리합니다. 실제 실행 중인 프로세스가 잡고 있는 lock은 수동으로 건드리지 않는 것이 원칙입니다.
 
@@ -57,6 +58,7 @@
 - `career-ops-kr normalize-statuses`: 비표준 상태를 정규화
 - `career-ops-kr merge-tracker`: additions를 tracker에 병합하는 저수준 명령
 - `career-ops-kr verify`: 필수 파일, 중복, 누락 링크 검사
+- `career-ops-kr audit-jobs`: tracker row와 `output/` 산출물을 같이 점검해 report/resume 누락, manifest referenced file 누락, artifact-index drift, legacy HTML을 출력
 - `career-ops-kr process-pipeline`: pending URL을 fetch하고, 선택적으로 score/report/addition까지 생성한 뒤 성공한 항목만 처리 완료로 표시
 - `career-ops-kr score-job`: 저장된 JD를 다시 점수화하고 `--tracker-out`, `--profile-path`, `--scorecard-path`로 출력과 scoring 입력을 제어할 수 있음
 - `career-ops-kr prepare-resume-tailoring`: 저장된 JD와 score report를 resume tailoring JSON packet으로 구조화하고, 필요하면 `--base-context`로 현재 resume context와의 gap도 계산함
@@ -110,19 +112,20 @@ Codex에게는 아래 순서로 요청하는 것이 좋습니다.
 3. 홈에서 `설정 -> 이력서 -> 검색 -> 산출물 -> 트래커` 순서로 들어가고, 최근 생성한 HTML/PDF와 preset 경로를 함께 확인합니다.
 4. `설정` 페이지에서 웹 DB 경로를 확인하고 필요하면 `DB 백업 생성`, `JSON 내보내기`, `JSON 가져오기`를 사용합니다. 최근 saved live smoke 상태도 같은 화면에서 확인할 수 있습니다.
 5. `이력서` 페이지에서 PDF/TXT/MD 이력서를 업로드합니다.
-6. `검색` 페이지에서 공고를 검색합니다. 결과 위쪽의 provider status strip으로 사람인 / 원티드 / eFinancial의 `정상 / 결과 없음 / 실패`와 실제 사용 검색어를 같이 확인합니다.
+6. `검색` 페이지에서 공고를 검색합니다. 결과 위쪽의 provider status strip으로 사람인 / 원티드 / eFinancial의 `정상 / 결과 없음 / 실패`와 실제 사용 검색어를 같이 확인합니다. 자주 쓰는 입력어는 search preset으로 저장해 두고 `/search?preset=...` 링크로 다시 실행할 수 있습니다.
 7. 검색 결과에서 아래를 바로 실행할 수 있습니다.
    - local tracker DB 저장
    - 맞춤 이력서 HTML/PDF 생성
    같은 canonical detail URL을 다시 저장하면 새 row를 만들지 않고 기존 항목을 다시 엽니다. 저장 panel에서 `새 저장 / 기존 항목 보완 / 기존 항목 재사용`도 바로 확인합니다.
 8. `산출물` 페이지에서 웹과 CLI에서 생성한 HTML/PDF inventory를 함께 확인하고, 연결된 공고가 있으면 상세 화면으로 바로 이동할 수 있습니다. 새 산출물은 manifest 기반으로 provenance를 보여주고, manifest가 없는 예전 HTML은 legacy로 구분합니다.
-9. `트래커` 페이지에서 상태와 메모를 정리합니다. `리포트 없음`, `이력서 없음`, `팔로업 overdue`, `tracker 미연결` preset으로 attention item만 바로 좁힐 수 있습니다.
-10. 여러 항목을 한 번에 정리할 때는 `트래커`에서 보이는 row만 선택해서 상태, 팔로업, 출처를 일괄 변경할 수 있습니다. 이 bulk update도 기존 update 경로를 재사용하므로 상태와 출처는 markdown tracker가 같이 맞춰지고, 팔로업은 web sidecar에서만 관리합니다. 선택한 row에 메모/위치 미저장 draft가 있으면 먼저 개별 저장을 요구해서 다른 draft를 잃지 않게 유지합니다. tracker-linked field를 바꿀 때 `tracker_id`가 없는 row는 먼저 막아서 잘못된 markdown row를 건드리지 않게 유지합니다.
-11. 저장한 공고를 다시 볼 때는 `트래커` 목록에서 상세 화면으로 들어가 tracker 상태와 연결된 JD/report/context/HTML/PDF를 확인하고, 공고 URL이 있으면 그 자리에서 맞춤 이력서를 다시 생성합니다.
-12. 상세 화면에는 `다음에 할 일`과 tracker/web drift 요약이 같이 보여서, 단순 조회가 아니라 다음 액션 결정 화면으로 사용합니다.
-13. `홈`으로 돌아오면 최근 생성한 HTML/PDF 이력서와 preset 경로를 다시 바로 확인할 수 있습니다. 이 목록은 웹에서 만든 산출물과 CLI에서 만든 산출물을 함께 보여줍니다.
-14. `홈`은 recent live smoke 상태를 짧게 요약하고, `설정`은 target별 문제/dir/report 수를 자세히 보여줍니다.
-15. 웹 화면은 검색, 저장, tracker 정리, deterministic resume build 중심으로 사용합니다.
+9. `팔로업` 페이지에서는 overdue / 오늘 / 앞으로 7일 / 날짜 미설정 active 항목을 전용 inbox로 모아 봅니다. tracker markdown 포맷은 유지하고, 일정 정리만 web sidecar 기준으로 돕습니다.
+10. `트래커` 페이지에서 상태와 메모를 정리합니다. `리포트 없음`, `이력서 없음`, `팔로업 overdue`, `tracker 미연결` preset으로 attention item만 바로 좁힐 수 있습니다.
+11. 여러 항목을 한 번에 정리할 때는 `트래커`에서 보이는 row만 선택해서 상태, 팔로업, 출처를 일괄 변경할 수 있습니다. 이 bulk update도 기존 update 경로를 재사용하므로 상태와 출처는 markdown tracker가 같이 맞춰지고, 팔로업은 web sidecar에서만 관리합니다. 선택한 row에 메모/위치 미저장 draft가 있으면 먼저 개별 저장을 요구해서 다른 draft를 잃지 않게 유지합니다. tracker-linked field를 바꿀 때 `tracker_id`가 없는 row는 먼저 막아서 잘못된 markdown row를 건드리지 않게 유지합니다.
+12. 저장한 공고를 다시 볼 때는 `트래커` 목록에서 상세 화면으로 들어가 tracker 상태와 연결된 JD/report/context/HTML/PDF를 확인하고, 공고 URL이 있으면 그 자리에서 맞춤 이력서를 다시 생성합니다.
+13. 상세 화면에는 `다음에 할 일`과 tracker/web drift 요약이 같이 보여서, 단순 조회가 아니라 다음 액션 결정 화면으로 사용합니다.
+14. `홈`으로 돌아오면 최근 생성한 HTML/PDF 이력서와 preset 경로를 다시 바로 확인할 수 있습니다. 이 목록은 웹에서 만든 산출물과 CLI에서 만든 산출물을 함께 보여줍니다.
+15. `홈`은 recent live smoke 상태를 짧게 요약하고, `설정`은 target별 문제/dir/report 수를 자세히 보여줍니다.
+16. 웹 화면은 검색, 저장, 팔로업 정리, tracker 정리, deterministic resume build 중심으로 사용합니다.
 
 규칙:
 

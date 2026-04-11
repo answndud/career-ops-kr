@@ -128,6 +128,7 @@ career-ops-kr serve-web
   - 연결된 공고가 있으면 바로 상세 화면으로 이동
 - **검색**
   - 사람인 / 원티드 / eFinancial 통합 검색
+  - 자주 쓰는 검색어를 search preset으로 저장하고 다시 실행
   - 검색 source 상태 strip에서 provider별 `정상 / 결과 없음 / 실패`와 실제 사용 검색어를 바로 확인
   - 검색 결과 저장
   - 같은 공고를 다시 저장해도 canonical URL 기준으로 기존 항목을 다시 열고 중복 row를 만들지 않음
@@ -143,6 +144,10 @@ career-ops-kr serve-web
   - 저장된 공고 상세 화면에서 같은 URL로 맞춤 이력서 HTML/PDF 다시 생성
   - 수동 추가 / 상태 수정 / 삭제
   - `data/applications.md` 기준 tracker sync
+- **팔로업**
+  - overdue / 오늘 / 앞으로 7일 / 날짜 미설정 active 항목을 전용 inbox에서 확인
+  - tracker 상세로 바로 이동해 상태와 메모를 갱신
+  - 팔로업 날짜는 web sidecar 전용이며 tracker markdown 포맷은 바꾸지 않음
 
 화면 구성 원칙:
 
@@ -168,8 +173,8 @@ career-ops-kr serve-web
 지금 이 프로젝트의 웹 화면은 아래 4가지만 써도 충분합니다.
 
 1. `이력서`에서 이력서 업로드
-2. `검색`에서 공고 저장
-3. `트래커`에서 상태와 메모 정리
+2. `검색`에서 공고 저장과 search preset 저장
+3. `팔로업`과 `트래커`에서 다음 액션 정리
 4. `검색` 또는 `트래커 상세`에서 맞춤 이력서 HTML/PDF 생성
 
 같은 공고를 저장 버튼으로 다시 눌러도 duplicate row를 만들지 않고, 이미 저장된 항목이면 기존 항목으로 연결됩니다.
@@ -313,6 +318,7 @@ career-ops-kr process-pipeline --limit 3 --score --profile-path config/profile.e
 ```bash
 source .venv/bin/activate
 career-ops-kr finalize-tracker
+career-ops-kr audit-jobs
 ```
 
 이 명령은 보통 아래를 한 번에 처리합니다.
@@ -320,6 +326,16 @@ career-ops-kr finalize-tracker
 - additions 병합
 - 상태값 정리
 - 기본 검증
+
+`career-ops-kr audit-jobs`는 tracker row와 `output/` 산출물을 같이 점검해서 아래 같은 운영 이슈를 바로 보여줍니다.
+
+- report 경로 누락
+- report 파일 누락
+- active row의 resume 경로 누락
+- resume 파일 누락
+- sibling manifest가 없는 legacy HTML 산출물
+- manifest가 가리키는 context/report/pdf/html 같은 파일 누락
+- `artifact-index.json` 누락 또는 manifest/index drift
 
 지원 현황 원본 파일은 `data/applications.md`입니다.
 
@@ -401,6 +417,8 @@ career-ops-kr prepare-company-followup research/<brief>.md --mode summary
   모아둔 공고 여러 개 처리
 - `career-ops-kr finalize-tracker`
   tracker 반영
+- `career-ops-kr audit-jobs`
+  tracker와 산출물의 운영 이슈 점검
 - `career-ops-kr build-tailored-resume-from-url ...`
   공고 URL 하나로 바로 이력서 만들기
 - `career-ops-kr prepare-company-research <company>`
@@ -459,6 +477,7 @@ career-ops-kr --help
 ```bash
 source .venv/bin/activate
 career-ops-kr verify
+career-ops-kr audit-jobs
 ```
 
 ### 웹 DB를 백업하거나 옮기고 싶을 때

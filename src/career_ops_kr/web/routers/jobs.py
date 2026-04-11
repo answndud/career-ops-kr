@@ -4,10 +4,10 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
-from career_ops_kr.web.routers.deps import WebRouterDeps
+from career_ops_kr.web.routers.deps import JobsRouterDeps
 
 
-def build_jobs_router(deps: WebRouterDeps) -> APIRouter:
+def build_jobs_router(deps: JobsRouterDeps) -> APIRouter:
     router = APIRouter()
 
     @router.get("/api/jobs")
@@ -43,6 +43,10 @@ def build_jobs_router(deps: WebRouterDeps) -> APIRouter:
             rows = conn.execute(query, params).fetchall()
         ui_rows = [deps.job_row_with_ui_state(row) for row in rows]
         return [row for row in ui_rows if deps.matches_attention_filter(row, attention)]
+
+    @router.get("/api/follow-ups")
+    def api_follow_ups(horizon_days: int = 7) -> dict[str, Any]:
+        return deps.get_follow_up_agenda(horizon_days=horizon_days)
 
     @router.post("/api/jobs", status_code=201)
     async def api_create_job(request: Request) -> dict[str, Any]:

@@ -6,6 +6,7 @@ from typing import Any
 from career_ops_kr.utils import load_yaml
 from career_ops_kr.web.artifacts import generated_resume_snapshot
 from career_ops_kr.web.db import connection_scope
+from career_ops_kr.web.followups import build_follow_up_agenda
 from career_ops_kr.web.paths import WebPaths
 
 
@@ -19,31 +20,45 @@ def get_dashboard_snapshot(*, paths: WebPaths) -> dict[str, Any]:
         recent_jobs = conn.execute(
             "SELECT id, company, position, status, updated_at FROM jobs ORDER BY updated_at DESC LIMIT 5"
         ).fetchall()
-        follow_ups = conn.execute(
+        follow_up_rows = conn.execute(
             """
-            SELECT id, company, position, follow_up
+            SELECT id, company, position, status, source, follow_up, notes, updated_at
             FROM jobs
-            WHERE follow_up IS NOT NULL AND follow_up >= date('now')
-            ORDER BY follow_up ASC
-            LIMIT 5
+            WHERE follow_up IS NOT NULL OR status IN ('검토중', '지원예정')
+            ORDER BY updated_at DESC, created_at DESC
             """
         ).fetchall()
         recent_resumes = conn.execute(
             "SELECT id, filename, created_at FROM resumes ORDER BY created_at DESC LIMIT 5"
         ).fetchall()
     generated_outputs = generated_resume_snapshot(paths=paths, limit=6)
+    follow_up_agenda = build_follow_up_agenda(list(follow_up_rows))
     return {
         "totalJobs": total_jobs,
         "totalResumes": total_resumes,
         "statusCounts": status_counts,
         "recentJobs": recent_jobs,
-        "upcomingFollowUps": follow_ups,
+        "upcomingFollowUps": follow_up_agenda["preview_items"],
+        "followUpAgenda": follow_up_agenda,
         "recentResumes": recent_resumes,
         "generatedResumeCount": generated_outputs["total"],
         "generatedWebResumeCount": generated_outputs["web_total"],
         "generatedCliResumeCount": generated_outputs["cli_total"],
         "recentGeneratedResumes": generated_outputs["items"],
     }
+
+
+def get_follow_up_agenda(*, horizon_days: int = 7) -> dict[str, Any]:
+    with connection_scope() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, company, position, status, source, follow_up, notes, updated_at
+            FROM jobs
+            WHERE follow_up IS NOT NULL OR status IN ('검토중', '지원예정')
+            ORDER BY updated_at DESC, created_at DESC
+            """
+        ).fetchall()
+    return build_follow_up_agenda(list(rows), horizon_days=horizon_days)
 
 
 def default_web_profile_path(*, default_profile_path: Path, repo_root: Path) -> Path:

@@ -3,7 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from career_ops_kr.tracker import merge_tracker_additions, normalize_tracker_statuses, parse_tracker_rows
+from career_ops_kr.tracker import (
+    TrackerAuditResult,
+    audit_tracker_jobs,
+    merge_tracker_additions,
+    normalize_tracker_statuses,
+    parse_tracker_rows,
+)
 
 
 @dataclass(slots=True)
@@ -61,4 +67,17 @@ def run_verify() -> VerifyResult:
         missing=missing,
         duplicates=duplicates,
         missing_reports=missing_reports,
+    )
+
+
+def run_audit_jobs(
+    tracker_path: Path,
+    *,
+    repo_root: Path,
+    output_dir: Path,
+) -> TrackerAuditResult:
+    return audit_tracker_jobs(
+        tracker_path,
+        repo_root=repo_root,
+        output_dir=output_dir,
     )
