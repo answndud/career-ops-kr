@@ -81,6 +81,11 @@
     - attention preset을 현재 visible row selection과 bulk form prefill까지 바로 연결
     - 기존에 정의되지 않았던 `CareerOpsTracker.selectVisible()` 호출도 실제 helper로 보강
     - `tests/test_web.py`에 tracker quick prep UI 노출 회귀 추가
+  - browser E2E 회귀 확장과 quick-action quoting fix
+    - `tests/test_web_e2e.py`에 `search preset -> 저장 -> build -> artifacts filter -> tracker bulk quick prep -> follow-up quick action` 흐름 추가
+    - `home.html`, `follow-ups.html`, `search.html`의 inline `onclick + tojson` quoting 문제를 data-attribute helper 방식으로 정리
+    - `tests/test_web.py`에 home/follow-up quick action button wiring 회귀 추가
+    - `CAREER_OPS_RUN_BROWSER_E2E=1 python -m unittest tests.test_web_e2e` 통과
   - web search preset 1차 추가
     - `src/career_ops_kr/web/search_presets.py`
     - `/api/search-presets` GET/POST/DELETE 추가

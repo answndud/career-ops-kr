@@ -124,9 +124,10 @@
 - AI harness 로컬 설정 추가 설계
   - Codex: `AGENTS.md`, `.codex/config.toml`, `.codex/agents/`, `.agents/skills/`
   - command surface는 skill 우선으로 통일하고, 별도 command 계층은 만들지 않음
-- optional web surface browser E2E는 선택 검증으로 유지
+  - optional web surface browser E2E는 선택 검증으로 유지
   - Python Playwright 기반 `tests/test_web_e2e.py`
   - 홈 -> resume upload -> tracker 생성 -> saved job detail -> resume build 기본 흐름을 필요할 때만 실제 브라우저에서 점검
+  - search preset 저장/기본 적용, artifacts attention filter, tracker bulk quick prep, follow-up quick action도 선택 browser E2E에서 함께 점검
   - resume manifest는 `build_run_id`, `inventory_key`, derived `artifact-index.json`까지 같이 유지
   - `backfill-artifact-manifests`는 stale `artifact-index.json` orphan entry도 같이 정리
 

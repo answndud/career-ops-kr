@@ -66,12 +66,12 @@
             {% if preset.is_default %}<span class="status-chip ok">기본 preset</span>{% endif %}
             <span class="status-chip">{{ preset.activity_label }}</span>
           </div>
-          <div class="actions">
-            <a class="link" href="/search?preset={{ preset.key | urlencode }}">실행</a>
+            <div class="actions">
+              <a class="link" href="/search?preset={{ preset.key | urlencode }}">실행</a>
             {% if not preset.is_default %}
-              <button type="button" class="ghost" onclick="CareerOpsSearch.setDefaultPreset({{ preset.key | tojson }})">기본으로 지정</button>
+              <button type="button" class="ghost" data-preset-key="{{ preset.key }}" onclick="CareerOpsSearch.setDefaultPresetFromButton(this)">기본으로 지정</button>
             {% endif %}
-            <button type="button" class="ghost" onclick="CareerOpsSearch.deletePreset({{ preset.key | tojson }})">삭제</button>
+            <button type="button" class="ghost" data-preset-key="{{ preset.key }}" onclick="CareerOpsSearch.deletePresetFromButton(this)">삭제</button>
           </div>
         </li>
       {% else %}
@@ -191,7 +191,8 @@
                     <button
                       type="button"
                       class="secondary"
-                      onclick="CareerOpsSearch.copyUrl({{ item.url | tojson }})"
+                      data-url="{{ item.url }}"
+                      onclick="CareerOpsSearch.copyUrlFromButton(this)"
                     >
                       URL 복사
                     </button>
@@ -316,6 +317,10 @@
         output.textContent = error.message;
       }
     },
+    async copyUrlFromButton(button) {
+      if (!button) return;
+      await CareerOpsSearch.copyUrl(button.dataset.url || "");
+    },
     async save(button) {
       const payload = {
         title: button.dataset.title,
@@ -424,6 +429,10 @@
       CareerOpsSearch.renderPresetResult(`기본 검색 preset을 지정했습니다: ${data.preset.name}`, "ok");
       CareerOpsSearch.renderPresetList(data.presets || []);
     },
+    async setDefaultPresetFromButton(button) {
+      if (!button) return;
+      await CareerOpsSearch.setDefaultPreset(button.dataset.presetKey || "");
+    },
     async deletePreset(presetKey) {
       if (!presetKey) return;
       CareerOpsSearch.renderPresetResult("검색 preset 삭제 중...", "warn");
@@ -435,6 +444,10 @@
       }
       CareerOpsSearch.renderPresetResult("검색 preset을 삭제했습니다.", "ok");
       CareerOpsSearch.renderPresetList(data.presets || []);
+    },
+    async deletePresetFromButton(button) {
+      if (!button) return;
+      await CareerOpsSearch.deletePreset(button.dataset.presetKey || "");
     },
     async buildResume(button) {
       const output = document.getElementById("search-build-output");

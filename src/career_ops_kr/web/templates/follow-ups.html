@@ -96,12 +96,12 @@
               {% if item.id %}
                 <div class="actions">
                   {% if item.follow_up != agenda.today %}
-                    <button type="button" class="ghost" onclick="CareerOpsFollowUps.quickAction({{ item.id }}, 'today', {{ (item.company ~ ' · ' ~ item.position) | tojson }})">오늘로</button>
+                    <button type="button" class="ghost" data-job-id="{{ item.id }}" data-action="today" data-label="{{ item.company }} · {{ item.position }}" onclick="CareerOpsFollowUps.quickActionButton(this)">오늘로</button>
                   {% endif %}
-                  <button type="button" class="ghost" onclick="CareerOpsFollowUps.quickAction({{ item.id }}, 'plus3', {{ (item.company ~ ' · ' ~ item.position) | tojson }})">3일 뒤</button>
-                  <button type="button" class="ghost" onclick="CareerOpsFollowUps.quickAction({{ item.id }}, 'plus7', {{ (item.company ~ ' · ' ~ item.position) | tojson }})">7일 뒤</button>
+                  <button type="button" class="ghost" data-job-id="{{ item.id }}" data-action="plus3" data-label="{{ item.company }} · {{ item.position }}" onclick="CareerOpsFollowUps.quickActionButton(this)">3일 뒤</button>
+                  <button type="button" class="ghost" data-job-id="{{ item.id }}" data-action="plus7" data-label="{{ item.company }} · {{ item.position }}" onclick="CareerOpsFollowUps.quickActionButton(this)">7일 뒤</button>
                   {% if item.follow_up %}
-                    <button type="button" class="ghost" onclick="CareerOpsFollowUps.quickAction({{ item.id }}, 'clear', {{ (item.company ~ ' · ' ~ item.position) | tojson }})">미설정</button>
+                    <button type="button" class="ghost" data-job-id="{{ item.id }}" data-action="clear" data-label="{{ item.company }} · {{ item.position }}" onclick="CareerOpsFollowUps.quickActionButton(this)">미설정</button>
                   {% endif %}
                 </div>
               {% endif %}
@@ -116,6 +116,10 @@
 </div>
 <script>
   const CareerOpsFollowUps = {
+    async quickActionButton(button) {
+      if (!button) return;
+      await CareerOpsFollowUps.quickAction(button.dataset.jobId, button.dataset.action, button.dataset.label);
+    },
     async quickAction(jobId, action, label) {
       await CareerOpsWeb.quickFollowUpAction("follow-up-action-output", jobId, action, label, true);
     },

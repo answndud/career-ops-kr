@@ -7,6 +7,7 @@ import threading
 import time
 import unittest
 from contextlib import closing
+from datetime import date, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -47,9 +48,11 @@ class WebAppE2ETests(unittest.TestCase):
             patch.object(resume_tools, "UPLOAD_DIR", self.upload_dir),
             patch.object(web_app, "OUTPUT_DIR", self.output_dir),
             patch.object(web_app, "WEB_RESUME_OUTPUT_DIR", self.output_dir / "web-resumes"),
+            patch.object(web_app, "LIVE_SMOKE_REPORT_DIR", self.output_dir / "live-smoke"),
             patch.object(web_app, "TRACKER_PATH", self.tracker_path),
             patch.object(web_app, "JD_DIR", self.jd_dir),
             patch.object(web_app, "REPORT_DIR", self.report_dir),
+            patch.object(web_app, "search_jobs", side_effect=self._fake_search_jobs),
             patch.object(web_app, "run_build_tailored_resume_from_url", side_effect=self._fake_build_from_url),
         ]
         for active_patch in self.patches:
@@ -149,6 +152,35 @@ class WebAppE2ETests(unittest.TestCase):
             manifest_path=manifest_path,
         )
 
+    def _fake_search_jobs(self, query: str) -> dict[str, object]:
+        normalized = query.strip().lower()
+        title = "Platform Engineer" if "platform" in normalized else "Backend Engineer"
+        company = "Search Co" if "platform" in normalized else "Preset Co"
+        row_id = "wanted-platform-1" if "platform" in normalized else "wanted-backend-1"
+        return {
+            "results": [
+                {
+                    "id": row_id,
+                    "title": title,
+                    "company": company,
+                    "location": "Seoul",
+                    "source": "원티드",
+                    "url": f"https://www.wanted.co.kr/wd/{54321 if 'platform' in normalized else 12345}",
+                    "type": "-",
+                    "experience": "-",
+                    "salary": "-",
+                    "deadline": "-",
+                    "description": f"{title} role for {company}",
+                }
+            ],
+            "count": 1,
+            "translated_query": None,
+            "provider_statuses": [],
+            "provider_summary": None,
+            "degraded": False,
+            "sources": {"전체": 1, "원티드": 1},
+        }
+
     def test_home_to_tracker_to_detail_flow(self) -> None:
         with sync_playwright() as playwright:
             try:
@@ -202,6 +234,67 @@ class WebAppE2ETests(unittest.TestCase):
                 page.locator("nav").get_by_role("link", name="홈", exact=True).click()
                 page.wait_for_url(self.base_url + "/")
                 self.assertIn(generated_files[0].name, page.content())
+            finally:
+                browser.close()
+
+    def test_search_preset_artifact_filter_and_follow_up_flow(self) -> None:
+        with sync_playwright() as playwright:
+            try:
+                browser = playwright.chromium.launch(headless=True)
+            except PlaywrightError as exc:
+                self.skipTest(f"Chromium is not available for Playwright: {exc}")
+            try:
+                page = browser.new_page()
+                page.goto(f"{self.base_url}/search", wait_until="networkidle")
+
+                page.locator('input[name="q"]').fill("platform engineer")
+                page.get_by_role("button", name="검색", exact=True).click()
+                page.wait_for_load_state("networkidle")
+                page.locator("tbody").get_by_text("Search Co").wait_for()
+
+                page.locator("#search-preset-name").fill("플랫폼 기본")
+                page.get_by_role("button", name="현재 검색어를 기본으로 저장", exact=True).click()
+                page.locator("#search-preset-output").get_by_text("기본 검색 preset을 저장했습니다").wait_for()
+                self.assertIn("플랫폼 기본", page.locator("#search-preset-list").inner_text())
+                self.assertIn("기본 preset", page.locator("#search-preset-list").inner_text())
+
+                page.goto(f"{self.base_url}/search", wait_until="networkidle")
+                page.get_by_text("기본 preset으로 검색 중").wait_for()
+                page.locator("tbody").get_by_text("Search Co").wait_for()
+
+                result_row = page.locator("tbody tr").filter(has=page.get_by_text("Search Co"))
+                result_row.get_by_role("button", name="저장", exact=True).click()
+                page.locator("#search-save-output").get_by_text("새 공고를 저장했습니다").wait_for()
+
+                result_row.get_by_role("button", name="이력서 생성", exact=True).click()
+                page.locator("#search-build-output").get_by_text("생성 완료").wait_for()
+
+                generated_files = list((self.output_dir / "web-resumes").glob("*.html"))
+                self.assertEqual(len(generated_files), 1)
+                generated_name = generated_files[0].name
+
+                page.goto(f"{self.base_url}/artifacts", wait_until="networkidle")
+                page.locator('select[name="attention"]').select_option("follow-up-missing")
+                page.get_by_role("button", name="보기", exact=True).click()
+                page.wait_for_load_state("networkidle")
+                self.assertIn(generated_name, page.content())
+                self.assertIn("팔로업 미설정", page.content())
+
+                page.goto(f"{self.base_url}/tracker", wait_until="networkidle")
+                page.get_by_role("button", name="미설정 3일 준비", exact=True).click()
+                page.locator("#tracker-action-output").get_by_text("미리 채웠습니다").wait_for()
+                expected_follow_up = (date.today() + timedelta(days=3)).isoformat()
+                self.assertEqual(page.locator("#bulk-follow-up").input_value(), expected_follow_up)
+                self.assertEqual(page.locator(".job-select:checked").count(), 1)
+
+                page.get_by_role("button", name="선택 항목 적용", exact=True).click()
+                page.locator("#tracker-action-output").get_by_text("1개 항목에 follow_up 변경을 적용했습니다").wait_for()
+
+                page.goto(f"{self.base_url}/follow-ups", wait_until="networkidle")
+                page.get_by_text("Search Co · Platform Engineer").wait_for()
+                page.get_by_role("button", name="오늘로", exact=True).click()
+                page.wait_for_timeout(600)
+                self.assertIn(date.today().isoformat(), page.content())
             finally:
                 browser.close()
 

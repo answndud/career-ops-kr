@@ -163,6 +163,8 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("3일 뒤", page.text)
         self.assertIn("7일 뒤", page.text)
         self.assertIn("미설정", page.text)
+        self.assertIn('CareerOpsFollowUps.quickActionButton(this)', page.text)
+        self.assertIn('data-job-id="1"', page.text)
 
         payload = self.client.get("/api/follow-ups").json()
         self.assertEqual(payload["counts"]["overdue"], 1)
@@ -881,6 +883,7 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("3일 뒤", text)
         self.assertIn("7일 뒤", text)
         self.assertIn("미설정", text)
+        self.assertIn('CareerOpsHome.quickActionButton(this)', text)
         self.assertNotIn("최근 AI 출력", text)
 
     def test_dashboard_api_includes_recent_artifact_paths(self) -> None:
