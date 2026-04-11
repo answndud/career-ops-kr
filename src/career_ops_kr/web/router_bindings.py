@@ -58,6 +58,8 @@ from career_ops_kr.web.jobs_view import (
     load_tracker_row_for_job,
     matches_attention_filter,
     saved_job_search_state,
+    tracker_attention_counts,
+    tracker_attention_filters,
 )
 from career_ops_kr.web.live_smoke import (
     get_live_smoke_status_snapshot,
@@ -318,6 +320,14 @@ class WebRouterBindings:
     @property
     def matches_attention_filter(self) -> Any:
         return matches_attention_filter
+
+    @property
+    def tracker_attention_filters(self) -> Any:
+        return tracker_attention_filters
+
+    @property
+    def tracker_attention_counts(self) -> Any:
+        return tracker_attention_counts
 
     @property
     def resolve_db_path(self) -> Any:

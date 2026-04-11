@@ -71,6 +71,16 @@
     - `artifacts.html`에 운영 신호 select filter 추가
     - generated artifact job signal helper를 `dashboard.py`에서 `jobs_view.py`로 옮겨 책임 정리
     - `tests/test_web.py`에 overdue attention filter 회귀 추가
+  - tracker attention preset 확장
+    - `jobs_view.py`에 tracker attention preset/count helper를 추가해 `problem-only / missing-report / missing-resume / follow-up-overdue / follow-up-missing / unlinked-tracker`를 공통 기준으로 계산
+    - `pages.py`, `tracker.html`, `/api/jobs`가 같은 helper를 공유하도록 정리
+    - tracker summary pill과 quick filter에 `문제 있음`, `팔로업 미설정`을 추가
+    - `tests/test_web.py`에 tracker page/API preset 회귀 추가
+  - tracker bulk quick prep 추가
+    - `tracker.html`에 `문제 항목 선택 / overdue 오늘 준비 / 미설정 3일 준비 / tracker 미연결 선택` 버튼 추가
+    - attention preset을 현재 visible row selection과 bulk form prefill까지 바로 연결
+    - 기존에 정의되지 않았던 `CareerOpsTracker.selectVisible()` 호출도 실제 helper로 보강
+    - `tests/test_web.py`에 tracker quick prep UI 노출 회귀 추가
   - web search preset 1차 추가
     - `src/career_ops_kr/web/search_presets.py`
     - `/api/search-presets` GET/POST/DELETE 추가

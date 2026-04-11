@@ -30,15 +30,15 @@
       {% endfor %}
     </ul>
   <div class="mini-pills">
-      <span class="status-chip warn">리포트 없음 {{ attention_counts.missing_report }}</span>
-      <span class="status-chip warn">이력서 없음 {{ attention_counts.missing_resume }}</span>
-      <span class="status-chip {% if attention_counts.overdue_follow_up %}error{% else %}ok{% endif %}">
-        overdue {{ attention_counts.overdue_follow_up }}
-      </span>
+      {% for filter in attention_filters %}
+        <span class="status-chip {% if attention_counts[filter.key] == 0 %}ok{% elif filter.tone == 'error' %}error{% else %}warn{% endif %}">
+          {{ filter.label }} {{ attention_counts[filter.key] }}
+        </span>
+      {% endfor %}
     </div>
     <div class="actions">
-      {% for key, label in attention_filters %}
-        <button type="button" class="ghost" onclick="CareerOpsTracker.applyAttentionFilter('{{ key }}')">{{ label }}</button>
+      {% for filter in attention_filters %}
+        <button type="button" class="ghost" onclick="CareerOpsTracker.applyAttentionFilter('{{ filter.key }}')">{{ filter.label }}</button>
       {% endfor %}
     </div>
   </section>
@@ -149,8 +149,8 @@
       <label for="filter-attention">주의 preset</label>
       <select id="filter-attention">
         <option value="">전체</option>
-        {% for key, label in attention_filters %}
-          <option value="{{ key }}">{{ label }}</option>
+        {% for filter in attention_filters %}
+          <option value="{{ filter.key }}">{{ filter.label }}</option>
         {% endfor %}
       </select>
     </div>
@@ -169,6 +169,13 @@
       <p class="muted">보이는 항목 중 필요한 row만 선택해서 상태, 팔로업, 출처를 한 번에 바꿉니다.</p>
     </div>
   </div>
+  <div class="actions">
+    <button type="button" class="ghost" onclick="CareerOpsTracker.prepareBulkPreset('problem-only')">문제 항목 선택</button>
+    <button type="button" class="ghost" onclick="CareerOpsTracker.prepareBulkPreset('follow-up-overdue')">overdue 오늘 준비</button>
+    <button type="button" class="ghost" onclick="CareerOpsTracker.prepareBulkPreset('follow-up-missing')">미설정 3일 준비</button>
+    <button type="button" class="ghost" onclick="CareerOpsTracker.prepareBulkPreset('unlinked-tracker')">tracker 미연결 선택</button>
+  </div>
+  <div class="muted">attention preset 기준으로 보이는 항목을 바로 선택하고, 필요한 bulk 값은 미리 채운 뒤 마지막 적용만 직접 누르게 유지합니다.</div>
   <div class="grid three">
     <div class="field">
       <label for="bulk-status">상태</label>
@@ -367,10 +374,14 @@
     rowMatchesAttention(row, attention) {
       const normalized = CareerOpsTracker.normalizeText(attention);
       if (!normalized) return true;
+      if (normalized === "problem-only") return Boolean(row.attention?.has_problem);
       if (normalized === "missing-report") return !row.artifact_summary?.report;
       if (normalized === "missing-resume") return !row.artifact_summary?.html;
       if (normalized === "follow-up-overdue") {
         return (row.attention?.tags || []).some((tag) => tag.label === "팔로업 overdue");
+      }
+      if (normalized === "follow-up-missing") {
+        return (row.attention?.tags || []).some((tag) => tag.label === "팔로업 미설정");
       }
       if (normalized === "unlinked-tracker") return row.tracker_row == null;
       return true;
@@ -512,6 +523,26 @@
       CareerOpsTracker.syncSelectionSummary();
     },
 
+    selectVisible(checked) {
+      CareerOpsTracker.toggleVisibleSelection(checked);
+    },
+
+    isoDateFromToday(offsetDays = 0) {
+      const next = new Date();
+      next.setHours(12, 0, 0, 0);
+      next.setDate(next.getDate() + offsetDays);
+      const year = next.getFullYear();
+      const month = String(next.getMonth() + 1).padStart(2, "0");
+      const day = String(next.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    },
+
+    setBulkFormValues({status = "", followUp = "", source = ""} = {}) {
+      document.getElementById("bulk-status").value = status;
+      document.getElementById("bulk-follow-up").value = followUp;
+      document.getElementById("bulk-source").value = source;
+    },
+
     clearSelection() {
       CareerOpsTracker.selectedIds.clear();
       document.querySelectorAll(".job-select").forEach((checkbox) => {
@@ -561,6 +592,56 @@
     applyAttentionFilter(value) {
       document.getElementById("filter-attention").value = value;
       CareerOpsTracker.refreshJobs();
+    },
+
+    async prepareBulkPreset(presetKey) {
+      const output = document.getElementById("tracker-action-output");
+      const presetMap = {
+        "problem-only": {
+          attention: "problem-only",
+          label: "문제 항목",
+          bulk: {},
+        },
+        "follow-up-overdue": {
+          attention: "follow-up-overdue",
+          label: "팔로업 overdue 항목",
+          bulk: {followUp: CareerOpsTracker.isoDateFromToday(0)},
+        },
+        "follow-up-missing": {
+          attention: "follow-up-missing",
+          label: "팔로업 미설정 항목",
+          bulk: {followUp: CareerOpsTracker.isoDateFromToday(3)},
+        },
+        "unlinked-tracker": {
+          attention: "unlinked-tracker",
+          label: "tracker 미연결 항목",
+          bulk: {},
+        },
+      };
+      const preset = presetMap[presetKey];
+      if (!preset) return;
+
+      document.getElementById("filter-attention").value = preset.attention;
+      await CareerOpsTracker.refreshJobs();
+
+      const visibleCount = document.querySelectorAll(".job-select").length;
+      CareerOpsTracker.clearSelection();
+      CareerOpsTracker.setBulkFormValues(preset.bulk);
+
+      if (!visibleCount) {
+        output.className = "notice warn";
+        output.textContent = `${preset.label} 조건에 맞는 항목이 없습니다.`;
+        return;
+      }
+
+      CareerOpsTracker.selectVisible(true);
+      const preparedFields = [];
+      if (preset.bulk.status) preparedFields.push(`상태=${preset.bulk.status}`);
+      if (preset.bulk.followUp) preparedFields.push(`팔로업=${preset.bulk.followUp}`);
+      if (preset.bulk.source) preparedFields.push(`출처=${preset.bulk.source}`);
+
+      output.className = "notice ok";
+      output.textContent = `${preset.label} ${visibleCount}개를 선택했습니다.${preparedFields.length ? ` ${preparedFields.join(" · ")} 값을 미리 채웠습니다.` : ""} 적용 버튼을 누르면 bulk 변경이 실행됩니다.`;
     },
 
     async createJob(event) {

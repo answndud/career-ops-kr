@@ -55,6 +55,8 @@
   - search provider status는 `정상 / 결과 없음 / 실패`를 구분하고, duplicate-save 결과는 새 row 생성 여부를 in-page에서 바로 설명하도록 유지
   - tracker 목록에서 선택한 항목에 대한 bulk status/source/follow-up 변경을 지원하고, status/source는 markdown tracker sync를 유지
   - tracker-linked bulk update는 `tracker_id`가 없는 row를 먼저 막아 잘못된 markdown fallback 매칭을 피함
+  - tracker attention preset은 `문제 있음 / 리포트 없음 / 이력서 없음 / 팔로업 overdue / 팔로업 미설정 / tracker 미연결`을 공통 helper 기준으로 유지
+  - tracker attention preset은 bulk quick prep 버튼과 연결해 보이는 row 선택과 follow-up 기본값 준비를 바로 이어주도록 유지
   - job detail drift 경고는 status뿐 아니라 source mismatch도 포함
   - tracker 단일 row 저장은 full table refetch 없이 부분 갱신하고, bulk update는 메모/위치 미저장 draft가 있으면 먼저 막아 입력 손실을 피함
   - tracker/detail은 `다음에 할 일`, attention preset, tracker/web drift 같은 read-only operational hint를 유지

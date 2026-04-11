@@ -21,6 +21,16 @@ from career_ops_kr.web.db import connection_scope
 from career_ops_kr.web.paths import WebPaths
 
 
+TRACKER_ATTENTION_FILTERS: tuple[dict[str, str], ...] = (
+    {"key": "problem-only", "label": "문제 있음", "tone": "error"},
+    {"key": "missing-report", "label": "리포트 없음", "tone": "warn"},
+    {"key": "missing-resume", "label": "이력서 없음", "tone": "warn"},
+    {"key": "follow-up-overdue", "label": "팔로업 overdue", "tone": "error"},
+    {"key": "follow-up-missing", "label": "팔로업 미설정", "tone": "warn"},
+    {"key": "unlinked-tracker", "label": "tracker 미연결", "tone": "warn"},
+)
+
+
 def load_tracker_row_for_job(job_row: dict[str, Any], *, paths: WebPaths) -> dict[str, str] | None:
     if not paths.tracker_path.exists():
         return None
@@ -138,15 +148,30 @@ def matches_attention_filter(row: dict[str, Any], attention: str | None) -> bool
     normalized = safe_text(attention).lower()
     if not normalized:
         return True
+    if normalized == "problem-only":
+        return bool(row["attention"]["has_problem"])
     if normalized == "missing-report":
         return not row["artifact_summary"]["report"]
     if normalized == "missing-resume":
         return not row["artifact_summary"]["html"]
     if normalized == "follow-up-overdue":
         return any(tag["label"] == "팔로업 overdue" for tag in row["attention"]["tags"])
+    if normalized == "follow-up-missing":
+        return any(tag["label"] == "팔로업 미설정" for tag in row["attention"]["tags"])
     if normalized == "unlinked-tracker":
         return row["tracker_row"] is None
     return True
+
+
+def tracker_attention_filters() -> list[dict[str, str]]:
+    return [dict(item) for item in TRACKER_ATTENTION_FILTERS]
+
+
+def tracker_attention_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
+    return {
+        item["key"]: sum(1 for row in rows if matches_attention_filter(row, item["key"]))
+        for item in TRACKER_ATTENTION_FILTERS
+    }
 
 
 def job_tracker_sync_snapshot(job_row: dict[str, Any], tracker_row: dict[str, str] | None) -> list[str]:

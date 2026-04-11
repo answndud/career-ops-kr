@@ -141,7 +141,8 @@ career-ops-kr serve-web
   - 검색 결과에서 바로 맞춤 이력서 HTML/PDF 생성
 - **트래커**
   - 저장된 공고 목록 확인
-  - `리포트 없음 / 이력서 없음 / 팔로업 overdue / tracker 미연결` attention preset으로 바로 좁혀 보기
+  - `문제 있음 / 리포트 없음 / 이력서 없음 / 팔로업 overdue / 팔로업 미설정 / tracker 미연결` attention preset으로 바로 좁혀 보기
+  - attention preset에서 바로 `보이는 항목 선택`과 bulk 값 미리 채우기까지 이어지는 quick prep 버튼 사용
   - 보이는 항목을 선택해서 상태 / 팔로업 / 출처를 일괄 변경
   - 선택한 항목 중 메모/위치에 미저장 변경이 있으면 먼저 개별 저장 후 bulk를 실행
   - 저장된 공고 상세 화면에서 tracker 상태와 생성 산출물 확인
@@ -168,7 +169,8 @@ career-ops-kr serve-web
 - 기본 CLI/file workflow는 그대로 유지됩니다.
 - 웹 화면은 편한 사용을 위해 로컬 SQLite 파일 `data/career-ops-web.db`를 같이 씁니다.
 - 웹에서 공고를 추가/수정/삭제하면 tracker markdown도 같이 맞추고, 필요하면 `트래커` 화면에서 다시 sync할 수 있습니다.
-- `트래커`에서 저장된 공고 상세 화면으로 들어가면 JD/report/context/HTML/PDF 연결 상태를 다시 확인할 수 있고, 저장된 공고 URL이 있으면 그 자리에서 다시 맞춤 이력서를 생성할 수 있습니다.
+  - `트래커`에서 저장된 공고 상세 화면으로 들어가면 JD/report/context/HTML/PDF 연결 상태를 다시 확인할 수 있고, 저장된 공고 URL이 있으면 그 자리에서 다시 맞춤 이력서를 생성할 수 있습니다.
+  - `트래커` attention preset은 홈/산출물 화면과 같은 운영 신호를 공유해서 문제 항목과 팔로업 미설정 항목을 같은 기준으로 바로 좁힙니다.
 - 최종 HTML/PDF 이력서 산출은 기존 Python resume pipeline을 그대로 호출합니다.
 - 웹에서 방금 만든 HTML/PDF는 `홈` 화면의 최근 생성 결과에서 다시 열 수 있습니다.
 - `산출물` 화면에서는 웹에서 만든 결과와 CLI에서 만든 결과를 함께 다시 볼 수 있습니다.

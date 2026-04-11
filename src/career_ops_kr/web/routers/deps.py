@@ -25,6 +25,8 @@ class PagesRouterDeps:
     enrich_generated_resume_items: Callable[[list[dict[str, Any]]], list[dict[str, Any]]]
     tracker_status_choices: Callable[[], list[str]]
     job_row_with_ui_state: Callable[[dict[str, Any]], dict[str, Any]]
+    tracker_attention_filters: Callable[[], list[dict[str, str]]]
+    tracker_attention_counts: Callable[[list[dict[str, Any]]], dict[str, int]]
     load_tracker_row_for_job: Callable[[dict[str, Any]], dict[str, str] | None]
     load_tailoring_guidance: Callable[[Path | None], dict[str, Any] | None]
     coerce_path: Callable[[Any], Path | None]

@@ -126,13 +126,8 @@ def build_pages_router(deps: PagesRouterDeps) -> APIRouter:
                 "SELECT * FROM jobs ORDER BY updated_at DESC, created_at DESC"
             ).fetchall()
         jobs = [deps.job_row_with_ui_state(row) for row in rows]
-        attention_counts = {
-            "missing_report": sum(1 for row in jobs if not row["artifact_summary"]["report"]),
-            "missing_resume": sum(1 for row in jobs if not row["artifact_summary"]["html"]),
-            "overdue_follow_up": sum(
-                1 for row in jobs if any(tag["label"] == "팔로업 overdue" for tag in row["attention"]["tags"])
-            ),
-        }
+        attention_filters = deps.tracker_attention_filters()
+        attention_counts = deps.tracker_attention_counts(jobs)
         return deps.templates.TemplateResponse(
             request,
             "tracker.html",
@@ -141,12 +136,7 @@ def build_pages_router(deps: PagesRouterDeps) -> APIRouter:
                 dashboard=deps.get_dashboard_snapshot(),
                 statuses=deps.tracker_status_choices(),
                 attention_counts=attention_counts,
-                attention_filters=[
-                    ("missing-report", "리포트 없음"),
-                    ("missing-resume", "이력서 없음"),
-                    ("follow-up-overdue", "팔로업 overdue"),
-                    ("unlinked-tracker", "tracker 미연결"),
-                ],
+                attention_filters=attention_filters,
             ),
         )
 

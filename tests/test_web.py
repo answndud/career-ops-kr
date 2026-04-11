@@ -1190,6 +1190,63 @@ class WebAppTests(unittest.TestCase):
         self.assertIn("공고 평가 리포트를 먼저 생성하세요.", detail_response.text)
         self.assertIn("상태와 메모 수정", detail_response.text)
 
+    def test_tracker_attention_presets_cover_problem_only_and_follow_up_missing(self) -> None:
+        problem_response = self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Problem Co",
+                "position": "Platform Engineer",
+                "status": "검토중",
+                "source": "web",
+                "url": "https://example.com/jobs/problem-co",
+            },
+        )
+        self.assertEqual(problem_response.status_code, 201)
+        problem_job_id = problem_response.json()["id"]
+
+        healthy_response = self.client.post(
+            "/api/jobs",
+            json={
+                "company": "Healthy Co",
+                "position": "Backend Engineer",
+                "status": "검토중",
+                "source": "web",
+                "url": "https://example.com/jobs/healthy-co",
+                "follow_up": "2026-04-20",
+            },
+        )
+        self.assertEqual(healthy_response.status_code, 201)
+        healthy_job_id = healthy_response.json()["id"]
+
+        self.report_dir.mkdir(parents=True, exist_ok=True)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        report_path = self.report_dir / "healthy-co.md"
+        html_path = self.output_dir / "healthy-co.html"
+        pdf_path = self.output_dir / "healthy-co.pdf"
+        report_path.write_text("# Report\n\nGood fit", encoding="utf-8")
+        html_path.write_text("<html><body>Healthy</body></html>", encoding="utf-8")
+        pdf_path.write_bytes(b"%PDF-1.4")
+        with connection_scope() as conn:
+            conn.execute(
+                "UPDATE jobs SET report_path = ?, html_path = ?, pdf_path = ? WHERE id = ?",
+                (report_path.as_posix(), html_path.as_posix(), pdf_path.as_posix(), healthy_job_id),
+            )
+            conn.commit()
+
+        tracker_response = self.client.get("/tracker")
+        self.assertEqual(tracker_response.status_code, 200)
+        self.assertIn("문제 있음 1", tracker_response.text)
+        self.assertIn("팔로업 미설정 1", tracker_response.text)
+        self.assertIn("overdue 오늘 준비", tracker_response.text)
+        self.assertIn("미설정 3일 준비", tracker_response.text)
+        self.assertIn("prepareBulkPreset", tracker_response.text)
+
+        problem_rows = self.client.get("/api/jobs", params={"attention": "problem-only"}).json()
+        self.assertEqual([row["id"] for row in problem_rows], [problem_job_id])
+
+        follow_up_missing_rows = self.client.get("/api/jobs", params={"attention": "follow-up-missing"}).json()
+        self.assertEqual([row["id"] for row in follow_up_missing_rows], [problem_job_id])
+
     def test_database_backup_export_and_import_roundtrip(self) -> None:
         self.client.post(
             "/api/jobs",
