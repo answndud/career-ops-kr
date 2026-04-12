@@ -9,6 +9,7 @@ from pathlib import Path
 
 from career_ops_kr.commands.resume import (
     BatchLiveResumeSmokeResult,
+    audit_artifact_inventory,
     backfill_artifact_manifests,
     compare_live_smoke_reports,
     DEFAULT_LIVE_SMOKE_TARGETS_PATH,
@@ -893,6 +894,140 @@ class ResumeTailoringTest(unittest.TestCase):
                 ["rendered-resumes/legacy-platform.html"],
                 sorted(index_payload["entries"].keys()),
             )
+
+    def test_audit_artifact_inventory_reports_legacy_and_index_findings(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            output_dir = temp_path / "output"
+            html_dir = output_dir / "rendered-resumes"
+            html_dir.mkdir(parents=True, exist_ok=True)
+
+            legacy_html = html_dir / "legacy-platform.html"
+            legacy_html.write_text("<html></html>", encoding="utf-8")
+
+            built_html = html_dir / "built-platform.html"
+            built_html.write_text("<html></html>", encoding="utf-8")
+            manifest_path = built_html.with_suffix(".manifest.json")
+            missing_context = output_dir / "resume-contexts" / "missing.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "generated_at": "2026-04-11T00:00:00+00:00",
+                        "build_run_id": "br_keep",
+                        "inventory_key": "rendered-resumes/built-platform.html",
+                        "pipeline": "build_tailored_resume",
+                        "paths": {
+                            "job_path": None,
+                            "report_path": None,
+                            "tailoring_path": None,
+                            "context_path": missing_context.as_posix(),
+                            "html_path": built_html.as_posix(),
+                            "pdf_path": None,
+                            "base_context_path": None,
+                            "template_path": None,
+                            "profile_path": None,
+                            "scorecard_path": None,
+                        },
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            index_path = output_dir / "artifact-index.json"
+            index_path.write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "updated_at": "2026-04-11T00:00:00+00:00",
+                        "entries": {
+                            "rendered-resumes/built-platform.html": {
+                                "inventory_key": "rendered-resumes/built-platform.html",
+                                "build_run_id": "br_keep",
+                                "generated_at": "2026-04-11T00:00:00+00:00",
+                                "pipeline": "build_tailored_resume",
+                                "manifest_path": manifest_path.as_posix(),
+                                "html_path": legacy_html.as_posix(),
+                                "pdf_path": None,
+                            },
+                            "rendered-resumes/orphan.html": {
+                                "inventory_key": "rendered-resumes/orphan.html",
+                                "build_run_id": "br_orphan",
+                                "generated_at": "2026-04-11T00:00:00+00:00",
+                                "pipeline": "legacy_backfill",
+                                "manifest_path": (html_dir / "orphan.manifest.json").as_posix(),
+                                "html_path": (html_dir / "orphan.html").as_posix(),
+                                "pdf_path": None,
+                            },
+                        },
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = audit_artifact_inventory(
+                output_dir=output_dir,
+                repo_root=temp_path,
+            )
+
+            self.assertEqual(2, result.html_artifact_count)
+            self.assertEqual(1, result.manifest_count)
+            self.assertEqual(1, result.legacy_html_count)
+            self.assertEqual(1, result.counts["legacy_html"])
+            self.assertEqual(1, result.counts["manifest_missing_context_file"])
+            self.assertEqual(1, result.counts["artifact_index_entry_mismatch"])
+            self.assertEqual(1, result.counts["orphan_artifact_index_entry"])
+
+    def test_audit_artifact_inventory_warns_when_manifests_exist_without_index(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            output_dir = temp_path / "output"
+            html_dir = output_dir / "rendered-resumes"
+            html_dir.mkdir(parents=True, exist_ok=True)
+
+            built_html = html_dir / "built-platform.html"
+            built_html.write_text("<html></html>", encoding="utf-8")
+            built_html.with_suffix(".manifest.json").write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "generated_at": "2026-04-11T00:00:00+00:00",
+                        "build_run_id": "br_keep",
+                        "inventory_key": "rendered-resumes/built-platform.html",
+                        "pipeline": "build_tailored_resume",
+                        "paths": {
+                            "job_path": None,
+                            "report_path": None,
+                            "tailoring_path": None,
+                            "context_path": None,
+                            "html_path": built_html.as_posix(),
+                            "pdf_path": None,
+                            "base_context_path": None,
+                            "template_path": None,
+                            "profile_path": None,
+                            "scorecard_path": None,
+                        },
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = audit_artifact_inventory(
+                output_dir=output_dir,
+                repo_root=temp_path,
+            )
+
+            self.assertFalse(result.ok)
+            self.assertEqual(1, result.counts["missing_artifact_index"])
 
     def test_build_tailored_resume_from_url_stops_before_scoring_when_fetch_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
