@@ -107,12 +107,32 @@
   - `tests/fixtures/realistic_jds.py`에 `DevOps Engineer (Data Platform Foundations)`, `MLOps Engineer` realistic mixed-role fixture 추가
   - `tests/test_scoring.py`에 devops-title platform 유지와 mlops-title data-ai 유지 회귀 추가
   - `docs/scoring-kr.md`에 ops-heavy DevOps vs serving-heavy MLOps decision rule을 명시
+- scorecard 2차 tuning 15차 반영
+  - `tests/fixtures/realistic_jds.py`에 `DevOps Engineer (Data Platform)` realistic mixed-role fixture 추가
+  - `tests/test_scoring.py`에 같은 `DevOps` title이라도 pipeline-heavy wording이면 `Data-Platform`으로 가는 회귀 추가
+  - `docs/scoring-kr.md`에 DevOps title의 runtime-heavy vs pipeline-heavy 경계 규칙을 보강
+- scoring explainability 1차 추가
+  - `src/career_ops_kr/scoring.py`가 domain candidate별 `total / anchor / signal / tie` 점수를 계산해 report의 `Domain Match Candidates`에 함께 출력
+  - mixed-role JD에서 title bias인지 body signal인지 보고서만으로 다시 판단할 수 있게 정리
+  - `tests/test_scoring.py`에 domain candidate line 노출 회귀 추가
+- scoring explainability 2차 추가
+  - `src/career_ops_kr/scoring.py`가 role candidate별 `total / anchor / signal / ratio / preferred` 근거를 계산해 report의 `Role Match Candidates`에 함께 출력
+  - mixed-role JD에서 최종 role profile 선택이 specialization bias인지 JD signal 우세인지 보고서만으로 다시 판단할 수 있게 정리
+  - `tests/test_scoring.py`에 role candidate line 노출 회귀 추가
+- scoring explainability 3차 추가
+  - `src/career_ops_kr/scoring.py`가 `Domain Selection Note`, `Role Selection Note`를 함께 출력해 near-tie tie-break, preferred specialization, General fallback 이유를 한 줄로 설명
+  - `tests/test_scoring.py`에 mixed tie-break / preferred specialization / General fallback note 회귀 추가
+  - `docs/scoring-kr.md`에 selection note 의미를 문서화
 - repo-level ops check helper 1차 추가
   - `career-ops-kr ops-check`
   - `src/career_ops_kr/commands/ops.py`, `src/career_ops_kr/commands/ops_cli.py`
   - `verify`, `audit-jobs`, saved live smoke report health를 한 번에 묶는 운영 체크 surface 추가
   - live smoke report가 없으면 기본은 `skip`, `--require-live-smoke`를 주면 운영 gate로 실패하게 정리
   - `tests/test_cli.py`에 skip/failing JSON 회귀 추가
+- repo-level ops check helper 2차 정리
+  - `src/career_ops_kr/commands/ops_cli.py` 기본 text 출력이 compact summary만 보여주고, 상세 verify/audit/live smoke entry는 `--verbose`에서만 펼치도록 조정
+  - live smoke summary line에 target 수와 nonzero status count를 같이 표시
+  - `tests/test_cli.py`에 verbose detail 출력 회귀 추가
 - artifact inventory audit helper 1차 추가
   - `career-ops-kr audit-artifacts`
   - `src/career_ops_kr/resume_pipeline/artifacts.py`, `src/career_ops_kr/commands/resume_build_cli.py`

@@ -432,6 +432,7 @@ career-ops-kr prepare-company-followup research/<brief>.md --mode summary
 - `career-ops-kr score-job jds/<job>.md`
   저장한 공고 1개 평가
   현재 지원 범위 밖 역할군으로 명확한 제목은 report에서 `General` fallback으로 표시될 수 있음
+  mixed-role 공고라면 report의 `Domain Match Candidates`, `Role Match Candidates`, `Domain Selection Note`, `Role Selection Note`를 먼저 보면 분류 이유를 바로 확인 가능
 - `career-ops-kr discover-jobs wanted --limit 10`
   포털에서 공고 URL 모으기
 - `career-ops-kr process-pipeline --limit 3 --score`
@@ -444,6 +445,7 @@ career-ops-kr prepare-company-followup research/<brief>.md --mode summary
   output 산출물만 따로 점검해서 legacy HTML, manifest referenced file 누락, artifact-index drift 확인
 - `career-ops-kr ops-check`
   verify, tracker/output audit, saved live smoke report health를 한 번에 점검
+  기본은 compact summary만 보여주고, per-target 상세가 필요하면 `--verbose` 사용
 - `career-ops-kr build-tailored-resume-from-url ...`
   공고 URL 하나로 바로 이력서 만들기
 - `career-ops-kr prepare-company-research <company>`

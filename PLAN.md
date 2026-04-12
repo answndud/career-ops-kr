@@ -29,6 +29,7 @@
   - `career-ops-kr ops-check`
   - `verify`, `audit-jobs`, saved live smoke report health를 한 번에 묶는 운영 헬스 체크 surface 추가
   - live smoke report가 없으면 기본은 `skip`, `--require-live-smoke`로 강제 gate 지원
+  - text 출력은 compact summary를 기본으로 유지하고, 상세 verify/audit/live smoke entry는 `--verbose`일 때만 펼치도록 정리
   - artifact inventory audit helper 1차 추가 완료
   - `career-ops-kr audit-artifacts`
   - tracker와 무관하게 output root의 legacy HTML, manifest referenced file 누락, artifact-index drift를 점검
@@ -327,6 +328,18 @@
   - realistic boundary fixture 6차 완료
     - `DevOps Engineer (Data Platform Foundations)`를 platform-heavy mixed fixture로 추가
     - `MLOps Engineer`를 data-ai-heavy mixed fixture로 추가
+  - realistic boundary fixture 7차 완료
+    - `DevOps Engineer (Data Platform)`를 data-platform-heavy mixed fixture로 추가
+    - 같은 `DevOps` title이라도 runtime ops-heavy vs pipeline-heavy wording에 따라 경계가 달라지는 현재 정책을 fixture로 고정
+  - scoring explainability 1차 완료
+    - score report에 `Domain Match Candidates`를 추가해 domain별 total/anchor/signal/tie 근거를 같이 노출
+    - mixed-role tuning 시 title bias와 body signal을 보고서만으로 다시 확인할 수 있게 정리
+  - scoring explainability 2차 완료
+    - score report의 `Role Match Candidates`를 role별 total/anchor/signal/ratio/preferred 근거까지 보이도록 확장
+    - domain을 건드리지 않고도 role profile 선택이 specialization bias인지 JD signal 우세인지 다시 읽을 수 있게 정리
+  - scoring explainability 3차 완료
+    - score report에 `Domain Selection Note`, `Role Selection Note`를 추가해 near-tie tie-break, preferred specialization, General fallback 이유를 한 줄로 설명
+    - grouped signal 재설계가 필요한지 판단하기 전에 현재 selection policy를 보고서만으로 재검토할 수 있게 정리
   - Data domain specialization 2차 완료
     - near-tie에서 `specialization_anchor_keywords`로 한 번 더 보정
     - anchor도 애매하면 기존 selector로 fallback
