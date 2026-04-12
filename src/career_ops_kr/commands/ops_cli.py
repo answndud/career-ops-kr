@@ -9,13 +9,24 @@ from career_ops_kr.commands.ops import run_ops_check
 from career_ops_kr.commands.resume import DEFAULT_LIVE_SMOKE_TARGETS_PATH
 
 
-def _print_verify_summary(result: object) -> None:
+def _format_status_counts(counts: dict[str, int], *, ordered_keys: tuple[str, ...] | None = None) -> str:
+    if not counts:
+        return "-"
+    ordered = list(ordered_keys or ())
+    ordered.extend(key for key in counts if key not in ordered)
+    parts = [f"{key}={counts[key]}" for key in ordered if counts.get(key, 0) > 0]
+    return ", ".join(parts) if parts else "0"
+
+
+def _print_verify_summary(result: object, *, verbose: bool) -> None:
     verify = result.verify
     typer.echo(
         "Verify: "
         + ("OK" if verify.ok else "FAIL")
         + f" | missing={len(verify.missing)} | duplicates={len(verify.duplicates)} | missing_reports={len(verify.missing_reports)}"
     )
+    if not verbose and verify.ok:
+        return
     for path in verify.missing:
         typer.echo(f"- missing required file: {path}")
     for duplicate in verify.duplicates:
@@ -24,7 +35,7 @@ def _print_verify_summary(result: object) -> None:
         typer.echo(f"- missing report file: {report_path}")
 
 
-def _print_audit_summary(result: object, *, limit: int) -> None:
+def _print_audit_summary(result: object, *, limit: int, verbose: bool) -> None:
     audit = result.audit
     typer.echo(
         "Audit: "
@@ -32,7 +43,13 @@ def _print_audit_summary(result: object, *, limit: int) -> None:
         + f" | tracker_rows={audit.tracker_row_count} | findings={len(audit.findings)}"
     )
     if audit.findings:
-        for category, count in audit.counts.items():
+        summary = _format_status_counts(audit.counts)
+        if summary != "-":
+            typer.echo(f"- audit counts: {summary}")
+    if not verbose and audit.ok:
+        return
+    if audit.findings:
+        for category, count in sorted(audit.counts.items()):
             typer.echo(f"- audit {category}: {count}")
         for finding in audit.findings[:limit]:
             subject = ""
@@ -45,15 +62,23 @@ def _print_audit_summary(result: object, *, limit: int) -> None:
             typer.echo(f"... {remaining} more audit finding(s)")
 
 
-def _print_live_smoke_summary(result: object) -> None:
+def _print_live_smoke_summary(result: object, *, verbose: bool) -> None:
     live_smoke_status = str(result.live_smoke_status).upper()
     scan_summary = result.live_smoke_scan_summary or {"recognized_count": 0, "ignored": []}
+    counts_text = _format_status_counts(
+        result.live_smoke_counts,
+        ordered_keys=("ok", "stale", "failed", "missing"),
+    )
     typer.echo(
         f"Live smoke: {live_smoke_status}"
         + f" | recognized_reports={scan_summary.get('recognized_count', 0)}"
+        + (f" | targets={len(result.live_smoke_entries)}" if result.live_smoke_entries else "")
+        + (f" | counts={counts_text}" if counts_text != "-" else "")
     )
-    if result.live_smoke_message:
+    if result.live_smoke_message and (verbose or not result.live_smoke_ok):
         typer.echo(f"- {result.live_smoke_message}")
+    if not verbose and result.live_smoke_ok:
+        return
     for entry in result.live_smoke_entries:
         age_text = f"{entry.age_hours:.1f}h" if entry.age_hours is not None else "-"
         report_kind = entry.report_type or "-"
@@ -124,6 +149,7 @@ def register_ops_commands(app: typer.Typer) -> None:
             help="Only validate a specific live smoke target key.",
         ),
         as_json: bool = typer.Option(False, "--json", help="Print the ops check result as JSON."),
+        verbose: bool = typer.Option(False, "--verbose", help="Print detailed verify, audit, and live smoke entries."),
     ) -> None:
         try:
             result = run_ops_check(
@@ -145,10 +171,10 @@ def register_ops_commands(app: typer.Typer) -> None:
         if as_json:
             typer.echo(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
         else:
-            typer.echo("Ops check summary")
-            _print_verify_summary(result)
-            _print_audit_summary(result, limit=audit_limit)
-            _print_live_smoke_summary(result)
+            typer.echo("Ops check")
+            _print_verify_summary(result, verbose=verbose)
+            _print_audit_summary(result, limit=audit_limit, verbose=verbose)
+            _print_live_smoke_summary(result, verbose=verbose)
             typer.echo("Overall: " + ("OK" if result.ok else "FAIL"))
 
         if not result.ok:

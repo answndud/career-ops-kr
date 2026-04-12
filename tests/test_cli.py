@@ -658,6 +658,67 @@ class OpsCheckCliTest(unittest.TestCase):
         self.assertIn("Live smoke: SKIPPED", result.output)
         self.assertIn("Overall: OK", result.output)
 
+    def test_ops_check_verbose_prints_detailed_live_smoke_entries(self) -> None:
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            tracker_path = temp_path / "applications.md"
+            tracker_path.write_text(
+                "\n".join(
+                    [
+                        "# Applications Tracker",
+                        "",
+                        "| ID | Date | Company | Role | Score | Status | Source | Resume | Report | Notes |",
+                        "|----|------|---------|------|-------|--------|--------|--------|--------|-------|",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            targets_path = _write_test_live_smoke_targets_yaml(temp_path)
+            now = datetime.now(UTC)
+            (temp_path / "single.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": now.isoformat(),
+                        "targets_path": targets_path.as_posix(),
+                        "target": "remember_platform_ko",
+                        "selected_url": "https://career.rememberapp.co.kr/job/posting/293599",
+                        "candidate_label": "primary",
+                        "used_fallback": False,
+                        "cleaned": True,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = runner.invoke(
+                app,
+                [
+                    "ops-check",
+                    "--tracker-path",
+                    tracker_path.as_posix(),
+                    "--repo-root",
+                    temp_path.as_posix(),
+                    "--output-dir",
+                    temp_path.as_posix(),
+                    "--live-smoke-dir",
+                    temp_path.as_posix(),
+                    "--live-smoke-targets-path",
+                    targets_path.as_posix(),
+                    "--verbose",
+                ],
+            )
+
+        self.assertEqual(1, result.exit_code, msg=result.output)
+        self.assertIn("Live smoke: FAILING", result.output)
+        self.assertIn("counts=ok=1, missing=1", result.output)
+        self.assertIn("- OK remember_platform_ko", result.output)
+        self.assertIn("- MISSING wanted_backend_ko", result.output)
+
     def test_ops_check_json_fails_for_stale_or_missing_live_smoke_targets(self) -> None:
         runner = CliRunner()
         with tempfile.TemporaryDirectory() as temp_dir:
