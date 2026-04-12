@@ -276,6 +276,8 @@ class ScoreJobFileTest(unittest.TestCase):
             report = artifacts.report_path.read_text(encoding="utf-8")
             self.assertIn("Selected Target Role: General", report)
             self.assertIn("Selected Role Profile: General", report)
+            self.assertIn("Role Selection Note: General fallback because best role", report)
+            self.assertIn("ratio=", report)
 
     def test_score_job_file_selects_backend_role_profile(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -775,6 +777,13 @@ class ScoreJobFileTest(unittest.TestCase):
             self.assertIn("Selected Domain: Data", report)
             self.assertIn("Selected Target Role: Applied AI Engineer", report)
             self.assertIn("Selected Role Profile: Data-AI", report)
+            self.assertIn("Domain Match Candidates:", report)
+            self.assertIn("Data: total=", report)
+            self.assertIn("Platform: total=", report)
+            self.assertIn("Role Match Candidates:", report)
+            self.assertIn("Applied AI Engineer: total=", report)
+            self.assertIn("Data Platform Engineer: total=", report)
+            self.assertIn("preferred=yes", report)
             self.assertGreaterEqual(artifacts.total_score, 3.0)
             self.assertLess(artifacts.total_score, 4.5)
 
@@ -1360,6 +1369,9 @@ class ScoreJobFileTest(unittest.TestCase):
             report = artifacts.report_path.read_text(encoding="utf-8")
             self.assertIn("Selected Domain: Data", report)
             self.assertIn("Selected Role Profile: Data-Platform", report)
+            self.assertIn("Role Match Candidates:", report)
+            self.assertIn("Data Platform Engineer: total=", report)
+            self.assertIn("Applied AI Engineer: total=", report)
             self.assertGreaterEqual(artifacts.total_score, 3.0)
             self.assertLess(artifacts.total_score, 4.5)
 
@@ -1508,6 +1520,8 @@ class ScoreJobFileTest(unittest.TestCase):
             report = artifacts.report_path.read_text(encoding="utf-8")
             self.assertIn("Selected Domain: Data", report)
             self.assertIn("Selected Role Profile: Data-Platform", report)
+            self.assertIn("Domain Selection Note: Data selected on total-signal lead over Platform; tie-break override was not needed.", report)
+            self.assertIn("Role Selection Note: Data Platform Engineer selected because preferred specialization matched;", report)
             self.assertGreaterEqual(artifacts.total_score, 3.0)
             self.assertLess(artifacts.total_score, 4.5)
 
@@ -1545,6 +1559,7 @@ class ScoreJobFileTest(unittest.TestCase):
             report = artifacts.report_path.read_text(encoding="utf-8")
             self.assertIn("Selected Domain: Data", report)
             self.assertIn("Selected Role Profile: Data-Platform", report)
+            self.assertIn("Role Selection Note: Data Platform Engineer selected because preferred specialization matched;", report)
             self.assertGreaterEqual(artifacts.total_score, 3.0)
             self.assertLess(artifacts.total_score, 4.5)
 
@@ -1582,6 +1597,45 @@ class ScoreJobFileTest(unittest.TestCase):
             report = artifacts.report_path.read_text(encoding="utf-8")
             self.assertIn("Selected Domain: Platform", report)
             self.assertIn("Selected Role Profile: Platform", report)
+            self.assertGreaterEqual(artifacts.total_score, 3.0)
+            self.assertLess(artifacts.total_score, 4.5)
+
+    def test_score_job_file_scores_realistic_devops_data_pipeline_fixture_as_data_platform(self) -> None:
+        sample = REALISTIC_JD_SAMPLES["devops_data_pipeline_reliability"]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            job_path = temp_path / "realistic-devops-data-pipeline.md"
+            job_path.write_text(
+                "\n".join(
+                    [
+                        "---",
+                        f'title: "{sample["title"]}"',
+                        'url: "https://example.com/jobs/realistic-devops-data-pipeline"',
+                        'source: "fixture"',
+                        "---",
+                        "",
+                        f'# {sample["title"]}',
+                        "",
+                        sample["body"],
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            artifacts = score_job_file(
+                job_path,
+                report_dir=temp_path / "reports",
+                tracker_dir=temp_path / "tracker-additions",
+                profile_path=PROFILE_EXAMPLE,
+                scorecard_path=SCORECARD,
+            )
+
+            report = artifacts.report_path.read_text(encoding="utf-8")
+            self.assertIn("Selected Domain: Data", report)
+            self.assertIn("Selected Role Profile: Data-Platform", report)
+            self.assertIn("Domain Selection Note: Data selected by total-signal ranking over Platform.", report)
+            self.assertIn("Role Selection Note: Data Platform Engineer selected because preferred specialization matched;", report)
             self.assertGreaterEqual(artifacts.total_score, 3.0)
             self.assertLess(artifacts.total_score, 4.5)
 

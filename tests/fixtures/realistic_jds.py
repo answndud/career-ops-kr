@@ -110,6 +110,15 @@ REALISTIC_JD_SAMPLES: dict[str, dict[str, str]] = {
             "analytics products."
         ),
     },
+    "devops_data_pipeline_reliability": {
+        "title": "DevOps Engineer (Data Platform)",
+        "body": (
+            "DevOps role for data platform reliability. Build Kafka streaming, Spark "
+            "pipelines, warehouse orchestration, dbt jobs, Airflow DAG operations, "
+            "data quality runtime, and data platform reliability tooling for product "
+            "analytics systems."
+        ),
+    },
     "mlops_inference_runtime": {
         "title": "MLOps Engineer",
         "body": (

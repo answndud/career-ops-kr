@@ -2,7 +2,7 @@
 
 한국 개발자 구직용 기본 점수화 항목입니다. 스크립트는 이 기준을 단순화해 사용하고, Codex는 리포트 작성 시 정성 평가를 추가합니다.
 
-현재 이 규칙은 `career-ops-kr score-job`와 `career-ops-kr process-pipeline --score`가 공통으로 사용합니다. 기본 입력은 `config/profile.yml`과 `config/scorecard.kr.yml`이지만, 재현 가능한 실행이나 테스트가 필요하면 CLI에서 `--profile-path`, `--scorecard-path`로 덮어쓸 수 있습니다. 스크립트는 먼저 JD를 `Backend`, `Platform`, `Data` domain 중 하나로 좁힌 뒤, 그 domain 안에서 현재 후보자가 노리는 `target_role`과 가장 가까운 role profile을 선택합니다. 그 다음 해당 role profile의 weights, stack keywords, role-specific company signal keywords를 적용합니다. 기본 제공 role profile은 `Backend`, `Platform`, `Data-Platform`, `Data-AI`이며 보고서에는 `Selected Domain`, `Selected Target Role`, `Selected Role Profile`, `Role Match Candidates`가 표시됩니다.
+현재 이 규칙은 `career-ops-kr score-job`와 `career-ops-kr process-pipeline --score`가 공통으로 사용합니다. 기본 입력은 `config/profile.yml`과 `config/scorecard.kr.yml`이지만, 재현 가능한 실행이나 테스트가 필요하면 CLI에서 `--profile-path`, `--scorecard-path`로 덮어쓸 수 있습니다. 스크립트는 먼저 JD를 `Backend`, `Platform`, `Data` domain 중 하나로 좁힌 뒤, 그 domain 안에서 현재 후보자가 노리는 `target_role`과 가장 가까운 role profile을 선택합니다. 그 다음 해당 role profile의 weights, stack keywords, role-specific company signal keywords를 적용합니다. 기본 제공 role profile은 `Backend`, `Platform`, `Data-Platform`, `Data-AI`이며 보고서에는 `Selected Domain`, `Selected Target Role`, `Selected Role Profile`, `Domain Match Candidates`, `Role Match Candidates`가 표시됩니다.
 
 | Dimension | Weight | Intent |
 |-----------|--------|--------|
@@ -37,6 +37,9 @@
 - `company_signal`은 후보자 공통 선호/회피 도메인과 role profile별 positive/negative company keyword를 함께 반영합니다.
 - role selection은 `domain -> role profile` 2단계입니다. 현재 domain은 `Backend`, `Platform`, `Data`입니다.
 - domain selection은 anchor count만 보지 않고 domain-level total signal을 더 우선합니다. 그래서 `Airflow / warehouse / Spark`가 충분히 많은 JD는 `Kubernetes`가 일부 섞여 있어도 `Data`로 내려갈 수 있습니다.
+- report의 `Domain Match Candidates`는 각 domain의 `total / anchor / signal / tie` count를 같이 보여줘서, mixed JD가 왜 `Platform` 또는 `Data`로 선택됐는지 바로 다시 볼 수 있게 합니다.
+- report의 `Role Match Candidates`는 각 role 후보의 `total / anchor / signal / ratio / preferred`를 같이 보여줘서, 최종 role profile 선택이 domain specialization 때문인지 실제 JD signal 때문인지 다시 확인할 수 있게 합니다.
+- report의 `Domain Selection Note`, `Role Selection Note`는 near-tie tie-break, preferred specialization, General fallback 같은 최종 결정 이유를 한 줄로 바로 설명합니다.
 - role profile 선택에서는 generic runtime 키워드보다 역할명과 도메인 맥락을 더 우선합니다.
 - role profile 선택에서는 각 profile의 `selection_anchor_keywords`를 먼저 보고, 일반 `match_keywords` count와 ratio로 tie-break 합니다.
 - anchor가 비슷하게 붙는 경우에는 `selection_signal_keywords`로 domain signal을 한 번 더 비교해 `data infra for ML teams`와 `analytics infrastructure platform` 같은 혼합 JD의 흔들림을 줄입니다.
@@ -77,6 +80,7 @@
 - `Platform`과 `Data` domain이 near-tie인 경우에도 위 anchor가 충분히 강하면 `AI Infrastructure`처럼 infra 단어가 섞인 JD를 Data-AI 쪽으로 유지합니다.
 - `Data Platform SRE`, `Analytics Infrastructure`처럼 infra 운영 단어가 섞여도 data pipeline/warehouse/streaming 문맥이 총합에서 더 강하면 `Data-Platform`으로 유지합니다.
 - 반대로 `DevOps Engineer`처럼 ops title이 전면에 있고 Kubernetes/Terraform/observability/runtime 운영이 더 강한 JD는 data 문맥이 일부 섞여 있어도 `Platform`으로 남길 수 있습니다.
+- 하지만 `DevOps Engineer` 제목이어도 Kafka/Spark/warehouse/Airflow/dbt/data quality 같은 pipeline orchestration 문맥이 더 강하면 `Data-Platform`으로 내려갈 수 있습니다.
 - `MLOps Engineer`처럼 title이 애매해도 model serving / inference / eval / llmops 신호가 강하면 `Data-AI`로 유지합니다.
 
 ### Data-Platform

@@ -18,6 +18,30 @@ class ScoreJobArtifacts:
     recommendation: str
 
 
+@dataclass(frozen=True, slots=True)
+class DomainCandidateScore:
+    domain_key: str
+    label: str
+    anchor_score: int
+    signal_score: int
+    total_score: int
+    total_ratio: float
+    tie_break_score: int
+
+
+@dataclass(frozen=True, slots=True)
+class RoleCandidateScore:
+    role_name: str
+    profile_key: str
+    preferred_match: bool
+    anchor_score: int
+    signal_score: int
+    total_score: int
+    keyword_total: int
+    match_ratio: float
+    target_order: int
+
+
 class ScoreJobError(ValueError):
     pass
 
@@ -162,14 +186,14 @@ def _infer_role_profile_key(target_role: dict[str, Any], role_profiles: dict[str
     return max(scores, key=scores.get) if scores else None
 
 
-def _select_role_domain(
+def _score_role_domains(
     job_text: str,
     target_roles: list[dict[str, Any]],
     role_profiles: dict[str, Any],
     domains: dict[str, Any],
-) -> str | None:
+) -> list[DomainCandidateScore]:
     if not target_roles or not role_profiles or not domains:
-        return None
+        return []
 
     available_domains: list[str] = []
     for target_role in target_roles:
@@ -183,9 +207,9 @@ def _select_role_domain(
         available_domains.append(domain_key)
 
     if not available_domains:
-        return None
+        return []
 
-    candidates: list[tuple[str, int, int, int, float]] = []
+    candidates: list[DomainCandidateScore] = []
     for domain_key in available_domains:
         domain = domains.get(domain_key, {})
         anchor_keywords = [str(keyword) for keyword in domain.get("anchor_keywords", [])]
@@ -195,35 +219,51 @@ def _select_role_domain(
         signal_score = _count_matches(job_text, signal_keywords)
         total_score = _count_matches(job_text, domain_keywords)
         total_ratio = total_score / len(domain_keywords) if domain_keywords else 0.0
-        candidates.append((domain_key, anchor_score, signal_score, total_score, total_ratio))
+        tie_break_keywords = [str(keyword) for keyword in domain.get("tie_break_anchor_keywords", [])]
+        candidates.append(
+            DomainCandidateScore(
+                domain_key=domain_key,
+                label=str(domain.get("label") or domain_key.title()),
+                anchor_score=anchor_score,
+                signal_score=signal_score,
+                total_score=total_score,
+                total_ratio=total_ratio,
+                tie_break_score=_count_matches(job_text, tie_break_keywords),
+            )
+        )
+
+    return candidates
+
+
+def _select_role_domain(
+    job_text: str,
+    target_roles: list[dict[str, Any]],
+    role_profiles: dict[str, Any],
+    domains: dict[str, Any],
+) -> tuple[str | None, list[DomainCandidateScore]]:
+    candidates = _score_role_domains(job_text, target_roles, role_profiles, domains)
 
     if not candidates:
-        return None
+        return None, []
 
     ranked_candidates = sorted(
         candidates,
-        key=lambda item: (item[3], item[1], item[2], item[4]),
+        key=lambda item: (item.total_score, item.anchor_score, item.signal_score, item.total_ratio),
         reverse=True,
     )
-    selected_domain, _, _, total_score, total_ratio = ranked_candidates[0]
+    selected_candidate = ranked_candidates[0]
     if len(ranked_candidates) >= 2:
-        second_domain, _, _, second_total_score, _ = ranked_candidates[1]
-        if {selected_domain, second_domain} == {"platform", "data"} and abs(total_score - second_total_score) <= 1:
-            selected_tie_break_keywords = [
-                str(keyword) for keyword in domains.get(selected_domain, {}).get("tie_break_anchor_keywords", [])
-            ]
-            second_tie_break_keywords = [
-                str(keyword) for keyword in domains.get(second_domain, {}).get("tie_break_anchor_keywords", [])
-            ]
-            selected_tie_break_score = _count_matches(job_text, selected_tie_break_keywords)
-            second_tie_break_score = _count_matches(job_text, second_tie_break_keywords)
+        second_candidate = ranked_candidates[1]
+        if {
+            selected_candidate.domain_key,
+            second_candidate.domain_key,
+        } == {"platform", "data"} and abs(selected_candidate.total_score - second_candidate.total_score) <= 1:
             # Do not overturn the total-signal winner on a one-keyword tie-break wobble.
-            if second_tie_break_score >= selected_tie_break_score + 2:
-                selected_domain = second_domain
-                total_score = second_total_score
-    if total_score <= 0 or total_ratio < 0.12:
-        return None
-    return selected_domain
+            if second_candidate.tie_break_score >= selected_candidate.tie_break_score + 2:
+                selected_candidate = second_candidate
+    if selected_candidate.total_score <= 0 or selected_candidate.total_ratio < 0.12:
+        return None, ranked_candidates
+    return selected_candidate.domain_key, ranked_candidates
 
 
 def _select_data_specialization(job_text: str, role_profiles: dict[str, Any]) -> str | None:
@@ -261,6 +301,73 @@ def _select_data_specialization(job_text: str, role_profiles: dict[str, Any]) ->
     return None
 
 
+def _describe_domain_selection(
+    candidates: list[DomainCandidateScore],
+    selected_domain: str | None,
+    *,
+    unsupported_role_family: str | None = None,
+) -> str:
+    if unsupported_role_family:
+        return f"Skipped because unsupported role family guard forced General fallback ({unsupported_role_family})."
+    if not candidates:
+        return "No eligible domain candidates."
+
+    top_candidate = candidates[0]
+    if selected_domain is None:
+        return (
+            f"General fallback because best domain {top_candidate.label} reached "
+            f"total={top_candidate.total_score} ratio={top_candidate.total_ratio:.2f}, below minimum signal threshold."
+        )
+
+    selected_candidate = next((candidate for candidate in candidates if candidate.domain_key == selected_domain), top_candidate)
+    if selected_candidate.domain_key != top_candidate.domain_key:
+        return f"{selected_candidate.label} selected after platform/data near-tie tie-break over {top_candidate.label}."
+
+    if len(candidates) == 1:
+        return f"{selected_candidate.label} was the only eligible domain candidate."
+
+    second_candidate = candidates[1]
+    near_tie = {selected_candidate.domain_key, second_candidate.domain_key} == {"platform", "data"} and abs(
+        selected_candidate.total_score - second_candidate.total_score
+    ) <= 1
+    if near_tie:
+        return (
+            f"{selected_candidate.label} selected on total-signal lead over {second_candidate.label}; "
+            "tie-break override was not needed."
+        )
+    return f"{selected_candidate.label} selected by total-signal ranking over {second_candidate.label}."
+
+
+def _describe_role_selection(
+    candidates: list[RoleCandidateScore],
+    selected_role_profile: dict[str, Any] | None,
+    *,
+    unsupported_role_family: str | None = None,
+) -> str:
+    if unsupported_role_family:
+        return f"Unsupported role family guard forced General fallback ({unsupported_role_family})."
+    if not candidates:
+        return "No eligible role candidates after domain filtering."
+
+    best_candidate = candidates[0]
+    if selected_role_profile is None:
+        return (
+            f"General fallback because best role {best_candidate.role_name} matched "
+            f"{best_candidate.total_score}/{best_candidate.keyword_total} keywords "
+            f"(ratio={best_candidate.match_ratio:.2f} < 0.20)."
+        )
+    if best_candidate.preferred_match:
+        return (
+            f"{best_candidate.role_name} selected because preferred specialization matched; "
+            "preferred candidates are ranked ahead of anchor/signal/ratio within the selected domain."
+        )
+    if len(candidates) == 1:
+        return f"{best_candidate.role_name} was the only eligible role candidate in the selected domain."
+
+    second_candidate = candidates[1]
+    return f"{best_candidate.role_name} selected by anchor/signal/ratio ranking over {second_candidate.role_name}."
+
+
 def _select_role_profile(
     job_text: str,
     target_roles: list[dict[str, Any]],
@@ -268,11 +375,11 @@ def _select_role_profile(
     *,
     allowed_domain: str | None = None,
     preferred_profile_key: str | None = None,
-) -> tuple[dict[str, Any] | None, str | None, list[tuple[str, int]]]:
+) -> tuple[dict[str, Any] | None, str | None, list[RoleCandidateScore]]:
     if not target_roles or not role_profiles:
         return None, None, []
 
-    candidates: list[tuple[str, int, int, int, int, int, float, str, dict[str, Any]]] = []
+    candidates: list[RoleCandidateScore] = []
     for index, target_role in enumerate(target_roles):
         role_key = _infer_role_profile_key(target_role, role_profiles)
         if role_key is None:
@@ -290,33 +397,40 @@ def _select_role_profile(
         selection_total = len(selection_keywords)
         selection_ratio = selection_score / selection_total if selection_total else 0.0
         candidates.append(
-            (
-                target_role.get("name", role_key),
-                1 if preferred_profile_key and role_key == preferred_profile_key else 0,
-                _count_matches(job_text, anchor_keywords),
-                _count_matches(job_text, signal_keywords),
-                selection_score,
-                selection_total,
-                selection_ratio,
-                role_key,
-                target_role,
+            RoleCandidateScore(
+                role_name=str(target_role.get("name", role_key)),
+                profile_key=role_key,
+                preferred_match=bool(preferred_profile_key and role_key == preferred_profile_key),
+                anchor_score=_count_matches(job_text, anchor_keywords),
+                signal_score=_count_matches(job_text, signal_keywords),
+                total_score=selection_score,
+                keyword_total=selection_total,
+                match_ratio=selection_ratio,
+                target_order=index,
             )
         )
 
     if not candidates:
         return None, None, []
 
-    role_matches = [(name, score) for name, _, _, _, score, _, _, _, _ in candidates]
-    role_matches.sort(key=lambda item: item[1], reverse=True)
-    selected_name, _, _, _, selected_score, selected_total_keywords, selected_ratio, selected_key, _ = max(
+    ranked_candidates = sorted(
         candidates,
-        key=lambda item: (item[1], item[2], item[3], item[4], item[6], -target_roles.index(item[8])),
+        key=lambda item: (
+            1 if item.preferred_match else 0,
+            item.anchor_score,
+            item.signal_score,
+            item.total_score,
+            item.match_ratio,
+            -item.target_order,
+        ),
+        reverse=True,
     )
-    if selected_score <= 0 or selected_ratio < 0.2:
-        return None, None, role_matches
+    selected_candidate = ranked_candidates[0]
+    if selected_candidate.total_score <= 0 or selected_candidate.match_ratio < 0.2:
+        return None, None, ranked_candidates
 
-    selected_profile = role_profiles.get(selected_key, {})
-    return selected_profile, selected_name, role_matches
+    selected_profile = role_profiles.get(selected_candidate.profile_key, {})
+    return selected_profile, selected_candidate.role_name, ranked_candidates
 
 
 def score_job_file(
@@ -349,9 +463,10 @@ def score_job_file(
             selected_domain_label = "General"
             selected_role_profile = None
             selected_role_name = None
-            role_candidate_scores: list[tuple[str, int]] = []
+            domain_candidate_scores: list[DomainCandidateScore] = []
+            role_candidate_scores: list[RoleCandidateScore] = []
         else:
-            selected_domain = _select_role_domain(
+            selected_domain, domain_candidate_scores = _select_role_domain(
                 lower,
                 profile.get("target_roles", []),
                 role_profiles,
@@ -479,7 +594,40 @@ def score_job_file(
         ],
     ]
 
-    role_candidate_lines = [f"{name}: {score}" for name, score in role_candidate_scores] if role_candidate_scores else ["N/A"]
+    role_candidate_lines = (
+        [
+            (
+                f"{candidate.role_name}: total={candidate.total_score}/{candidate.keyword_total} "
+                f"ratio={candidate.match_ratio:.2f} "
+                f"(anchor={candidate.anchor_score}, signal={candidate.signal_score}, "
+                f"preferred={'yes' if candidate.preferred_match else 'no'})"
+            )
+            for candidate in role_candidate_scores
+        ]
+        if role_candidate_scores
+        else ["N/A"]
+    )
+    domain_candidate_lines = (
+        [
+            (
+                f"{candidate.label}: total={candidate.total_score} "
+                f"(anchor={candidate.anchor_score}, signal={candidate.signal_score}, tie={candidate.tie_break_score})"
+            )
+            for candidate in domain_candidate_scores
+        ]
+        if domain_candidate_scores
+        else ["N/A"]
+    )
+    domain_selection_note = _describe_domain_selection(
+        domain_candidate_scores,
+        selected_domain,
+        unsupported_role_family=unsupported_role_family,
+    )
+    role_selection_note = _describe_role_selection(
+        role_candidate_scores,
+        selected_role_profile,
+        unsupported_role_family=unsupported_role_family,
+    )
 
     report = "\n".join(
         [
@@ -491,14 +639,17 @@ def score_job_file(
             f"- Source: {metadata.get('source', 'manual')}",
             f"- URL: {metadata.get('url', 'N/A')}",
             f"- Selected Domain: {selected_domain_label}",
+            f"- Domain Selection Note: {domain_selection_note}",
             f"- Selected Target Role: {selected_target_role_name}",
             f"- Selected Role Profile: {selected_role_label}",
+            f"- Role Selection Note: {role_selection_note}",
             *( [f"- Unsupported Role Family: {unsupported_role_family}"] if unsupported_role_family else [] ),
             f"- Total Score: {total_score}/5",
             f"- Recommendation: {recommendation}",
             f"- Seniority Signal: {seniority}",
             f"- Work Mode Signal: {work_mode}",
             f"- Language Signal: {', '.join(language_needs)}",
+            f"- Domain Match Candidates: {', '.join(domain_candidate_lines)}",
             f"- Role Match Candidates: {', '.join(role_candidate_lines)}",
             "",
             "## Scorecard",
