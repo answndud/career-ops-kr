@@ -578,7 +578,6 @@ class CompanyResearchCliTest(unittest.TestCase):
             self.assertEqual(0, result.exit_code, msg=result.output)
             self.assertTrue(followup_path.exists())
             self.assertIn(followup_path.as_posix(), result.output)
-
             content = followup_path.read_text(encoding="utf-8")
             self.assertIn('mode: "summary"', content)
             self.assertIn("# Toss Research Summary", content)
@@ -615,6 +614,342 @@ class CompanyResearchCliTest(unittest.TestCase):
             self.assertIn("# Toss Research Summary", content)
             self.assertIn("- Homepage: https://toss.im", content)
             self.assertIn(followup_path.as_posix(), result.output)
+
+
+class OpsCheckCliTest(unittest.TestCase):
+    def test_ops_check_passes_and_skips_live_smoke_without_saved_reports(self) -> None:
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            tracker_path = temp_path / "applications.md"
+            output_dir = temp_path / "output"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            tracker_path.write_text(
+                "\n".join(
+                    [
+                        "# Applications Tracker",
+                        "",
+                        "| ID | Date | Company | Role | Score | Status | Source | Resume | Report | Notes |",
+                        "|----|------|---------|------|-------|--------|--------|--------|--------|-------|",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = runner.invoke(
+                app,
+                [
+                    "ops-check",
+                    "--tracker-path",
+                    tracker_path.as_posix(),
+                    "--repo-root",
+                    temp_path.as_posix(),
+                    "--output-dir",
+                    output_dir.as_posix(),
+                    "--live-smoke-dir",
+                    output_dir.as_posix(),
+                ],
+            )
+
+        self.assertEqual(0, result.exit_code, msg=result.output)
+        self.assertIn("Verify: OK", result.output)
+        self.assertIn("Audit: OK", result.output)
+        self.assertIn("Live smoke: SKIPPED", result.output)
+        self.assertIn("Overall: OK", result.output)
+
+    def test_ops_check_verbose_prints_detailed_live_smoke_entries(self) -> None:
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            tracker_path = temp_path / "applications.md"
+            tracker_path.write_text(
+                "\n".join(
+                    [
+                        "# Applications Tracker",
+                        "",
+                        "| ID | Date | Company | Role | Score | Status | Source | Resume | Report | Notes |",
+                        "|----|------|---------|------|-------|--------|--------|--------|--------|-------|",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            targets_path = _write_test_live_smoke_targets_yaml(temp_path)
+            now = datetime.now(UTC)
+            (temp_path / "single.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": now.isoformat(),
+                        "targets_path": targets_path.as_posix(),
+                        "target": "remember_platform_ko",
+                        "selected_url": "https://career.rememberapp.co.kr/job/posting/293599",
+                        "candidate_label": "primary",
+                        "used_fallback": False,
+                        "cleaned": True,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = runner.invoke(
+                app,
+                [
+                    "ops-check",
+                    "--tracker-path",
+                    tracker_path.as_posix(),
+                    "--repo-root",
+                    temp_path.as_posix(),
+                    "--output-dir",
+                    temp_path.as_posix(),
+                    "--live-smoke-dir",
+                    temp_path.as_posix(),
+                    "--live-smoke-targets-path",
+                    targets_path.as_posix(),
+                    "--verbose",
+                ],
+            )
+
+        self.assertEqual(1, result.exit_code, msg=result.output)
+        self.assertIn("Live smoke: FAILING", result.output)
+        self.assertIn("counts=ok=1, missing=1", result.output)
+        self.assertIn("- OK remember_platform_ko", result.output)
+        self.assertIn("- MISSING wanted_backend_ko", result.output)
+
+    def test_ops_check_snapshot_out_writes_snapshot_even_on_failure(self) -> None:
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            tracker_path = temp_path / "applications.md"
+            snapshot_path = temp_path / "ops-check" / "latest.json"
+            tracker_path.write_text(
+                "\n".join(
+                    [
+                        "# Applications Tracker",
+                        "",
+                        "| ID | Date | Company | Role | Score | Status | Source | Resume | Report | Notes |",
+                        "|----|------|---------|------|-------|--------|--------|--------|--------|-------|",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            targets_path = _write_test_live_smoke_targets_yaml(temp_path)
+            now = datetime.now(UTC)
+            (temp_path / "single.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": now.isoformat(),
+                        "targets_path": targets_path.as_posix(),
+                        "target": "remember_platform_ko",
+                        "selected_url": "https://career.rememberapp.co.kr/job/posting/293599",
+                        "candidate_label": "primary",
+                        "used_fallback": False,
+                        "cleaned": True,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = runner.invoke(
+                app,
+                [
+                    "ops-check",
+                    "--tracker-path",
+                    tracker_path.as_posix(),
+                    "--repo-root",
+                    temp_path.as_posix(),
+                    "--output-dir",
+                    temp_path.as_posix(),
+                    "--live-smoke-dir",
+                    temp_path.as_posix(),
+                    "--live-smoke-targets-path",
+                    targets_path.as_posix(),
+                    "--snapshot-out",
+                    snapshot_path.as_posix(),
+                ],
+            )
+
+            self.assertEqual(1, result.exit_code, msg=result.output)
+            self.assertIn(f"Snapshot: {snapshot_path.as_posix()}", result.output)
+            self.assertTrue(snapshot_path.exists())
+
+            payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(1, payload["snapshot_version"])
+        self.assertEqual("ops-check", payload["command"])
+        self.assertEqual(tracker_path.as_posix(), payload["inputs"]["tracker_path"])
+        self.assertEqual(temp_path.as_posix(), payload["inputs"]["repo_root"])
+        self.assertEqual(temp_path.as_posix(), payload["inputs"]["output_dir"])
+        self.assertTrue(payload["inputs"]["live_smoke"]["enabled"])
+        self.assertFalse(payload["inputs"]["live_smoke"]["required"])
+        self.assertEqual(temp_path.as_posix(), payload["inputs"]["live_smoke"]["dir"])
+        self.assertEqual(targets_path.as_posix(), payload["inputs"]["live_smoke"]["targets_path"])
+        self.assertFalse(payload["result"]["ok"])
+        self.assertEqual("failing", payload["result"]["live_smoke"]["status"])
+        self.assertEqual(1, payload["result"]["live_smoke"]["counts"]["ok"])
+        self.assertEqual(1, payload["result"]["live_smoke"]["counts"]["missing"])
+        self.assertIn("generated_at", payload)
+
+    def test_ops_check_snapshot_dir_writes_timestamped_snapshot_file(self) -> None:
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            tracker_path = temp_path / "applications.md"
+            snapshot_dir = temp_path / "ops-snapshots"
+            output_dir = temp_path / "output"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            tracker_path.write_text(
+                "\n".join(
+                    [
+                        "# Applications Tracker",
+                        "",
+                        "| ID | Date | Company | Role | Score | Status | Source | Resume | Report | Notes |",
+                        "|----|------|---------|------|-------|--------|--------|--------|--------|-------|",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = runner.invoke(
+                app,
+                [
+                    "ops-check",
+                    "--tracker-path",
+                    tracker_path.as_posix(),
+                    "--repo-root",
+                    temp_path.as_posix(),
+                    "--output-dir",
+                    output_dir.as_posix(),
+                    "--live-smoke-dir",
+                    output_dir.as_posix(),
+                    "--snapshot-dir",
+                    snapshot_dir.as_posix(),
+                ],
+            )
+
+            self.assertEqual(0, result.exit_code, msg=result.output)
+            snapshot_files = sorted(snapshot_dir.glob("*.json"))
+            self.assertEqual(1, len(snapshot_files))
+            snapshot_path = snapshot_files[0]
+            self.assertTrue(snapshot_path.name.startswith("ops-check-"))
+            self.assertTrue(snapshot_path.name.endswith("-ok.json"))
+            self.assertIn(f"Snapshot: {snapshot_path.as_posix()}", result.output)
+
+            payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(payload["result"]["ok"])
+        self.assertEqual(output_dir.as_posix(), payload["inputs"]["output_dir"])
+        self.assertEqual("skipped", payload["result"]["live_smoke"]["status"])
+
+    def test_ops_check_rejects_snapshot_out_and_snapshot_dir_together(self) -> None:
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            tracker_path = temp_path / "applications.md"
+            tracker_path.write_text(
+                "\n".join(
+                    [
+                        "# Applications Tracker",
+                        "",
+                        "| ID | Date | Company | Role | Score | Status | Source | Resume | Report | Notes |",
+                        "|----|------|---------|------|-------|--------|--------|--------|--------|-------|",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = runner.invoke(
+                app,
+                [
+                    "ops-check",
+                    "--tracker-path",
+                    tracker_path.as_posix(),
+                    "--snapshot-out",
+                    (temp_path / "one.json").as_posix(),
+                    "--snapshot-dir",
+                    (temp_path / "snapshots").as_posix(),
+                ],
+            )
+
+        self.assertNotEqual(0, result.exit_code)
+        self.assertIn("Use either --snapshot-out or --snapshot-dir, not both.", result.output)
+
+    def test_ops_check_json_fails_for_stale_or_missing_live_smoke_targets(self) -> None:
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            tracker_path = temp_path / "applications.md"
+            tracker_path.write_text(
+                "\n".join(
+                    [
+                        "# Applications Tracker",
+                        "",
+                        "| ID | Date | Company | Role | Score | Status | Source | Resume | Report | Notes |",
+                        "|----|------|---------|------|-------|--------|--------|--------|--------|-------|",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            targets_path = _write_test_live_smoke_targets_yaml(temp_path)
+            now = datetime.now(UTC)
+            (temp_path / "single.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": (now - timedelta(hours=48)).isoformat(),
+                        "targets_path": targets_path.as_posix(),
+                        "target": "remember_platform_ko",
+                        "selected_url": "https://career.rememberapp.co.kr/job/posting/293599",
+                        "candidate_label": "primary",
+                        "used_fallback": False,
+                        "cleaned": True,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = runner.invoke(
+                app,
+                [
+                    "ops-check",
+                    "--tracker-path",
+                    tracker_path.as_posix(),
+                    "--repo-root",
+                    temp_path.as_posix(),
+                    "--output-dir",
+                    temp_path.as_posix(),
+                    "--live-smoke-dir",
+                    temp_path.as_posix(),
+                    "--live-smoke-targets-path",
+                    targets_path.as_posix(),
+                    "--live-smoke-max-age-hours",
+                    "24",
+                    "--json",
+                ],
+            )
+
+        self.assertEqual(1, result.exit_code, msg=result.output)
+        payload = json.loads(result.output)
+        self.assertFalse(payload["ok"])
+        self.assertEqual("failing", payload["live_smoke"]["status"])
+        self.assertEqual(1, payload["live_smoke"]["counts"]["stale"])
+        self.assertEqual(1, payload["live_smoke"]["counts"]["missing"])
+        self.assertEqual(
+            ["remember_platform_ko", "wanted_backend_ko"],
+            [entry["target"] for entry in payload["live_smoke"]["entries"]],
+        )
 
 
 class ResumeCliTest(unittest.TestCase):
@@ -1973,6 +2308,81 @@ class ArtifactManifestCliTest(unittest.TestCase):
             self.assertIn(new_html.with_suffix(".manifest.json").as_posix(), result.output)
             self.assertIn(existing_manifest.as_posix(), result.output)
             self.assertEqual('{"version":1,"paths":{}}\n', existing_manifest.read_text(encoding="utf-8"))
+
+    def test_audit_artifacts_reports_inventory_findings(self) -> None:
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            output_dir = temp_path / "output"
+            html_dir = output_dir / "rendered"
+            html_dir.mkdir(parents=True, exist_ok=True)
+
+            legacy_html = html_dir / "legacy-role.html"
+            legacy_html.write_text("<html></html>", encoding="utf-8")
+            built_html = html_dir / "built-role.html"
+            built_html.write_text("<html></html>", encoding="utf-8")
+            manifest_path = built_html.with_suffix(".manifest.json")
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "generated_at": "2026-04-11T00:00:00+00:00",
+                        "build_run_id": "br_keep",
+                        "inventory_key": "rendered/built-role.html",
+                        "pipeline": "build_tailored_resume",
+                        "paths": {
+                            "job_path": None,
+                            "report_path": None,
+                            "tailoring_path": None,
+                            "context_path": None,
+                            "html_path": built_html.as_posix(),
+                            "pdf_path": None,
+                            "base_context_path": None,
+                            "template_path": None,
+                            "profile_path": None,
+                            "scorecard_path": None,
+                        },
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = runner.invoke(
+                app,
+                [
+                    "audit-artifacts",
+                    "--output-dir",
+                    output_dir.as_posix(),
+                    "--repo-root",
+                    temp_path.as_posix(),
+                    "--json",
+                ],
+            )
+
+            self.assertEqual(0, result.exit_code, msg=result.output)
+            payload = json.loads(result.output)
+            self.assertEqual(2, payload["html_artifact_count"])
+            self.assertEqual(1, payload["manifest_count"])
+            self.assertEqual(1, payload["legacy_html_count"])
+            self.assertEqual(1, payload["counts"]["missing_artifact_index"])
+            self.assertEqual(1, payload["counts"]["legacy_html"])
+
+            strict_result = runner.invoke(
+                app,
+                [
+                    "audit-artifacts",
+                    "--output-dir",
+                    output_dir.as_posix(),
+                    "--repo-root",
+                    temp_path.as_posix(),
+                    "--strict",
+                ],
+            )
+            self.assertEqual(1, strict_result.exit_code)
+            self.assertIn("missing_artifact_index", strict_result.output)
 
 
 if __name__ == "__main__":

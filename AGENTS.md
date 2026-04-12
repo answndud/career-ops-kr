@@ -37,6 +37,7 @@ career-ops-kr prepare-resume-tailoring jds/<job-file>.md reports/<report-file>.m
 career-ops-kr apply-resume-tailoring output/resume-tailoring/<packet>.json examples/resume-context.example.json --out output/<company>-resume-context.json
 career-ops-kr build-tailored-resume jds/<job-file>.md reports/<report-file>.md examples/resume-context.platform.ko.example.json templates/resume-ko.html --html-out output/<company>-resume.html
 career-ops-kr build-tailored-resume-from-url "https://career.rememberapp.co.kr/job/posting/293599" examples/resume-context.platform.ko.example.json templates/resume-ko.html --job-out jds/remember-platform.md --report-out reports/remember-platform.md --html-out output/remember-platform.html --profile-path config/profile.example.yml
+career-ops-kr audit-artifacts
 career-ops-kr backfill-artifact-manifests
 career-ops-kr backfill-artifact-manifests --dry-run
 career-ops-kr validate-live-smoke-targets
@@ -57,6 +58,7 @@ career-ops-kr compare-live-smoke-reports output/previous-live-smoke-report.json 
 career-ops-kr compare-live-smoke-reports --latest-from output --type batch --target remember_platform_ko
 career-ops-kr finalize-tracker
 career-ops-kr audit-jobs
+career-ops-kr ops-check
 career-ops-kr merge-tracker
 career-ops-kr normalize-statuses
 career-ops-kr verify
@@ -201,6 +203,7 @@ rm -f research/test-toss.md research/test-toss-summary.md
 - 포털 discovery 로직은 [src/career_ops_kr/portals.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/portals.py)에 둔다.
 - 회사 조사 brief와 follow-up scaffold 생성 로직은 [src/career_ops_kr/research.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/research.py)에 둔다.
 - 새 CLI 기능은 가능하면 [src/career_ops_kr/commands](/Users/alex/project/career-ops-kr/src/career_ops_kr/commands) 아래 해당 command group 모듈에 둔다. `cli.py`는 얇은 엔트리포인트로 유지한다.
+- repo-level 운영 점검처럼 tracker/resume smoke를 함께 보는 cross-cutting helper는 [src/career_ops_kr/commands/ops.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/commands/ops.py), [src/career_ops_kr/commands/ops_cli.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/commands/ops_cli.py)처럼 별도 command group으로 분리한다.
 - optional web product surface는 [src/career_ops_kr/web](/Users/alex/project/career-ops-kr/src/career_ops_kr/web) 아래에 둔다. 엔트리포인트는 [src/career_ops_kr/commands/web.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/commands/web.py)와 `career-ops-kr serve-web`만 사용한다.
 - web layer는 local-only SQLite sidecar를 써도 되지만, deterministic JD/report/resume 산출은 기존 core helper를 재사용해야 한다.
 - web 검색/설정/이력서/트래커 표면은 [src/career_ops_kr/web/app.py](/Users/alex/project/career-ops-kr/src/career_ops_kr/web/app.py), [src/career_ops_kr/web/routers](/Users/alex/project/career-ops-kr/src/career_ops_kr/web/routers), [src/career_ops_kr/web/templates](/Users/alex/project/career-ops-kr/src/career_ops_kr/web/templates)에서 관리한다. web 표면은 검색, tracker, deterministic resume build 중심으로 유지한다.
@@ -228,6 +231,8 @@ rm -f research/test-toss.md research/test-toss-summary.md
 - `build-tailored-resume`는 `prepare-resume-tailoring -> apply-resume-tailoring -> render-resume` wrapper다. score report parsing과 render wiring만 묶고, fetch/score 단계까지 확장하지 않는다.
 - `build-tailored-resume-from-url`는 `fetch-job -> score-job -> build-tailored-resume` wrapper다. 출력 경로를 먼저 preflight하고, tracker addition은 `--tracker-out`을 준 경우에만 생성한다.
 - `backfill-artifact-manifests`는 기존 HTML 산출물 옆에 sibling `.manifest.json`을 생성해 web inventory provenance를 최신 규칙으로 맞춘다. 기본은 manifest가 없는 HTML만 채우고, `--overwrite`로 기존 manifest를 다시 쓸 수 있다. 같은 실행에서 output root의 `artifact-index.json` derived cache도 같이 맞춘다.
+- `audit-artifacts`는 tracker와 무관하게 output root만 점검해 legacy HTML, manifest referenced file 누락, artifact-index drift를 본다. legacy 정리를 시작하기 전에 먼저 실행한다.
+- legacy 산출물 운영 기준은 `inventory만 맞추면 되는 archive -> audit-artifacts + backfill`, `현재 지원 흐름에 다시 쓰는 산출물 -> build-tailored-resume/build-tailored-resume-from-url로 재생성`으로 나눈다. `context/tailoringGuidance`가 필요하면 backfill 대신 rebuild를 택한다.
 - `build-tailored-resume`, `build-tailored-resume-from-url`, `backfill-artifact-manifests`가 쓰는 manifest에는 `build_run_id`와 `inventory_key`를 같이 기록한다.
 - `smoke-live-resume`는 registry 기반 target을 읽어 `build-tailored-resume-from-url` 경로를 검증하는 수동 smoke helper다. 기본은 성공 후 artifact를 정리하고, 확인이 필요할 때만 `--keep-artifacts`를 사용한다.
 - `validate-live-smoke-targets`는 registry를 네트워크 없이 검증하는 저비용 helper다. live smoke를 돌리기 전에 먼저 실행한다.
@@ -284,15 +289,16 @@ rm -f research/test-toss.md research/test-toss-summary.md
 6. 변경 범위에 맞는 검증 명령을 실행한다.
 7. smoke test 생성물을 삭제한다.
 8. 작업이 끝나면 [PLAN.md](/Users/alex/project/career-ops-kr/PLAN.md)와 [PROGRESS.md](/Users/alex/project/career-ops-kr/PROGRESS.md)를 현재 상태에 맞게 업데이트한다.
-9. 최종 보고에 변경 파일, 실행 명령, 남은 리스크를 적는다.
+9. 최종 보고에는 변경 이유, 변경 파일, 다음에 이어서 할 작업을 적는다. 실행한 검증, 실행하지 않은 검증, 외부 요인 리스크는 사용자가 요청할 때만 적는다.
 
 ## 보고 규칙
 
 - 최종 보고에는 바꾼 이유를 한 문단으로 먼저 요약한다.
 - 그 다음 실제 변경 파일 경로를 적는다.
-- 실행한 검증 명령을 적고, 통과/실패 여부를 명확히 적는다.
-- 실행하지 못한 검증이 있으면 이유를 적는다.
-- 네트워크, 인증서, 포털 구조 변경처럼 외부 요인에 의존하는 리스크가 있으면 별도로 적는다.
+- 기본 최종 보고에는 다음에 이어서 할 작업을 함께 적는다.
+- 실행한 검증 명령과 통과/실패 여부는 사용자가 요청할 때만 적는다.
+- 실행하지 못한 검증과 그 이유도 사용자가 요청할 때만 적는다.
+- 네트워크, 인증서, 포털 구조 변경처럼 외부 요인에 의존하는 리스크도 사용자가 요청할 때만 적는다.
 
 ## 반드시 읽어야 할 파일
 

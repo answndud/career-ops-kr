@@ -81,36 +81,106 @@
     - attention preset을 현재 visible row selection과 bulk form prefill까지 바로 연결
     - 기존에 정의되지 않았던 `CareerOpsTracker.selectVisible()` 호출도 실제 helper로 보강
     - `tests/test_web.py`에 tracker quick prep UI 노출 회귀 추가
-  - browser E2E 회귀 확장과 quick-action quoting fix
-    - `tests/test_web_e2e.py`에 `search preset -> 저장 -> build -> artifacts filter -> tracker bulk quick prep -> follow-up quick action` 흐름 추가
-    - `home.html`, `follow-ups.html`, `search.html`의 inline `onclick + tojson` quoting 문제를 data-attribute helper 방식으로 정리
-    - `tests/test_web.py`에 home/follow-up quick action button wiring 회귀 추가
-    - `CAREER_OPS_RUN_BROWSER_E2E=1 python -m unittest tests.test_web_e2e` 통과
-  - web search preset 1차 추가
-    - `src/career_ops_kr/web/search_presets.py`
-    - `/api/search-presets` GET/POST/DELETE 추가
-    - `/search?preset=<key>`로 저장된 검색어 재실행 지원
-    - search 화면에서 현재 검색어 preset 저장 / 삭제 / 재실행 UI 추가
-    - settings table JSON payload로 저장해 export/import에 자동 포함되도록 유지
-    - `tests/test_web.py`에 preset CRUD와 preset-based search page 회귀 추가
-  - web search preset 2차 마감
-    - `src/career_ops_kr/web/search_presets.py`에서 preset별 `last_used_at`, `is_default`, `activity_label` metadata 추가
-    - 첫 preset 자동 기본 지정, `/api/search-presets/{preset_key}/default` 기본 preset 변경 지원
-    - `/search`가 query 없이 열렸을 때 기본 preset으로 자동 검색되도록 정리
-    - `search.html`에서 기본 preset 지정 버튼과 마지막 사용 시각을 같이 노출
-    - `tests/test_web.py`에 default preset 자동 적용과 usage timestamp 회귀 추가
-  - web 구조 개선 5차 완료
-    - `src/career_ops_kr/web/routers/deps.py`를 `PagesRouterDeps`, `JobsRouterDeps`, `SearchRouterDeps`, `ResumeRouterDeps`, `SystemRouterDeps`로 분리
-    - `src/career_ops_kr/web/app.py`는 route별 deps factory를 조합하고 `_router_deps()` bundle patch 포인트만 유지하도록 정리
-    - `tests/test_web.py`의 runtime path patch 회귀와 router wiring 검증이 계속 통과하는 상태로 유지
-  - web 구조 개선 6차 완료
-    - `src/career_ops_kr/web/router_deps_factory.py`를 추가해 router deps assembly helper를 `app.py` 밖으로 분리
-    - `src/career_ops_kr/web/app.py`는 env/path preset 설정, patchable hook 노출, FastAPI app 조립만 맡도록 축소
-    - `web_app.search_jobs`, `web_app.run_build_tailored_resume_from_url`, `web_app._router_deps()` 늦은 바인딩 patch 계약을 유지한 채 `tests/test_web.py`, `career-ops-kr serve-web --help`, `python -m unittest discover -s tests`, `career-ops-kr verify` 통과
-  - web 구조 개선 7차 완료
-    - `src/career_ops_kr/web/router_bindings.py`를 추가해 path-aware adapter method 묶음을 별도 클래스로 분리
-    - `src/career_ops_kr/web/router_deps_factory.py`는 route deps dataclass mapping만 담당하도록 축소
-    - web assembler 계층이 `app.py -> router_deps_factory.py -> router_bindings.py`로 정리된 상태에서 `tests/test_web.py`, `career-ops-kr serve-web --help` 통과
+- browser E2E 회귀 확장과 quick-action quoting fix
+  - `tests/test_web_e2e.py`에 `search preset -> 저장 -> build -> artifacts filter -> tracker bulk quick prep -> follow-up quick action` 흐름 추가
+  - `home.html`, `follow-ups.html`, `search.html`의 inline `onclick + tojson` quoting 문제를 data-attribute helper 방식으로 정리
+  - `tests/test_web.py`에 home/follow-up quick action button wiring 회귀 추가
+  - `CAREER_OPS_RUN_BROWSER_E2E=1 python -m unittest tests.test_web_e2e` 통과
+- scorecard 2차 tuning 11차 반영
+  - `config/scorecard.kr.yml`에 unsupported 역할군 title guard 규칙 추가
+  - `src/career_ops_kr/scoring.py`가 `Product Design / QA / Embedded / Game Client` title을 먼저 감지하면 domain/profile 선택 전에 `General` fallback으로 내리고, report에 `Unsupported Role Family`를 표시
+  - `tests/fixtures/realistic_jds.py`에 `Product Designer`, `QA Automation Engineer`, `Embedded Software Engineer`, `Game Client Engineer` realistic fixture 추가
+  - `tests/test_scoring.py`에 위 4개 역할군의 realistic General fallback 회귀 추가
+  - `docs/scoring-kr.md`에 unsupported family title guard 동작을 문서화
+- scorecard 2차 tuning 12차 반영
+  - `config/scorecard.kr.yml`의 `domains.data.tie_break_anchor_keywords`에 `model serving / inference / llmops / embeddings` 등 Data-AI 강신호를 추가
+  - `AI Infrastructure Engineer`처럼 infra wording과 AI serving keyword가 함께 있는 JD가 platform/data near-tie에서 `Data-AI`로 남도록 보정
+  - `tests/fixtures/realistic_jds.py`에 `AI Infrastructure Engineer` realistic fixture 추가
+  - `tests/test_scoring.py`에 synthetic/realistic AI infrastructure 회귀 추가
+  - `docs/scoring-kr.md`에 mixed platform/data near-tie 규칙 보강
+- scorecard 2차 tuning 13차 반영
+  - `src/career_ops_kr/scoring.py`의 platform/data domain near-tie tie-break에 margin을 둬 total-signal winner가 one-keyword 차이로 뒤집히지 않게 조정
+  - `tests/fixtures/realistic_jds.py`에 `Data Platform SRE`, `Analytics Infrastructure Engineer` realistic fixture 추가
+  - `tests/test_scoring.py`에 synthetic `Data Platform SRE`와 realistic `Data Platform SRE / Analytics Infrastructure` 회귀 추가
+  - `docs/scoring-kr.md`에 infra-heavy data platform phrasing 보정 규칙을 문서화
+- scorecard 2차 tuning 14차 반영
+  - `tests/fixtures/realistic_jds.py`에 `DevOps Engineer (Data Platform Foundations)`, `MLOps Engineer` realistic mixed-role fixture 추가
+  - `tests/test_scoring.py`에 devops-title platform 유지와 mlops-title data-ai 유지 회귀 추가
+  - `docs/scoring-kr.md`에 ops-heavy DevOps vs serving-heavy MLOps decision rule을 명시
+- scorecard 2차 tuning 15차 반영
+  - `tests/fixtures/realistic_jds.py`에 `DevOps Engineer (Data Platform)` realistic mixed-role fixture 추가
+  - `tests/test_scoring.py`에 같은 `DevOps` title이라도 pipeline-heavy wording이면 `Data-Platform`으로 가는 회귀 추가
+  - `docs/scoring-kr.md`에 DevOps title의 runtime-heavy vs pipeline-heavy 경계 규칙을 보강
+- scoring explainability 1차 추가
+  - `src/career_ops_kr/scoring.py`가 domain candidate별 `total / anchor / signal / tie` 점수를 계산해 report의 `Domain Match Candidates`에 함께 출력
+  - mixed-role JD에서 title bias인지 body signal인지 보고서만으로 다시 판단할 수 있게 정리
+  - `tests/test_scoring.py`에 domain candidate line 노출 회귀 추가
+- scoring explainability 2차 추가
+  - `src/career_ops_kr/scoring.py`가 role candidate별 `total / anchor / signal / ratio / preferred` 근거를 계산해 report의 `Role Match Candidates`에 함께 출력
+  - mixed-role JD에서 최종 role profile 선택이 specialization bias인지 JD signal 우세인지 보고서만으로 다시 판단할 수 있게 정리
+  - `tests/test_scoring.py`에 role candidate line 노출 회귀 추가
+- scoring explainability 3차 추가
+  - `src/career_ops_kr/scoring.py`가 `Domain Selection Note`, `Role Selection Note`를 함께 출력해 near-tie tie-break, preferred specialization, General fallback 이유를 한 줄로 설명
+  - `tests/test_scoring.py`에 mixed tie-break / preferred specialization / General fallback note 회귀 추가
+  - `docs/scoring-kr.md`에 selection note 의미를 문서화
+- 실제 저장된 mixed JD review 1차 정리
+  - repo의 `jds/`, `data/applications.md`, `data/career-ops-web.db` `jobs`/`resumes`를 확인했지만 실제 저장된 JD/공고 데이터는 비어 있는 상태
+  - 따라서 scorecard의 grouped signal 재설계는 진행하지 않고, 현재 explainability surface를 유지한 채 실제 JD가 쌓인 뒤 다시 판단하기로 정리
+- repo-level ops check helper 1차 추가
+  - `career-ops-kr ops-check`
+  - `src/career_ops_kr/commands/ops.py`, `src/career_ops_kr/commands/ops_cli.py`
+  - `verify`, `audit-jobs`, saved live smoke report health를 한 번에 묶는 운영 체크 surface 추가
+  - live smoke report가 없으면 기본은 `skip`, `--require-live-smoke`를 주면 운영 gate로 실패하게 정리
+  - `tests/test_cli.py`에 skip/failing JSON 회귀 추가
+- repo-level ops check helper 2차 정리
+  - `src/career_ops_kr/commands/ops_cli.py` 기본 text 출력이 compact summary만 보여주고, 상세 verify/audit/live smoke entry는 `--verbose`에서만 펼치도록 조정
+  - live smoke summary line에 target 수와 nonzero status count를 같이 표시
+  - `tests/test_cli.py`에 verbose detail 출력 회귀 추가
+- repo-level ops check helper 3차 정리
+  - `src/career_ops_kr/commands/ops.py`에 실행 입력과 결과를 함께 담는 snapshot payload helper 추가
+  - `src/career_ops_kr/commands/ops_cli.py`가 `--snapshot-out`으로 ops-check JSON snapshot을 저장하고, 실패 케이스에서도 운영 기록이 남도록 정리
+  - `tests/test_cli.py`에 failing ops-check에서도 snapshot 파일이 생성되는 회귀 추가
+- repo-level ops check helper 4차 정리
+  - `src/career_ops_kr/commands/ops.py`에 UTC timestamp 기반 snapshot 파일명 helper 추가
+  - `src/career_ops_kr/commands/ops_cli.py`가 `--snapshot-dir`로 auto-named snapshot을 누적 저장하고, `--snapshot-out`과 동시 사용은 차단하도록 정리
+  - `tests/test_cli.py`에 auto-named snapshot 생성과 mutual exclusion 회귀 추가
+- artifact inventory audit helper 1차 추가
+  - `career-ops-kr audit-artifacts`
+  - `src/career_ops_kr/resume_pipeline/artifacts.py`, `src/career_ops_kr/commands/resume_build_cli.py`
+  - tracker 없이 output root만 읽어 legacy HTML, manifest referenced file 누락, artifact-index drift를 점검
+  - `tests/test_resume.py`, `tests/test_cli.py`에 helper/CLI 회귀 추가
+- legacy artifact 운영 기준 1차 문서화
+  - `README.md`, `docs/workflows.md`, `docs/architecture.md`, `AGENTS.md`
+  - archive성 산출물은 `audit-artifacts -> backfill-artifact-manifests`, 활성 지원 흐름 산출물은 새 build 경로 재생성 기준으로 정리
+  - `context/tailoringGuidance`가 필요하면 backfill 대신 rebuild를 택하도록 명시
+- AGENTS 최종 보고 규칙 조정
+  - 기본 최종 보고는 `변경 이유`, `변경 파일`, `다음에 할 작업` 중심으로 정리
+  - 실행한 검증, 실행하지 않은 검증, 외부 요인 리스크는 사용자가 요청할 때만 보고하도록 AGENTS 기준 업데이트
+- web search preset 1차 추가
+  - `src/career_ops_kr/web/search_presets.py`
+  - `/api/search-presets` GET/POST/DELETE 추가
+  - `/search?preset=<key>`로 저장된 검색어 재실행 지원
+  - search 화면에서 현재 검색어 preset 저장 / 삭제 / 재실행 UI 추가
+  - settings table JSON payload로 저장해 export/import에 자동 포함되도록 유지
+  - `tests/test_web.py`에 preset CRUD와 preset-based search page 회귀 추가
+- web search preset 2차 마감
+  - `src/career_ops_kr/web/search_presets.py`에서 preset별 `last_used_at`, `is_default`, `activity_label` metadata 추가
+  - 첫 preset 자동 기본 지정, `/api/search-presets/{preset_key}/default` 기본 preset 변경 지원
+  - `/search`가 query 없이 열렸을 때 기본 preset으로 자동 검색되도록 정리
+  - `search.html`에서 기본 preset 지정 버튼과 마지막 사용 시각을 같이 노출
+  - `tests/test_web.py`에 default preset 자동 적용과 usage timestamp 회귀 추가
+- web 구조 개선 5차 완료
+  - `src/career_ops_kr/web/routers/deps.py`를 `PagesRouterDeps`, `JobsRouterDeps`, `SearchRouterDeps`, `ResumeRouterDeps`, `SystemRouterDeps`로 분리
+  - `src/career_ops_kr/web/app.py`는 route별 deps factory를 조합하고 `_router_deps()` bundle patch 포인트만 유지하도록 정리
+  - `tests/test_web.py`의 runtime path patch 회귀와 router wiring 검증이 계속 통과하는 상태로 유지
+- web 구조 개선 6차 완료
+  - `src/career_ops_kr/web/router_deps_factory.py`를 추가해 router deps assembly helper를 `app.py` 밖으로 분리
+  - `src/career_ops_kr/web/app.py`는 env/path preset 설정, patchable hook 노출, FastAPI app 조립만 맡도록 축소
+  - `web_app.search_jobs`, `web_app.run_build_tailored_resume_from_url`, `web_app._router_deps()` 늦은 바인딩 patch 계약을 유지한 채 `tests/test_web.py`, `career-ops-kr serve-web --help`, `python -m unittest discover -s tests`, `career-ops-kr verify` 통과
+- web 구조 개선 7차 완료
+  - `src/career_ops_kr/web/router_bindings.py`를 추가해 path-aware adapter method 묶음을 별도 클래스로 분리
+  - `src/career_ops_kr/web/router_deps_factory.py`는 route deps dataclass mapping만 담당하도록 축소
+  - web assembler 계층이 `app.py -> router_deps_factory.py -> router_bindings.py`로 정리된 상태에서 `tests/test_web.py`, `career-ops-kr serve-web --help` 통과
 - optional web product surface 정비
   - `career-ops-kr serve-web` command 연결
   - `src/career_ops_kr/web/app.py` 기준 FastAPI app을 공식 web entry로 정리
@@ -150,6 +220,9 @@
     - legacy `ai_outputs` table은 schema init 시 자동 삭제
     - backup/export/import 디렉터리는 그룹별 최신 파일만 남기도록 prune 추가
     - `tests/test_web.py`에 backup/export/import roundtrip 회귀 유지
+  - web DB legacy cleanup regression 추가
+    - `tests/test_web.py`에 기존 DB에 `ai_outputs` table이 남아 있어도 `connection_scope()/init_schema()`가 자동으로 제거하는 회귀 추가
+    - AI surface 제거 후에도 schema migration이 실제 DB에서 유지되는지 고정
   - web 구조 개선 1차 완료
     - `src/career_ops_kr/web/common.py`
     - `src/career_ops_kr/web/artifacts.py`
@@ -825,11 +898,8 @@
 - lock file이 live PID를 가리키는 동안에는 같은 pipeline 파일을 처리할 수 없다. 장시간 hang가 나면 운영적으로 lock file 상태를 먼저 확인해야 한다.
 - JobPlanet / Blind는 company research source로 분류했고 summary/outreach scaffold와 search hint는 생겼지만, exact company URL 자동 추론은 아직 없다.
 - role profile taxonomy는 `Data-Platform`까지 확장됐고 role-specific company signal, generic keyword 축소, minimum match ratio fallback까지 들어갔지만, 더 세밀한 taxonomy와 실전 tuning은 아직 남아 있다.
-- mixed `Platform / Data-Platform / Data-AI` 경계는 여전히 phrasing 영향이 있어, 2-stage taxonomy나 더 좁은 grouped signal 설계는 후속 과제로 남아 있다.
-- domain-first, data specialization near-tie anchor, platform/data domain near-tie, realistic JD fixture까지 넣었지만 mixed `Platform / Data-Platform / Data-AI` 경계는 여전히 heuristic 기반이다. margin 규칙과 specialization taxonomy는 더 다듬을 수 있다.
+- mixed `Platform / Data-Platform / Data-AI` 경계는 tie-break anchor와 margin 규칙으로 `AI Infrastructure`, `Data Platform SRE`류 오분류를 줄였지만, 여전히 phrasing 영향이 남는 heuristic 영역이다. 2-stage taxonomy나 더 좁은 grouped signal 설계는 후속 과제로 남아 있다.
 - realistic fixture를 늘렸지만 여전히 paraphrase 기반이다. 실전 JD 다양성을 더 반영하려면 공개 공고 패턴을 계속 추가할 수 있다.
-- realistic fixture는 늘었지만 여전히 일부 역할군은 비어 있다. 프론트엔드, 모바일, pure ML research 계열은 아직 scoring regression fixture가 부족하다.
-- Frontend, 모바일, ML research fixture는 추가됐지만, 아직 pure product design, QA, embedded, game client 같은 역할군은 비어 있다.
 - `score-job`와 `process-pipeline --score`는 override flag가 생겼지만, 기본값은 여전히 로컬 `config/profile.yml`, `config/scorecard.kr.yml`이다.
 - pytest 등 더 넓은 테스트 스위트는 아직 없고, 현재는 `tests/test_cli.py`, `tests/test_jobs.py`, `tests/test_pipeline.py`, `tests/test_portals.py`, `tests/test_research.py`, `tests/test_scoring.py`, `tests/test_tracker.py` 중심의 `unittest`만 있다.
 - 현재 테스트 스위트는 주요 CLI override와 tracker finalize 흐름까지 커버하지만, live network fetch path 자체를 고정하는 테스트는 아니다.
@@ -862,7 +932,6 @@
    - specialization margin 규칙 추가 정교화
    - mixed fixture를 더 늘려 phrasing variation 회귀 방지
    - realistic public-JD fixture를 더 늘려 synthetic 편향 줄이기
-   - 아직 비어 있는 역할군 fixture 채우기
 5. resume tailoring 후속 흐름
    - `tailoringGuidance`를 실제 template field에 더 반영할지 검토
    - role별 ko/en variant example을 더 늘릴지 검토

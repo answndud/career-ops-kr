@@ -74,6 +74,59 @@ REALISTIC_JD_SAMPLES: dict[str, dict[str, str]] = {
             "operational resilience in cloud environments."
         ),
     },
+    "ai_infrastructure_llmops": {
+        "title": "AI Infrastructure Engineer",
+        "body": (
+            "AI infrastructure role for production AI products. Build llmops, "
+            "model-serving infrastructure, inference pipelines, LLM evaluation, "
+            "RAG retrieval, embeddings infrastructure, and deployment automation "
+            "while also operating Kubernetes, Terraform, observability, and cloud "
+            "reliability for AI services."
+        ),
+    },
+    "data_platform_sre_observability": {
+        "title": "Data Platform SRE",
+        "body": (
+            "Data platform SRE role operating warehouse workflows, Airflow runtime, "
+            "Spark jobs, Kafka streaming, and data pipeline reliability while also "
+            "owning Kubernetes, Terraform, observability, and incident response for "
+            "analytics systems."
+        ),
+    },
+    "analytics_infrastructure_experimentation": {
+        "title": "Analytics Infrastructure Engineer",
+        "body": (
+            "Analytics infrastructure role building warehouse platforms, dbt models, "
+            "Airflow orchestration, experimentation datasets, Spark processing, and "
+            "data platform reliability tooling with Kubernetes and cloud operations."
+        ),
+    },
+    "devops_data_platform_foundations": {
+        "title": "DevOps Engineer (Data Platform Foundations)",
+        "body": (
+            "DevOps role for data platform foundations. Operate Kubernetes clusters, "
+            "Terraform automation, observability, incident response, Airflow runtime, "
+            "Spark and Kafka jobs, warehouse pipelines, and platform reliability for "
+            "analytics products."
+        ),
+    },
+    "devops_data_pipeline_reliability": {
+        "title": "DevOps Engineer (Data Platform)",
+        "body": (
+            "DevOps role for data platform reliability. Build Kafka streaming, Spark "
+            "pipelines, warehouse orchestration, dbt jobs, Airflow DAG operations, "
+            "data quality runtime, and data platform reliability tooling for product "
+            "analytics systems."
+        ),
+    },
+    "mlops_inference_runtime": {
+        "title": "MLOps Engineer",
+        "body": (
+            "MLOps role building model-serving runtime, inference pipelines, llmops "
+            "tooling, evaluation workflows, embeddings infrastructure, RAG retrieval, "
+            "and deployment automation for production AI services."
+        ),
+    },
     "frontend_next_typescript": {
         "title": "Frontend Engineer",
         "body": (
@@ -100,6 +153,40 @@ REALISTIC_JD_SAMPLES: dict[str, dict[str, str]] = {
             "training pipelines, and applied research for large-scale AI systems. "
             "Requires strong ML foundations and experience improving model quality "
             "and efficiency in production-oriented research environments."
+        ),
+    },
+    "product_designer_design_system": {
+        "title": "Product Designer",
+        "body": (
+            "Product design role shaping end-to-end user experience for a B2B SaaS "
+            "platform. Own UX flows, UI patterns, design systems, experimentation "
+            "hypotheses, product discovery, analytics-informed iteration, and close "
+            "collaboration with product managers and engineers."
+        ),
+    },
+    "qa_automation_platform_quality": {
+        "title": "QA Automation Engineer",
+        "body": (
+            "Quality assurance role building automated regression coverage for web "
+            "products and APIs. Own test planning, release validation, CI pipeline "
+            "integration, flaky test reduction, and cross-team quality processes "
+            "for a fast-moving product organization."
+        ),
+    },
+    "embedded_firmware_iot": {
+        "title": "Embedded Software Engineer",
+        "body": (
+            "Embedded software role developing firmware for connected devices with "
+            "C and C++, RTOS scheduling, MCU integration, hardware interfaces, "
+            "low-level debugging, and reliability validation for production IoT systems."
+        ),
+    },
+    "game_client_unity_liveops": {
+        "title": "Game Client Engineer",
+        "body": (
+            "Game client role building live game features with Unity, gameplay "
+            "systems, rendering optimization, asset integration, client performance, "
+            "and live operations support in collaboration with design and server teams."
         ),
     },
 }

@@ -216,6 +216,17 @@ career-ops-kr backfill-artifact-manifests
 이 명령은 기존 HTML 옆에 `.manifest.json`을 만들어서 웹 `산출물` 화면과 provenance 표시를 최신 기준으로 맞춰 줍니다.
 이미 manifest가 있는 HTML도 같은 실행에서 `artifact-index.json` entry를 같이 맞추고, stale orphan entry가 있으면 함께 정리합니다.
 
+legacy 산출물 정리 기준:
+
+- 예전 HTML/PDF를 단순 inventory 정합성만 맞추고 보관하려면 먼저 `career-ops-kr audit-artifacts`로 상태를 보고, 그 다음 `career-ops-kr backfill-artifact-manifests`를 사용합니다.
+- 아직 실제 지원 흐름에 쓰는 산출물이라면 backfill보다 새 build를 우선합니다.
+- 아래 중 하나라도 해당하면 새 build로 다시 만드는 편이 맞습니다.
+  - tracker나 web detail에서 다시 열어보는 핵심 공고다
+  - 현재 템플릿, 현재 scorecard, 현재 resume context 기준 결과가 필요하다
+  - context/tailoring guidance까지 다시 확인해야 한다
+  - linked JD/report가 이미 있어 deterministic provenance를 새 기준으로 남길 수 있다
+- 이미 종료된 지원 건이거나, HTML만 남아 있어 읽기 전용 보관이 목적이면 backfill로 충분합니다.
+
 역할별 이력서 예시:
 
 - 백엔드: `examples/resume-context.backend.ko.example.json`
@@ -420,6 +431,8 @@ career-ops-kr prepare-company-followup research/<brief>.md --mode summary
   공고 1개 저장
 - `career-ops-kr score-job jds/<job>.md`
   저장한 공고 1개 평가
+  현재 지원 범위 밖 역할군으로 명확한 제목은 report에서 `General` fallback으로 표시될 수 있음
+  mixed-role 공고라면 report의 `Domain Match Candidates`, `Role Match Candidates`, `Domain Selection Note`, `Role Selection Note`를 먼저 보면 분류 이유를 바로 확인 가능
 - `career-ops-kr discover-jobs wanted --limit 10`
   포털에서 공고 URL 모으기
 - `career-ops-kr process-pipeline --limit 3 --score`
@@ -428,6 +441,13 @@ career-ops-kr prepare-company-followup research/<brief>.md --mode summary
   tracker 반영
 - `career-ops-kr audit-jobs`
   tracker와 산출물의 운영 이슈 점검
+- `career-ops-kr audit-artifacts`
+  output 산출물만 따로 점검해서 legacy HTML, manifest referenced file 누락, artifact-index drift 확인
+- `career-ops-kr ops-check`
+  verify, tracker/output audit, saved live smoke report health를 한 번에 점검
+  기본은 compact summary만 보여주고, per-target 상세가 필요하면 `--verbose` 사용
+  운영 기록을 남기고 싶으면 `--snapshot-out output/ops-check/latest.json` 같이 JSON snapshot 저장 가능
+  snapshot 파일을 누적 보관하고 싶으면 `--snapshot-dir output/ops-check`로 auto-named JSON 기록 생성 가능
 - `career-ops-kr build-tailored-resume-from-url ...`
   공고 URL 하나로 바로 이력서 만들기
 - `career-ops-kr prepare-company-research <company>`

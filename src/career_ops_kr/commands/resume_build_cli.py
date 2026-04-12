@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import typer
@@ -7,6 +8,7 @@ import typer
 from career_ops_kr.commands.intake import DEFAULT_PROFILE_PATH, DEFAULT_SCORECARD_PATH
 from career_ops_kr.commands.resume import (
     apply_resume_tailoring_packet,
+    audit_artifact_inventory,
     backfill_artifact_manifests,
     build_tailored_resume,
     build_tailored_resume_from_url,
@@ -230,6 +232,41 @@ def register_resume_build_commands(app: typer.Typer) -> None:
             typer.echo("Manifest paths:")
             for path in result.manifests:
                 typer.echo(path.as_posix())
+
+    @app.command("audit-artifacts")
+    def audit_artifacts_command(
+        output_dir: Path = typer.Option(Path("output"), "--output-dir", help="Root output directory to scan for HTML artifacts."),
+        repo_root: Path = typer.Option(Path("."), "--repo-root", help="Repository root used to resolve relative manifest paths."),
+        limit: int = typer.Option(20, "--limit", min=1, help="Maximum number of findings to print in text mode."),
+        as_json: bool = typer.Option(False, "--json", help="Print the artifact audit result as JSON."),
+        strict: bool = typer.Option(False, "--strict", help="Exit with code 1 when any findings are present."),
+    ) -> None:
+        result = audit_artifact_inventory(
+            output_dir=output_dir,
+            repo_root=repo_root,
+        )
+        if as_json:
+            typer.echo(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
+        else:
+            typer.echo(f"HTML artifacts: {result.html_artifact_count}")
+            typer.echo(f"Manifest files: {result.manifest_count}")
+            typer.echo(f"Legacy HTML: {result.legacy_html_count}")
+            typer.echo(f"Findings: {len(result.findings)}")
+            if result.findings:
+                typer.echo("Counts:")
+                for category, count in result.counts.items():
+                    typer.echo(f"- {category}: {count}")
+                typer.echo("Details:")
+                for finding in result.findings[:limit]:
+                    path_suffix = f" ({finding.path})" if finding.path else ""
+                    typer.echo(f"- {finding.category}: {finding.message}{path_suffix}")
+                remaining = len(result.findings) - limit
+                if remaining > 0:
+                    typer.echo(f"... {remaining} more finding(s)")
+            else:
+                typer.echo("No artifact audit findings.")
+        if strict and not result.ok:
+            raise typer.Exit(code=1)
 
     @app.command("generate-pdf")
     def generate_pdf(

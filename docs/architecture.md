@@ -9,7 +9,7 @@
 2. `jds/`, `reports/`, `research/`, `data/`
    공고 원문, 평가 리포트, 회사 조사 브리프, 지원 현황을 파일로 보관합니다.
 3. `src/career_ops_kr/`
-   공고 추출, 공통 점수 계산, resume 렌더링, tracker 정합성 유지 작업을 수행하는 Python CLI입니다. `cli.py`는 app 생성과 registration 호출만 맡는 얇은 엔트리포인트이고, 실제 command 등록은 `commands/*_cli.py`, domain helper와 orchestration은 `commands/*.py`, `resume_pipeline/*.py` 아래에 분리합니다. resume command 등록은 `commands/resume_build_cli.py`와 `commands/resume_smoke_cli.py`로 나누고, `commands/resume_cli.py`는 이를 조합하는 얇은 aggregator만 담당합니다. intake command 등록도 `commands/intake_fetch_cli.py`와 `commands/intake_pipeline_cli.py`로 나누고, `commands/intake_cli.py`는 이를 조합하는 얇은 aggregator만 담당합니다.
+   공고 추출, 공통 점수 계산, resume 렌더링, tracker 정합성 유지 작업을 수행하는 Python CLI입니다. `cli.py`는 app 생성과 registration 호출만 맡는 얇은 엔트리포인트이고, 실제 command 등록은 `commands/*_cli.py`, domain helper와 orchestration은 `commands/*.py`, `resume_pipeline/*.py` 아래에 분리합니다. resume command 등록은 `commands/resume_build_cli.py`와 `commands/resume_smoke_cli.py`로 나누고, `commands/resume_cli.py`는 이를 조합하는 얇은 aggregator만 담당합니다. intake command 등록도 `commands/intake_fetch_cli.py`와 `commands/intake_pipeline_cli.py`로 나누고, `commands/intake_cli.py`는 이를 조합하는 얇은 aggregator만 담당합니다. repo-level 운영 헬스 체크는 `commands/ops.py`와 `commands/ops_cli.py`가 맡고, `verify`, tracker/output audit, saved live smoke report health를 하나의 `ops-check` surface로 묶습니다. `ops-check`는 필요하면 `--snapshot-out`으로 실행 입력과 결과를 JSON snapshot으로 남기고, `--snapshot-dir`로 auto-named snapshot을 누적 저장할 수 있습니다.
 4. `.codex/` + `.agents/skills/`
    Codex용 project-local 운영 계층입니다. `.codex/config.toml`은 런타임 기본값과 custom agent를 정의하고, `.agents/skills/`는 반복 작업 절차를 정의합니다.
 5. `prompts/`
@@ -57,7 +57,7 @@ saved JD + score report
 
 `apply-resume-tailoring`는 packet을 base resume context에 반영하되, 없는 기술을 임의로 추가하지 않는다. 기본적으로 `headline`, `summary`, `skills` 순서, `experience/projects` 정렬만 바꾸고, 나머지 guidance는 `tailoringGuidance` metadata로 남긴다.
 
-`build-tailored-resume`와 `build-tailored-resume-from-url`는 HTML 옆에 sibling `.manifest.json`도 같이 남긴다. manifest에는 `build_run_id`와 `inventory_key`도 같이 기록되고, 같은 output root에는 `artifact-index.json` derived cache를 같이 갱신한다. web inventory는 여전히 manifest를 primary source로 읽어 provenance와 selection/focus metadata를 보여주고, manifest가 없는 예전 HTML만 legacy fallback으로 취급한다. 오래된 산출물을 새 기준에 맞출 때는 `career-ops-kr backfill-artifact-manifests`로 sibling manifest를 일괄 생성하고 stale `artifact-index.json` entry도 함께 정리한다.
+`build-tailored-resume`와 `build-tailored-resume-from-url`는 HTML 옆에 sibling `.manifest.json`도 같이 남긴다. manifest에는 `build_run_id`와 `inventory_key`도 같이 기록되고, 같은 output root에는 `artifact-index.json` derived cache를 같이 갱신한다. web inventory는 여전히 manifest를 primary source로 읽어 provenance와 selection/focus metadata를 보여주고, manifest가 없는 예전 HTML만 legacy fallback으로 취급한다. 오래된 산출물을 새 기준에 맞출 때는 먼저 `career-ops-kr audit-artifacts`로 legacy/manfiest/index 상태를 확인하고, `career-ops-kr backfill-artifact-manifests`로 sibling manifest를 일괄 생성해 stale `artifact-index.json` entry도 함께 정리한다. 단, backfill은 inventory/provenance 정합성 보강용이고 현재 template/scorecard/context 기준 결과를 재생성하지는 않는다. 따라서 활성 지원 건이나 context/tailoring guidance가 중요한 산출물은 새 build 경로로 다시 생성하는 것을 원칙으로 한다.
 
 회사 조사는 별도 흐름입니다.
 

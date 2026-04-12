@@ -10,6 +10,7 @@ from career_ops_kr.resume_pipeline.artifacts import (
     _default_resume_artifact_manifest_path,
     _new_build_run_id,
     _write_resume_artifact_manifest,
+    audit_artifact_inventory,
     backfill_artifact_manifests,
     load_resume_artifact_manifest,
 )
