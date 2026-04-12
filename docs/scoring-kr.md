@@ -42,8 +42,9 @@
 - anchor가 비슷하게 붙는 경우에는 `selection_signal_keywords`로 domain signal을 한 번 더 비교해 `data infra for ML teams`와 `analytics infrastructure platform` 같은 혼합 JD의 흔들림을 줄입니다.
 - `Data` domain 안에서는 `specialization_keywords`를 한 번 더 보고 `Data-Platform`과 `Data-AI`를 가릅니다. 차이가 작으면 기존 profile selector로 되돌아가 과한 강제 분류를 피합니다.
 - specialization 점수 차가 `1` 수준의 near-tie면 `specialization_anchor_keywords`를 한 번 더 보고 우선순위를 정합니다. anchor도 애매하면 기존 selector로 되돌아갑니다.
-- `Platform`과 `Data` domain이 붙는 near-tie에서는 domain-level total signal을 먼저 보고, 정말 비슷할 때만 domain tie-break anchor를 참고합니다.
+- `Platform`과 `Data` domain이 붙는 near-tie에서는 domain-level total signal을 먼저 보고, 정말 비슷할 때만 domain tie-break anchor를 참고합니다. 이때 tie-break는 한두 개의 keyword 차이로 total-signal winner를 뒤집지 않도록 margin을 두고 적용합니다. `Data` tie-break anchor는 `feature store / Airflow / warehouse` 같은 Data-Platform 신호뿐 아니라 `model serving / inference / llmops` 같은 Data-AI 신호도 포함해 `AI infrastructure` 류 JD가 infra 단어만 보고 `Platform`으로 굳지 않게 합니다.
 - role profile 선택은 raw match count만 보지 않고, selection keyword 대비 최소 match ratio가 낮으면 `General` fallback으로 내립니다.
+- title이 `Product Designer`, `QA Automation Engineer`, `Embedded Software Engineer`, `Game Client Engineer`처럼 현재 target role 바깥의 역할군으로 명확하면 unsupported family guard를 먼저 적용해 억지 분류를 막고 `General` fallback으로 내립니다.
 - role/stack keyword ratio 점수는 `0.7 / 0.4 / 0.2 / 0.08` 구간으로 나눠서 강한 적합 공고가 4점대에 더 잘 올라오도록 조정했습니다.
 - seniority 판정은 first-match가 아니라 keyword count와 seniority priority를 함께 봅니다. `senior`와 `engineer`가 같이 있는 JD는 `mid`로 잘못 내려가지 않습니다.
 - `mid ↔ senior`는 인접 mismatch로 보고 `seniority_fit 4.0`을 주고, 더 큰 차이는 `3.0`으로 둡니다.
@@ -73,6 +74,10 @@
 - AI tooling, inference, research 성격이 강한 팀 신호를 company signal에서 추가로 반영합니다.
 - generic `data` 키워드는 Data-Platform과 충돌이 커서 직접 match keyword에서 제외했습니다.
 - `model serving`, `inference`, `llmops`, `embeddings`, `eval` 같은 specialization keyword가 강하면 같은 Data domain 안에서도 Data-AI를 우선합니다.
+- `Platform`과 `Data` domain이 near-tie인 경우에도 위 anchor가 충분히 강하면 `AI Infrastructure`처럼 infra 단어가 섞인 JD를 Data-AI 쪽으로 유지합니다.
+- `Data Platform SRE`, `Analytics Infrastructure`처럼 infra 운영 단어가 섞여도 data pipeline/warehouse/streaming 문맥이 총합에서 더 강하면 `Data-Platform`으로 유지합니다.
+- 반대로 `DevOps Engineer`처럼 ops title이 전면에 있고 Kubernetes/Terraform/observability/runtime 운영이 더 강한 JD는 data 문맥이 일부 섞여 있어도 `Platform`으로 남길 수 있습니다.
+- `MLOps Engineer`처럼 title이 애매해도 model serving / inference / eval / llmops 신호가 강하면 `Data-AI`로 유지합니다.
 
 ### Data-Platform
 

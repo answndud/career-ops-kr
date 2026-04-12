@@ -100,6 +100,25 @@ def _detect_compensation_signal(text: str) -> float:
     return 4.0 if any(keyword in text for keyword in compensation_keywords) else 2.0
 
 
+def _detect_unsupported_role_family(title_text: str, rules: dict[str, list[str]]) -> str | None:
+    matches: list[tuple[int, str]] = []
+    label_overrides = {
+        "product_design": "Product Design",
+        "qa": "QA",
+        "embedded": "Embedded",
+        "game_client": "Game Client",
+    }
+    for label, keywords in rules.items():
+        count = _count_matches(title_text, [keyword.lower() for keyword in keywords])
+        if count <= 0:
+            continue
+        matches.append((count, label))
+    if not matches:
+        return None
+    selected_label = max(matches, key=lambda item: item[0])[1]
+    return label_overrides.get(selected_label, selected_label.replace("_", " ").strip())
+
+
 def _weighted_average(scores: dict[str, float], weights: dict[str, int]) -> float:
     total_weight = sum(weights.values())
     weighted = sum(scores[key] * weight for key, weight in weights.items())
@@ -198,7 +217,8 @@ def _select_role_domain(
             ]
             selected_tie_break_score = _count_matches(job_text, selected_tie_break_keywords)
             second_tie_break_score = _count_matches(job_text, second_tie_break_keywords)
-            if second_tie_break_score > selected_tie_break_score:
+            # Do not overturn the total-signal winner on a one-keyword tie-break wobble.
+            if second_tie_break_score >= selected_tie_break_score + 2:
                 selected_domain = second_domain
                 total_score = second_total_score
     if total_score <= 0 or total_ratio < 0.12:
@@ -316,24 +336,37 @@ def score_job_file(
         scorecard = load_yaml(scorecard_path)
         metadata, content = parse_front_matter(target_job_path)
         lower = content.lower()
+        title_text = str(metadata.get("title") or target_job_path.stem).lower()
         role_profiles = scorecard.get("role_profiles", {})
         domains = scorecard.get("domains", {})
-        selected_domain = _select_role_domain(
-            lower,
-            profile.get("target_roles", []),
-            role_profiles,
-            domains,
+        unsupported_role_family = _detect_unsupported_role_family(
+            title_text,
+            scorecard["rules"].get("unsupported_role_family_keywords", {}),
         )
-        selected_specialization = _select_data_specialization(lower, role_profiles) if selected_domain == "data" else None
-        selected_domain_label = domains.get(selected_domain, {}).get("label", "General") if selected_domain else "General"
+        if unsupported_role_family:
+            selected_domain = None
+            selected_specialization = None
+            selected_domain_label = "General"
+            selected_role_profile = None
+            selected_role_name = None
+            role_candidate_scores: list[tuple[str, int]] = []
+        else:
+            selected_domain = _select_role_domain(
+                lower,
+                profile.get("target_roles", []),
+                role_profiles,
+                domains,
+            )
+            selected_specialization = _select_data_specialization(lower, role_profiles) if selected_domain == "data" else None
+            selected_domain_label = domains.get(selected_domain, {}).get("label", "General") if selected_domain else "General"
 
-        selected_role_profile, selected_role_name, role_candidate_scores = _select_role_profile(
-            lower,
-            profile.get("target_roles", []),
-            role_profiles,
-            allowed_domain=selected_domain,
-            preferred_profile_key=selected_specialization,
-        )
+            selected_role_profile, selected_role_name, role_candidate_scores = _select_role_profile(
+                lower,
+                profile.get("target_roles", []),
+                role_profiles,
+                allowed_domain=selected_domain,
+                preferred_profile_key=selected_specialization,
+            )
         selected_role_label = selected_role_profile.get("label", "General") if selected_role_profile else "General"
         selected_weights = selected_role_profile.get("weights", scorecard["weights"]) if selected_role_profile else scorecard["weights"]
         selected_stack_keywords = selected_role_profile.get("stack_keywords", []) if selected_role_profile else []
@@ -460,6 +493,7 @@ def score_job_file(
             f"- Selected Domain: {selected_domain_label}",
             f"- Selected Target Role: {selected_target_role_name}",
             f"- Selected Role Profile: {selected_role_label}",
+            *( [f"- Unsupported Role Family: {unsupported_role_family}"] if unsupported_role_family else [] ),
             f"- Total Score: {total_score}/5",
             f"- Recommendation: {recommendation}",
             f"- Seniority Signal: {seniority}",

@@ -14,6 +14,47 @@ SCORECARD = ROOT / "config/scorecard.kr.yml"
 
 
 class ScoreJobFileTest(unittest.TestCase):
+    def _score_realistic_sample(self, sample_key: str, slug: str):
+        sample = REALISTIC_JD_SAMPLES[sample_key]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            job_path = temp_path / f"{slug}.md"
+            job_path.write_text(
+                "\n".join(
+                    [
+                        "---",
+                        f'title: "{sample["title"]}"',
+                        f'url: "https://example.com/jobs/{slug}"',
+                        'source: "fixture"',
+                        "---",
+                        "",
+                        f'# {sample["title"]}',
+                        "",
+                        sample["body"],
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            artifacts = score_job_file(
+                job_path,
+                report_dir=temp_path / "reports",
+                tracker_dir=temp_path / "tracker-additions",
+                profile_path=PROFILE_EXAMPLE,
+                scorecard_path=SCORECARD,
+            )
+            report = artifacts.report_path.read_text(encoding="utf-8")
+        return artifacts, report
+
+    def _assert_realistic_general_fixture(self, sample_key: str, slug: str, unsupported_family: str | None = None) -> None:
+        artifacts, report = self._score_realistic_sample(sample_key, slug)
+        self.assertIn("Selected Domain: General", report)
+        self.assertIn("Selected Role Profile: General", report)
+        if unsupported_family:
+            self.assertIn(f"Unsupported Role Family: {unsupported_family}", report)
+        self.assertLess(artifacts.total_score, 3.5)
+
     def test_score_job_file_writes_report_and_tracker_addition(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -700,6 +741,80 @@ class ScoreJobFileTest(unittest.TestCase):
             self.assertGreaterEqual(artifacts.total_score, 3.0)
             self.assertLess(artifacts.total_score, 4.0)
 
+    def test_score_job_file_prefers_data_ai_for_ai_infrastructure_jd(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            job_path = temp_path / "ai-infrastructure.md"
+            job_path.write_text(
+                "\n".join(
+                    [
+                        "---",
+                        'title: "AI Infrastructure Engineer"',
+                        'url: "https://example.com/jobs/ai-infrastructure"',
+                        'source: "manual"',
+                        "---",
+                        "",
+                        "# AI Infrastructure Engineer",
+                        "",
+                        "AI Infrastructure Engineer building llmops, model serving, inference pipelines, embeddings retrieval, kubernetes, terraform, and observability for production AI products.",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            artifacts = score_job_file(
+                job_path,
+                report_dir=temp_path / "reports",
+                tracker_dir=temp_path / "tracker-additions",
+                profile_path=PROFILE_EXAMPLE,
+                scorecard_path=SCORECARD,
+            )
+
+            report = artifacts.report_path.read_text(encoding="utf-8")
+            self.assertIn("Selected Domain: Data", report)
+            self.assertIn("Selected Target Role: Applied AI Engineer", report)
+            self.assertIn("Selected Role Profile: Data-AI", report)
+            self.assertGreaterEqual(artifacts.total_score, 3.0)
+            self.assertLess(artifacts.total_score, 4.5)
+
+    def test_score_job_file_prefers_data_platform_for_data_platform_sre_jd(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            job_path = temp_path / "data-platform-sre.md"
+            job_path.write_text(
+                "\n".join(
+                    [
+                        "---",
+                        'title: "Data Platform SRE"',
+                        'url: "https://example.com/jobs/data-platform-sre"',
+                        'source: "manual"',
+                        "---",
+                        "",
+                        "# Data Platform SRE",
+                        "",
+                        "Data Platform SRE operating airflow runtime, warehouse workflows, spark jobs, kafka streaming, data pipeline reliability, kubernetes, terraform, and observability for analytics systems.",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            artifacts = score_job_file(
+                job_path,
+                report_dir=temp_path / "reports",
+                tracker_dir=temp_path / "tracker-additions",
+                profile_path=PROFILE_EXAMPLE,
+                scorecard_path=SCORECARD,
+            )
+
+            report = artifacts.report_path.read_text(encoding="utf-8")
+            self.assertIn("Selected Domain: Data", report)
+            self.assertIn("Selected Target Role: Data Platform Engineer", report)
+            self.assertIn("Selected Role Profile: Data-Platform", report)
+            self.assertGreaterEqual(artifacts.total_score, 3.0)
+            self.assertLess(artifacts.total_score, 4.5)
+
     def test_score_job_file_prefers_platform_for_platform_heavy_ml_platform_jd(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -1322,6 +1437,191 @@ class ScoreJobFileTest(unittest.TestCase):
             self.assertGreaterEqual(artifacts.total_score, 3.0)
             self.assertLess(artifacts.total_score, 4.5)
 
+    def test_score_job_file_scores_realistic_ai_infrastructure_fixture_as_data_ai(self) -> None:
+        sample = REALISTIC_JD_SAMPLES["ai_infrastructure_llmops"]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            job_path = temp_path / "realistic-ai-infrastructure.md"
+            job_path.write_text(
+                "\n".join(
+                    [
+                        "---",
+                        f'title: "{sample["title"]}"',
+                        'url: "https://example.com/jobs/realistic-ai-infrastructure"',
+                        'source: "fixture"',
+                        "---",
+                        "",
+                        f'# {sample["title"]}',
+                        "",
+                        sample["body"],
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            artifacts = score_job_file(
+                job_path,
+                report_dir=temp_path / "reports",
+                tracker_dir=temp_path / "tracker-additions",
+                profile_path=PROFILE_EXAMPLE,
+                scorecard_path=SCORECARD,
+            )
+
+            report = artifacts.report_path.read_text(encoding="utf-8")
+            self.assertIn("Selected Domain: Data", report)
+            self.assertIn("Selected Role Profile: Data-AI", report)
+            self.assertGreaterEqual(artifacts.total_score, 3.0)
+            self.assertLess(artifacts.total_score, 4.5)
+
+    def test_score_job_file_scores_realistic_data_platform_sre_fixture_as_data_platform(self) -> None:
+        sample = REALISTIC_JD_SAMPLES["data_platform_sre_observability"]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            job_path = temp_path / "realistic-data-platform-sre.md"
+            job_path.write_text(
+                "\n".join(
+                    [
+                        "---",
+                        f'title: "{sample["title"]}"',
+                        'url: "https://example.com/jobs/realistic-data-platform-sre"',
+                        'source: "fixture"',
+                        "---",
+                        "",
+                        f'# {sample["title"]}',
+                        "",
+                        sample["body"],
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            artifacts = score_job_file(
+                job_path,
+                report_dir=temp_path / "reports",
+                tracker_dir=temp_path / "tracker-additions",
+                profile_path=PROFILE_EXAMPLE,
+                scorecard_path=SCORECARD,
+            )
+
+            report = artifacts.report_path.read_text(encoding="utf-8")
+            self.assertIn("Selected Domain: Data", report)
+            self.assertIn("Selected Role Profile: Data-Platform", report)
+            self.assertGreaterEqual(artifacts.total_score, 3.0)
+            self.assertLess(artifacts.total_score, 4.5)
+
+    def test_score_job_file_scores_realistic_analytics_infra_fixture_as_data_platform(self) -> None:
+        sample = REALISTIC_JD_SAMPLES["analytics_infrastructure_experimentation"]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            job_path = temp_path / "realistic-analytics-infrastructure.md"
+            job_path.write_text(
+                "\n".join(
+                    [
+                        "---",
+                        f'title: "{sample["title"]}"',
+                        'url: "https://example.com/jobs/realistic-analytics-infrastructure"',
+                        'source: "fixture"',
+                        "---",
+                        "",
+                        f'# {sample["title"]}',
+                        "",
+                        sample["body"],
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            artifacts = score_job_file(
+                job_path,
+                report_dir=temp_path / "reports",
+                tracker_dir=temp_path / "tracker-additions",
+                profile_path=PROFILE_EXAMPLE,
+                scorecard_path=SCORECARD,
+            )
+
+            report = artifacts.report_path.read_text(encoding="utf-8")
+            self.assertIn("Selected Domain: Data", report)
+            self.assertIn("Selected Role Profile: Data-Platform", report)
+            self.assertGreaterEqual(artifacts.total_score, 3.0)
+            self.assertLess(artifacts.total_score, 4.5)
+
+    def test_score_job_file_scores_realistic_devops_data_platform_fixture_as_platform(self) -> None:
+        sample = REALISTIC_JD_SAMPLES["devops_data_platform_foundations"]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            job_path = temp_path / "realistic-devops-data-platform.md"
+            job_path.write_text(
+                "\n".join(
+                    [
+                        "---",
+                        f'title: "{sample["title"]}"',
+                        'url: "https://example.com/jobs/realistic-devops-data-platform"',
+                        'source: "fixture"',
+                        "---",
+                        "",
+                        f'# {sample["title"]}',
+                        "",
+                        sample["body"],
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            artifacts = score_job_file(
+                job_path,
+                report_dir=temp_path / "reports",
+                tracker_dir=temp_path / "tracker-additions",
+                profile_path=PROFILE_EXAMPLE,
+                scorecard_path=SCORECARD,
+            )
+
+            report = artifacts.report_path.read_text(encoding="utf-8")
+            self.assertIn("Selected Domain: Platform", report)
+            self.assertIn("Selected Role Profile: Platform", report)
+            self.assertGreaterEqual(artifacts.total_score, 3.0)
+            self.assertLess(artifacts.total_score, 4.5)
+
+    def test_score_job_file_scores_realistic_mlops_fixture_as_data_ai(self) -> None:
+        sample = REALISTIC_JD_SAMPLES["mlops_inference_runtime"]
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            job_path = temp_path / "realistic-mlops.md"
+            job_path.write_text(
+                "\n".join(
+                    [
+                        "---",
+                        f'title: "{sample["title"]}"',
+                        'url: "https://example.com/jobs/realistic-mlops"',
+                        'source: "fixture"',
+                        "---",
+                        "",
+                        f'# {sample["title"]}',
+                        "",
+                        sample["body"],
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            artifacts = score_job_file(
+                job_path,
+                report_dir=temp_path / "reports",
+                tracker_dir=temp_path / "tracker-additions",
+                profile_path=PROFILE_EXAMPLE,
+                scorecard_path=SCORECARD,
+            )
+
+            report = artifacts.report_path.read_text(encoding="utf-8")
+            self.assertIn("Selected Domain: Data", report)
+            self.assertIn("Selected Role Profile: Data-AI", report)
+            self.assertGreaterEqual(artifacts.total_score, 3.0)
+            self.assertLess(artifacts.total_score, 4.5)
+
     def test_score_job_file_scores_realistic_frontend_fixture_as_general(self) -> None:
         sample = REALISTIC_JD_SAMPLES["frontend_next_typescript"]
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1393,6 +1693,34 @@ class ScoreJobFileTest(unittest.TestCase):
             self.assertIn("Selected Domain: General", report)
             self.assertIn("Selected Role Profile: General", report)
             self.assertLess(artifacts.total_score, 3.5)
+
+    def test_score_job_file_scores_realistic_product_design_fixture_as_general(self) -> None:
+        self._assert_realistic_general_fixture(
+            "product_designer_design_system",
+            "realistic-product-design",
+            unsupported_family="Product Design",
+        )
+
+    def test_score_job_file_scores_realistic_qa_fixture_as_general(self) -> None:
+        self._assert_realistic_general_fixture(
+            "qa_automation_platform_quality",
+            "realistic-qa-automation",
+            unsupported_family="QA",
+        )
+
+    def test_score_job_file_scores_realistic_embedded_fixture_as_general(self) -> None:
+        self._assert_realistic_general_fixture(
+            "embedded_firmware_iot",
+            "realistic-embedded-firmware",
+            unsupported_family="Embedded",
+        )
+
+    def test_score_job_file_scores_realistic_game_client_fixture_as_general(self) -> None:
+        self._assert_realistic_general_fixture(
+            "game_client_unity_liveops",
+            "realistic-game-client",
+            unsupported_family="Game Client",
+        )
 
     def test_score_job_file_scores_realistic_ml_research_fixture_as_data_ai(self) -> None:
         sample = REALISTIC_JD_SAMPLES["generative_ai_research_engineer"]

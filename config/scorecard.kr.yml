@@ -51,6 +51,38 @@ rules:
     en:
       - english
       - 영어
+  unsupported_role_family_keywords:
+    product_design:
+      - product designer
+      - ux designer
+      - ui designer
+      - product design
+      - visual designer
+      - designer
+    qa:
+      - qa engineer
+      - qa automation
+      - quality assurance
+      - test engineer
+      - software test
+      - sdet
+    embedded:
+      - embedded engineer
+      - embedded software
+      - firmware engineer
+      - firmware
+      - rtos
+      - mcu
+      - microcontroller
+      - device driver
+    game_client:
+      - game client
+      - client programmer
+      - gameplay engineer
+      - unity developer
+      - unreal engineer
+      - graphics engineer
+      - rendering engineer
 
 domains:
   backend:
@@ -130,6 +162,13 @@ domains:
       - spark
       - dbt
       - data pipeline
+      - model serving
+      - inference
+      - llm
+      - rag
+      - eval
+      - embeddings
+      - llmops
 
 role_profiles:
   backend:
