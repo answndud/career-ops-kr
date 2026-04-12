@@ -25,6 +25,15 @@
   - 기본 discover에서는 skip되고 `CAREER_OPS_RUN_BROWSER_E2E=1`일 때만 실행
   - 기본 회귀 기준은 `tests.test_web`, `unittest discover`, `verify`
 - tracker, report, output 디렉터리 워크플로우 유지
+  - repo-level 운영 점검 helper 1차 추가 완료
+  - `career-ops-kr ops-check`
+  - `verify`, `audit-jobs`, saved live smoke report health를 한 번에 묶는 운영 헬스 체크 surface 추가
+  - live smoke report가 없으면 기본은 `skip`, `--require-live-smoke`로 강제 gate 지원
+  - artifact inventory audit helper 1차 추가 완료
+  - `career-ops-kr audit-artifacts`
+  - tracker와 무관하게 output root의 legacy HTML, manifest referenced file 누락, artifact-index drift를 점검
+  - legacy artifact 운영 기준 1차 문서화 완료
+  - archive성 산출물은 `audit-artifacts + backfill`, 활성 산출물은 새 build 경로 재생성 기준으로 정리
 - tracker audit helper 1차 완료
   - `career-ops-kr audit-jobs`
   - tracker row 기준 report/resume 누락과 `output/` 아래 legacy HTML, manifest path drift, artifact-index drift를 함께 점검
@@ -32,6 +41,7 @@
 - README, docs, AGENTS 문서 동기화
   - 초보자용 전체 README 가이드 작성 완료
   - README에 웹 3단계 시작 루트, 웹 기본 루트, DB backup/export/import 설명 보강 완료
+  - AGENTS 최종 보고 기본 규칙을 `변경 이유 + 변경 파일 + 다음 작업` 중심으로 조정하고, 검증/리스크는 요청 시에만 보고하도록 정리
   - 이후 CLI 표면이 바뀌면 README 예시 명령도 함께 갱신
 - git hygiene 유지
   - 생성 산출물은 `.gitignore`와 `.gitkeep` 기준으로 버전 관리에서 제외
@@ -308,6 +318,15 @@
     - `specialization_keywords`로 `Data-Platform` vs `Data-AI` 보정
     - specialization 차이가 작으면 기존 selector로 fallback
     - feature/training pipeline vs model-serving/inference fixture 고정
+  - mixed/ambiguous JD selection 안정화 3차 완료
+    - `data` domain tie-break anchor를 `Data-Platform` + `Data-AI` 강신호까지 확장
+    - `AI Infrastructure`처럼 infra wording이 섞인 Data-AI JD가 near-tie에서 `Platform`으로 굳지 않게 보정
+  - mixed/ambiguous JD selection 안정화 4차 완료
+    - platform/data domain near-tie tie-break에 margin을 두어 one-keyword wobble로 winner가 뒤집히지 않게 조정
+    - `Data Platform SRE`, `Analytics Infrastructure` fixture를 추가해 infra-heavy data platform phrasing를 고정
+  - realistic boundary fixture 6차 완료
+    - `DevOps Engineer (Data Platform Foundations)`를 platform-heavy mixed fixture로 추가
+    - `MLOps Engineer`를 data-ai-heavy mixed fixture로 추가
   - Data domain specialization 2차 완료
     - near-tie에서 `specialization_anchor_keywords`로 한 번 더 보정
     - anchor도 애매하면 기존 selector로 fallback
@@ -327,6 +346,14 @@
     - `Next.js / React / TypeScript형 Frontend -> General fallback`
     - `Swift / SwiftUI형 iOS -> General fallback`
     - `Generative AI research / fine-tuning형 ML Research -> Data-AI`
+  - public Korean JD 기반 realistic regression fixture 5차 완료
+    - `Product Designer / design system형 -> General fallback`
+    - `QA Automation Engineer형 -> General fallback`
+    - `Embedded Software / firmware형 -> General fallback`
+    - `Game Client / Unity형 -> General fallback`
+  - unsupported 역할군 title guard 1차 완료
+    - `Product Design / QA / Embedded / Game Client` title keyword가 명확하면 억지 domain/profile 분류 전에 `General` fallback으로 내림
+    - report에 `Unsupported Role Family`를 함께 표시
   - `score-job`, `process-pipeline --score`의 `--profile-path`, `--scorecard-path` override 완료
   - `tests/test_cli.py`로 `score-job`, `process-pipeline --score` override CLI coverage 완료
   - `tests/test_cli.py`로 non-default `--scorecard-path` direct coverage 완료
