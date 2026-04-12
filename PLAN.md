@@ -109,6 +109,9 @@
     - `web/router_bindings.py`로 path-aware adapter method 묶음을 분리
     - `web/router_deps_factory.py`는 route deps dataclass mapping 전용으로 더 축소
     - web assembler 계층을 `app.py -> router_deps_factory.py -> router_bindings.py`로 정리
+  - web DB legacy cleanup regression 추가
+    - `connection_scope()/init_schema()`가 기존 DB의 `ai_outputs` legacy table을 실제로 제거하는지 테스트로 고정
+    - AI surface 제거 이후 schema migration이 다시 깨지지 않게 유지
 - resume 구조 개선 1차 완료
     - `resume_pipeline/models.py`로 resume/live-smoke dataclass 분리
     - `resume_pipeline/artifacts.py`로 manifest/index/backfill helper 분리

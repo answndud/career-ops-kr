@@ -220,6 +220,9 @@
     - legacy `ai_outputs` table은 schema init 시 자동 삭제
     - backup/export/import 디렉터리는 그룹별 최신 파일만 남기도록 prune 추가
     - `tests/test_web.py`에 backup/export/import roundtrip 회귀 유지
+  - web DB legacy cleanup regression 추가
+    - `tests/test_web.py`에 기존 DB에 `ai_outputs` table이 남아 있어도 `connection_scope()/init_schema()`가 자동으로 제거하는 회귀 추가
+    - AI surface 제거 후에도 schema migration이 실제 DB에서 유지되는지 고정
   - web 구조 개선 1차 완료
     - `src/career_ops_kr/web/common.py`
     - `src/career_ops_kr/web/artifacts.py`

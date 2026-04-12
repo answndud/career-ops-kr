@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import os
 import json
+import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from datetime import date, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -65,6 +67,7 @@ class WebAppTests(unittest.TestCase):
         self.addCleanup(self.report_dir_patch.stop)
 
         self.client = TestClient(web_app.create_app())
+        self.addCleanup(self.client.close)
 
     def test_pages_render(self) -> None:
         for route in ("/", "/search", "/follow-ups", "/settings", "/resume", "/tracker", "/artifacts"):
@@ -1304,6 +1307,33 @@ class WebAppTests(unittest.TestCase):
         with connection_scope() as conn:
             restored = conn.execute("SELECT value FROM settings WHERE key = ?", ("IMPORTED_TEST_KEY",)).fetchone()
         self.assertEqual(restored["value"], "restored-value")
+
+    def test_connection_scope_drops_legacy_ai_outputs_table(self) -> None:
+        with closing(sqlite3.connect(self.db_path)) as raw_conn:
+            raw_conn.execute(
+                """
+                CREATE TABLE ai_outputs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    type TEXT NOT NULL,
+                    job_id INTEGER,
+                    input_json TEXT NOT NULL,
+                    output TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                )
+                """
+            )
+            raw_conn.commit()
+
+        with connection_scope() as conn:
+            legacy_table = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ai_outputs'"
+            ).fetchone()
+            jobs_table = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'jobs'"
+            ).fetchone()
+
+        self.assertIsNone(legacy_table)
+        self.assertIsNotNone(jobs_table)
 
     def test_settings_page_surfaces_live_smoke_summary(self) -> None:
         live_smoke_dir = self.output_dir / "live-smoke"
