@@ -446,6 +446,8 @@ career-ops-kr prepare-company-followup research/<brief>.md --mode summary
 - `career-ops-kr ops-check`
   verify, tracker/output audit, saved live smoke report health를 한 번에 점검
   기본은 compact summary만 보여주고, per-target 상세가 필요하면 `--verbose` 사용
+  운영 기록을 남기고 싶으면 `--snapshot-out output/ops-check/latest.json` 같이 JSON snapshot 저장 가능
+  snapshot 파일을 누적 보관하고 싶으면 `--snapshot-dir output/ops-check`로 auto-named JSON 기록 생성 가능
 - `career-ops-kr build-tailored-resume-from-url ...`
   공고 URL 하나로 바로 이력서 만들기
 - `career-ops-kr prepare-company-research <company>`

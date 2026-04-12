@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -74,6 +75,51 @@ class OpsCheckResult:
                 "entries": [_live_smoke_entry_to_dict(entry) for entry in self.live_smoke_entries],
             },
         }
+
+
+def build_ops_check_snapshot(
+    result: OpsCheckResult,
+    *,
+    generated_at: datetime | None = None,
+    tracker_path: Path,
+    repo_root: Path,
+    output_dir: Path,
+    include_live_smoke: bool,
+    require_live_smoke: bool,
+    live_smoke_dir: Path,
+    live_smoke_targets_path: Path,
+    live_smoke_recursive: bool,
+    live_smoke_max_age_hours: float,
+    live_smoke_report_type: str | None,
+    live_smoke_target: str | None,
+) -> dict[str, Any]:
+    snapshot_generated_at = generated_at or datetime.now(UTC)
+    return {
+        "snapshot_version": 1,
+        "generated_at": snapshot_generated_at.isoformat(),
+        "command": "ops-check",
+        "inputs": {
+            "tracker_path": tracker_path.as_posix(),
+            "repo_root": repo_root.as_posix(),
+            "output_dir": output_dir.as_posix(),
+            "live_smoke": {
+                "enabled": include_live_smoke,
+                "required": require_live_smoke,
+                "dir": live_smoke_dir.as_posix(),
+                "targets_path": live_smoke_targets_path.as_posix(),
+                "recursive": live_smoke_recursive,
+                "max_age_hours": live_smoke_max_age_hours,
+                "report_type": live_smoke_report_type,
+                "target": live_smoke_target,
+            },
+        },
+        "result": result.to_dict(),
+    }
+
+
+def build_ops_check_snapshot_filename(*, generated_at: datetime, ok: bool) -> str:
+    status = "ok" if ok else "fail"
+    return f"ops-check-{generated_at.strftime('%Y%m%dT%H%M%SZ')}-{status}.json"
 
 
 def run_ops_check(

@@ -30,6 +30,8 @@
   - `verify`, `audit-jobs`, saved live smoke report health를 한 번에 묶는 운영 헬스 체크 surface 추가
   - live smoke report가 없으면 기본은 `skip`, `--require-live-smoke`로 강제 gate 지원
   - text 출력은 compact summary를 기본으로 유지하고, 상세 verify/audit/live smoke entry는 `--verbose`일 때만 펼치도록 정리
+  - `--snapshot-out`으로 실행 입력과 결과를 JSON 운영 snapshot으로 저장 가능하게 정리
+  - `--snapshot-dir`로 UTC timestamp 기반 auto-named 운영 snapshot을 누적 저장 가능하게 정리
   - artifact inventory audit helper 1차 추가 완료
   - `career-ops-kr audit-artifacts`
   - tracker와 무관하게 output root의 legacy HTML, manifest referenced file 누락, artifact-index drift를 점검
@@ -340,6 +342,9 @@
   - scoring explainability 3차 완료
     - score report에 `Domain Selection Note`, `Role Selection Note`를 추가해 near-tie tie-break, preferred specialization, General fallback 이유를 한 줄로 설명
     - grouped signal 재설계가 필요한지 판단하기 전에 현재 selection policy를 보고서만으로 재검토할 수 있게 정리
+  - 실제 저장된 mixed JD review 1차 완료
+    - 현재 repo의 `jds/`, tracker, web DB `jobs`에 실데이터가 없어 real-case scorecard 재판단은 보류
+    - 현재 explainability surface를 유지하고, 실제 JD가 쌓인 뒤 다시 grouped signal 재설계 필요성을 판단
   - Data domain specialization 2차 완료
     - near-tie에서 `specialization_anchor_keywords`로 한 번 더 보정
     - anchor도 애매하면 기존 selector로 fallback

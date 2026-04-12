@@ -719,6 +719,170 @@ class OpsCheckCliTest(unittest.TestCase):
         self.assertIn("- OK remember_platform_ko", result.output)
         self.assertIn("- MISSING wanted_backend_ko", result.output)
 
+    def test_ops_check_snapshot_out_writes_snapshot_even_on_failure(self) -> None:
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            tracker_path = temp_path / "applications.md"
+            snapshot_path = temp_path / "ops-check" / "latest.json"
+            tracker_path.write_text(
+                "\n".join(
+                    [
+                        "# Applications Tracker",
+                        "",
+                        "| ID | Date | Company | Role | Score | Status | Source | Resume | Report | Notes |",
+                        "|----|------|---------|------|-------|--------|--------|--------|--------|-------|",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            targets_path = _write_test_live_smoke_targets_yaml(temp_path)
+            now = datetime.now(UTC)
+            (temp_path / "single.json").write_text(
+                json.dumps(
+                    {
+                        "generated_at": now.isoformat(),
+                        "targets_path": targets_path.as_posix(),
+                        "target": "remember_platform_ko",
+                        "selected_url": "https://career.rememberapp.co.kr/job/posting/293599",
+                        "candidate_label": "primary",
+                        "used_fallback": False,
+                        "cleaned": True,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = runner.invoke(
+                app,
+                [
+                    "ops-check",
+                    "--tracker-path",
+                    tracker_path.as_posix(),
+                    "--repo-root",
+                    temp_path.as_posix(),
+                    "--output-dir",
+                    temp_path.as_posix(),
+                    "--live-smoke-dir",
+                    temp_path.as_posix(),
+                    "--live-smoke-targets-path",
+                    targets_path.as_posix(),
+                    "--snapshot-out",
+                    snapshot_path.as_posix(),
+                ],
+            )
+
+            self.assertEqual(1, result.exit_code, msg=result.output)
+            self.assertIn(f"Snapshot: {snapshot_path.as_posix()}", result.output)
+            self.assertTrue(snapshot_path.exists())
+
+            payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(1, payload["snapshot_version"])
+        self.assertEqual("ops-check", payload["command"])
+        self.assertEqual(tracker_path.as_posix(), payload["inputs"]["tracker_path"])
+        self.assertEqual(temp_path.as_posix(), payload["inputs"]["repo_root"])
+        self.assertEqual(temp_path.as_posix(), payload["inputs"]["output_dir"])
+        self.assertTrue(payload["inputs"]["live_smoke"]["enabled"])
+        self.assertFalse(payload["inputs"]["live_smoke"]["required"])
+        self.assertEqual(temp_path.as_posix(), payload["inputs"]["live_smoke"]["dir"])
+        self.assertEqual(targets_path.as_posix(), payload["inputs"]["live_smoke"]["targets_path"])
+        self.assertFalse(payload["result"]["ok"])
+        self.assertEqual("failing", payload["result"]["live_smoke"]["status"])
+        self.assertEqual(1, payload["result"]["live_smoke"]["counts"]["ok"])
+        self.assertEqual(1, payload["result"]["live_smoke"]["counts"]["missing"])
+        self.assertIn("generated_at", payload)
+
+    def test_ops_check_snapshot_dir_writes_timestamped_snapshot_file(self) -> None:
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            tracker_path = temp_path / "applications.md"
+            snapshot_dir = temp_path / "ops-snapshots"
+            output_dir = temp_path / "output"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            tracker_path.write_text(
+                "\n".join(
+                    [
+                        "# Applications Tracker",
+                        "",
+                        "| ID | Date | Company | Role | Score | Status | Source | Resume | Report | Notes |",
+                        "|----|------|---------|------|-------|--------|--------|--------|--------|-------|",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = runner.invoke(
+                app,
+                [
+                    "ops-check",
+                    "--tracker-path",
+                    tracker_path.as_posix(),
+                    "--repo-root",
+                    temp_path.as_posix(),
+                    "--output-dir",
+                    output_dir.as_posix(),
+                    "--live-smoke-dir",
+                    output_dir.as_posix(),
+                    "--snapshot-dir",
+                    snapshot_dir.as_posix(),
+                ],
+            )
+
+            self.assertEqual(0, result.exit_code, msg=result.output)
+            snapshot_files = sorted(snapshot_dir.glob("*.json"))
+            self.assertEqual(1, len(snapshot_files))
+            snapshot_path = snapshot_files[0]
+            self.assertTrue(snapshot_path.name.startswith("ops-check-"))
+            self.assertTrue(snapshot_path.name.endswith("-ok.json"))
+            self.assertIn(f"Snapshot: {snapshot_path.as_posix()}", result.output)
+
+            payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+
+        self.assertTrue(payload["result"]["ok"])
+        self.assertEqual(output_dir.as_posix(), payload["inputs"]["output_dir"])
+        self.assertEqual("skipped", payload["result"]["live_smoke"]["status"])
+
+    def test_ops_check_rejects_snapshot_out_and_snapshot_dir_together(self) -> None:
+        runner = CliRunner()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            tracker_path = temp_path / "applications.md"
+            tracker_path.write_text(
+                "\n".join(
+                    [
+                        "# Applications Tracker",
+                        "",
+                        "| ID | Date | Company | Role | Score | Status | Source | Resume | Report | Notes |",
+                        "|----|------|---------|------|-------|--------|--------|--------|--------|-------|",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = runner.invoke(
+                app,
+                [
+                    "ops-check",
+                    "--tracker-path",
+                    tracker_path.as_posix(),
+                    "--snapshot-out",
+                    (temp_path / "one.json").as_posix(),
+                    "--snapshot-dir",
+                    (temp_path / "snapshots").as_posix(),
+                ],
+            )
+
+        self.assertNotEqual(0, result.exit_code)
+        self.assertIn("Use either --snapshot-out or --snapshot-dir, not both.", result.output)
+
     def test_ops_check_json_fails_for_stale_or_missing_live_smoke_targets(self) -> None:
         runner = CliRunner()
         with tempfile.TemporaryDirectory() as temp_dir:

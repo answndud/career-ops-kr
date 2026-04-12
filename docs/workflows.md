@@ -65,7 +65,7 @@
 - `career-ops-kr verify`: 필수 파일, 중복, 누락 링크 검사
 - `career-ops-kr audit-jobs`: tracker row와 `output/` 산출물을 같이 점검해 report/resume 누락, manifest referenced file 누락, artifact-index drift, legacy HTML을 출력
 - `career-ops-kr audit-artifacts`: `output/` 산출물만 따로 점검해 legacy HTML, manifest referenced file 누락, artifact-index drift를 출력
-- `career-ops-kr ops-check`: `verify`, `audit-jobs`, saved live smoke report health를 한 번에 묶어 운영 체크를 수행함. 기본 text 출력은 compact summary이고, verify/audit/live smoke의 상세 entry가 필요하면 `--verbose`를 사용함. live smoke report가 없으면 기본은 `skip`으로 처리하고, `--require-live-smoke`를 주면 그 자체를 실패로 간주함
+- `career-ops-kr ops-check`: `verify`, `audit-jobs`, saved live smoke report health를 한 번에 묶어 운영 체크를 수행함. 기본 text 출력은 compact summary이고, verify/audit/live smoke의 상세 entry가 필요하면 `--verbose`를 사용함. live smoke report가 없으면 기본은 `skip`으로 처리하고, `--require-live-smoke`를 주면 그 자체를 실패로 간주함. 운영 기록이 필요하면 `--snapshot-out <path>.json`으로 실행 입력과 결과를 JSON snapshot으로 남기거나, `--snapshot-dir <dir>`로 auto-named snapshot을 누적 저장함
 - `career-ops-kr process-pipeline`: pending URL을 fetch하고, 선택적으로 score/report/addition까지 생성한 뒤 성공한 항목만 처리 완료로 표시
 - `career-ops-kr score-job`: 저장된 JD를 다시 점수화하고 `--tracker-out`, `--profile-path`, `--scorecard-path`로 출력과 scoring 입력을 제어할 수 있음
 - `career-ops-kr prepare-resume-tailoring`: 저장된 JD와 score report를 resume tailoring JSON packet으로 구조화하고, 필요하면 `--base-context`로 현재 resume context와의 gap도 계산함

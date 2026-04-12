@@ -123,6 +123,9 @@
   - `src/career_ops_kr/scoring.py`가 `Domain Selection Note`, `Role Selection Note`를 함께 출력해 near-tie tie-break, preferred specialization, General fallback 이유를 한 줄로 설명
   - `tests/test_scoring.py`에 mixed tie-break / preferred specialization / General fallback note 회귀 추가
   - `docs/scoring-kr.md`에 selection note 의미를 문서화
+- 실제 저장된 mixed JD review 1차 정리
+  - repo의 `jds/`, `data/applications.md`, `data/career-ops-web.db` `jobs`/`resumes`를 확인했지만 실제 저장된 JD/공고 데이터는 비어 있는 상태
+  - 따라서 scorecard의 grouped signal 재설계는 진행하지 않고, 현재 explainability surface를 유지한 채 실제 JD가 쌓인 뒤 다시 판단하기로 정리
 - repo-level ops check helper 1차 추가
   - `career-ops-kr ops-check`
   - `src/career_ops_kr/commands/ops.py`, `src/career_ops_kr/commands/ops_cli.py`
@@ -133,6 +136,14 @@
   - `src/career_ops_kr/commands/ops_cli.py` 기본 text 출력이 compact summary만 보여주고, 상세 verify/audit/live smoke entry는 `--verbose`에서만 펼치도록 조정
   - live smoke summary line에 target 수와 nonzero status count를 같이 표시
   - `tests/test_cli.py`에 verbose detail 출력 회귀 추가
+- repo-level ops check helper 3차 정리
+  - `src/career_ops_kr/commands/ops.py`에 실행 입력과 결과를 함께 담는 snapshot payload helper 추가
+  - `src/career_ops_kr/commands/ops_cli.py`가 `--snapshot-out`으로 ops-check JSON snapshot을 저장하고, 실패 케이스에서도 운영 기록이 남도록 정리
+  - `tests/test_cli.py`에 failing ops-check에서도 snapshot 파일이 생성되는 회귀 추가
+- repo-level ops check helper 4차 정리
+  - `src/career_ops_kr/commands/ops.py`에 UTC timestamp 기반 snapshot 파일명 helper 추가
+  - `src/career_ops_kr/commands/ops_cli.py`가 `--snapshot-dir`로 auto-named snapshot을 누적 저장하고, `--snapshot-out`과 동시 사용은 차단하도록 정리
+  - `tests/test_cli.py`에 auto-named snapshot 생성과 mutual exclusion 회귀 추가
 - artifact inventory audit helper 1차 추가
   - `career-ops-kr audit-artifacts`
   - `src/career_ops_kr/resume_pipeline/artifacts.py`, `src/career_ops_kr/commands/resume_build_cli.py`

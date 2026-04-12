@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
 
-from career_ops_kr.commands.ops import run_ops_check
+from career_ops_kr.commands.ops import (
+    build_ops_check_snapshot,
+    build_ops_check_snapshot_filename,
+    run_ops_check,
+)
 from career_ops_kr.commands.resume import DEFAULT_LIVE_SMOKE_TARGETS_PATH
 
 
@@ -150,7 +155,20 @@ def register_ops_commands(app: typer.Typer) -> None:
         ),
         as_json: bool = typer.Option(False, "--json", help="Print the ops check result as JSON."),
         verbose: bool = typer.Option(False, "--verbose", help="Print detailed verify, audit, and live smoke entries."),
+        snapshot_out: Path | None = typer.Option(
+            None,
+            "--snapshot-out",
+            help="Write an ops-check JSON snapshot to this file.",
+        ),
+        snapshot_dir: Path | None = typer.Option(
+            None,
+            "--snapshot-dir",
+            help="Write an auto-named ops-check JSON snapshot into this directory.",
+        ),
     ) -> None:
+        if snapshot_out is not None and snapshot_dir is not None:
+            raise typer.BadParameter("Use either --snapshot-out or --snapshot-dir, not both.")
+
         try:
             result = run_ops_check(
                 tracker_path=tracker_path,
@@ -168,6 +186,41 @@ def register_ops_commands(app: typer.Typer) -> None:
         except ValueError as exc:
             raise typer.BadParameter(str(exc)) from exc
 
+        snapshot_path: Path | None = snapshot_out
+        if snapshot_dir is not None:
+            generated_at = datetime.now(UTC)
+            snapshot_path = snapshot_dir / build_ops_check_snapshot_filename(
+                generated_at=generated_at,
+                ok=result.ok,
+            )
+        else:
+            generated_at = None
+
+        if snapshot_path is not None:
+            try:
+                snapshot_payload = build_ops_check_snapshot(
+                    result,
+                    generated_at=generated_at,
+                    tracker_path=tracker_path,
+                    repo_root=repo_root,
+                    output_dir=output_dir,
+                    include_live_smoke=include_live_smoke,
+                    require_live_smoke=require_live_smoke,
+                    live_smoke_dir=live_smoke_dir,
+                    live_smoke_targets_path=live_smoke_targets_path,
+                    live_smoke_recursive=live_smoke_recursive,
+                    live_smoke_max_age_hours=live_smoke_max_age_hours,
+                    live_smoke_report_type=live_smoke_report_type,
+                    live_smoke_target=live_smoke_target,
+                )
+                snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+                snapshot_path.write_text(
+                    json.dumps(snapshot_payload, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8",
+                )
+            except OSError as exc:
+                raise typer.BadParameter(f"Failed to write ops-check snapshot: {exc}") from exc
+
         if as_json:
             typer.echo(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
         else:
@@ -176,6 +229,8 @@ def register_ops_commands(app: typer.Typer) -> None:
             _print_audit_summary(result, limit=audit_limit, verbose=verbose)
             _print_live_smoke_summary(result, verbose=verbose)
             typer.echo("Overall: " + ("OK" if result.ok else "FAIL"))
+            if snapshot_path is not None:
+                typer.echo(f"Snapshot: {snapshot_path.as_posix()}")
 
         if not result.ok:
             raise typer.Exit(code=1)
