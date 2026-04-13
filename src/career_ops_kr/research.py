@@ -4,7 +4,9 @@ import json
 import re
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urljoin, urlsplit, urlunsplit
+
+import yaml
 
 from career_ops_kr.utils import ensure_dir, parse_front_matter, slugify
 
@@ -68,6 +70,206 @@ def _build_company_search_hints(company: str) -> list[str]:
     ]
 
 
+def _normalized_url(value: str | None) -> str | None:
+    if not value:
+        return None
+    parts = urlsplit(value.strip())
+    if not parts.scheme or not parts.netloc:
+        return None
+    path = parts.path or "/"
+    return urlunsplit((parts.scheme, parts.netloc, path, "", ""))
+
+
+def _url_origin(value: str | None) -> str | None:
+    normalized = _normalized_url(value)
+    if not normalized:
+        return None
+    parts = urlsplit(normalized)
+    return urlunsplit((parts.scheme, parts.netloc, "/", "", ""))
+
+
+def _job_parent_candidates(job_url: str | None) -> list[str]:
+    normalized = _normalized_url(job_url)
+    if not normalized:
+        return []
+    parts = urlsplit(normalized)
+    segments = [segment for segment in parts.path.split("/") if segment]
+    candidates: list[str] = []
+    while len(segments) > 1:
+        segments.pop()
+        candidate_path = "/" + "/".join(segments) + "/"
+        candidates.append(urlunsplit((parts.scheme, parts.netloc, candidate_path, "", "")))
+    return candidates
+
+
+def _careers_url_candidates(homepage: str | None, job_url: str | None) -> list[str]:
+    base_candidates = [
+        candidate
+        for candidate in (
+            _normalized_url(homepage),
+            _url_origin(homepage),
+            _url_origin(job_url),
+        )
+        if candidate
+    ]
+    suffixes = [
+        "career/",
+        "careers/",
+        "career/jobs/",
+        "careers/jobs/",
+        "jobs/",
+        "recruit/",
+        "recruitment/",
+    ]
+    candidates: list[str] = []
+    for base in base_candidates:
+        for suffix in suffixes:
+            candidates.append(urljoin(base, suffix))
+    candidates.extend(_job_parent_candidates(job_url))
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        normalized = _normalized_url(candidate)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(normalized)
+    return deduped
+
+
+def _build_official_url_hints(
+    company: str,
+    *,
+    homepage: str | None = None,
+    careers_url: str | None = None,
+    job_url: str | None = None,
+) -> list[str]:
+    hints: list[str] = []
+    homepage_candidate = _url_origin(job_url) if not homepage else None
+    if homepage_candidate:
+        hints.append(f"- Homepage candidate from job URL: {homepage_candidate}")
+
+    site_domain = urlsplit(homepage or job_url or "").netloc
+    if site_domain:
+        official_query = f'site:{site_domain} "{company}" (career OR careers OR jobs OR recruit)'
+        hints.append(f"- Official careers search query: {official_query}")
+        hints.append(f"- Official careers search URL: https://www.google.com/search?q={quote_plus(official_query)}")
+
+    if not careers_url:
+        career_candidates = _careers_url_candidates(homepage, job_url)
+        if career_candidates:
+            hints.append("- Likely careers URL candidates:")
+            hints.extend([f"  - {candidate}" for candidate in career_candidates[:6]])
+
+    if not hints:
+        hints.append("- Official URL candidates are not available yet. Fill homepage or job URL first.")
+    return hints
+
+
+def _structured_source_metadata(
+    *,
+    homepage: str | None = None,
+    careers_url: str | None = None,
+    job_url: str | None = None,
+    job_path: Path | None = None,
+    report_path: Path | None = None,
+    jobplanet_url: str | None = None,
+    blind_url: str | None = None,
+    extra_sources: list[tuple[str, str]] | None = None,
+) -> tuple[dict[str, object], dict[str, object]]:
+    official_sources: dict[str, object] = {
+        "homepage": homepage,
+        "careers_url": careers_url,
+        "job_url": job_url,
+        "job_path": job_path.as_posix() if job_path else None,
+        "report_path": report_path.as_posix() if report_path else None,
+        "homepage_candidate": _url_origin(job_url) if not homepage else None,
+        "careers_url_candidates": _careers_url_candidates(homepage, job_url) if not careers_url else [],
+    }
+    research_sources: dict[str, object] = {
+        "jobplanet_url": jobplanet_url,
+        "jobplanet_browse": JOBPLANET_COMPANIES_URL,
+        "blind_url": blind_url,
+        "blind_browse": BLIND_COMPANIES_URL,
+        "extra_sources": [{"label": label, "url": url} for label, url in (extra_sources or [])],
+    }
+    return official_sources, research_sources
+
+
+def _append_yaml_block(lines: list[str], key: str, value: dict[str, object]) -> None:
+    lines.append(f"{key}:")
+    dumped = yaml.safe_dump(value, allow_unicode=True, sort_keys=False, default_flow_style=False).rstrip()
+    for dumped_line in dumped.splitlines():
+        lines.append(f"  {dumped_line}")
+
+
+def _value_present(value: object) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _build_followup_source_readiness(
+    official_sources: dict[str, object],
+    research_sources: dict[str, object],
+) -> list[str]:
+    careers_candidates = official_sources.get("careers_url_candidates")
+    candidate_count = len(careers_candidates) if isinstance(careers_candidates, list) else 0
+    extra_sources = research_sources.get("extra_sources")
+    extra_source_count = len(extra_sources) if isinstance(extra_sources, list) else 0
+
+    careers_status = "linked" if _value_present(official_sources.get("careers_url")) else "missing"
+    if careers_status == "missing" and candidate_count:
+        careers_status = f"candidate-only ({candidate_count})"
+
+    lines = [
+        "## Source Readiness",
+        "",
+        f"- Official homepage: {'linked' if _value_present(official_sources.get('homepage')) else 'missing'}",
+        f"- Careers page: {careers_status}",
+        f"- Target job URL: {'linked' if _value_present(official_sources.get('job_url')) else 'missing'}",
+        f"- JD Markdown: {'linked' if _value_present(official_sources.get('job_path')) else 'missing'}",
+        f"- Score Report: {'linked' if _value_present(official_sources.get('report_path')) else 'missing'}",
+        f"- JobPlanet page: {'linked' if _value_present(research_sources.get('jobplanet_url')) else 'browse-only'}",
+        f"- Blind page: {'linked' if _value_present(research_sources.get('blind_url')) else 'browse-only'}",
+        f"- Extra research sources: {extra_source_count}",
+        "",
+    ]
+    return lines
+
+
+def _build_followup_source_candidates(
+    official_sources: dict[str, object],
+    research_sources: dict[str, object],
+) -> list[str]:
+    lines: list[str] = ["## Source Candidates To Confirm", ""]
+
+    homepage_candidate = official_sources.get("homepage_candidate")
+    if _value_present(homepage_candidate):
+        lines.append(f"- Homepage candidate: {homepage_candidate}")
+
+    careers_candidates = official_sources.get("careers_url_candidates")
+    if isinstance(careers_candidates, list) and careers_candidates:
+        lines.append("- Careers URL candidates:")
+        lines.extend([f"  - {candidate}" for candidate in careers_candidates[:6] if _value_present(candidate)])
+
+    extra_sources = research_sources.get("extra_sources")
+    if isinstance(extra_sources, list) and extra_sources:
+        lines.append("- Extra research sources:")
+        for item in extra_sources:
+            if not isinstance(item, dict):
+                continue
+            label = str(item.get("label") or "").strip()
+            url = str(item.get("url") or "").strip()
+            if label and url:
+                lines.append(f"  - {label}: {url}")
+
+    if len(lines) == 2:
+        lines.append("- 추가로 확인할 candidate source가 없습니다.")
+
+    lines.append("")
+    return lines
+
+
 def create_company_research_brief(
     company_name: str,
     *,
@@ -104,6 +306,16 @@ def create_company_research_brief(
         research_items = _default_research_items()
     parsed_extra_sources = _parse_extra_sources(extra_sources or [])
     ensure_dir(output_path.parent)
+    official_sources_metadata, research_sources_metadata = _structured_source_metadata(
+        homepage=homepage,
+        careers_url=careers_url,
+        job_url=job_url,
+        job_path=job_path,
+        report_path=report_path,
+        jobplanet_url=jobplanet_url,
+        blind_url=blind_url,
+        extra_sources=parsed_extra_sources,
+    )
 
     front_matter_lines = [
         "---",
@@ -117,9 +329,10 @@ def create_company_research_brief(
         f"job_path: {json.dumps(job_path.as_posix() if job_path else None, ensure_ascii=False)}",
         f"report_path: {json.dumps(report_path.as_posix() if report_path else None, ensure_ascii=False)}",
         f"prompt_path: {json.dumps(prompt_path.as_posix(), ensure_ascii=False)}",
-        "---",
-        "",
     ]
+    _append_yaml_block(front_matter_lines, "official_sources", official_sources_metadata)
+    _append_yaml_block(front_matter_lines, "research_sources", research_sources_metadata)
+    front_matter_lines.extend(["---", ""])
 
     official_sources = [
         f"- Homepage: {homepage or 'TBD'}",
@@ -155,6 +368,13 @@ def create_company_research_brief(
             *research_sources,
             "",
             "## Search Hints",
+            "",
+            *_build_official_url_hints(
+                company,
+                homepage=homepage,
+                careers_url=careers_url,
+                job_url=job_url,
+            ),
             "",
             *_build_company_search_hints(company),
             "",
@@ -214,36 +434,63 @@ def create_company_research_followup(
     if not research_items:
         research_items = _default_research_items()
 
+    official_sources = metadata.get("official_sources")
+    if not isinstance(official_sources, dict):
+        official_sources = {
+            "homepage": metadata.get("homepage"),
+            "careers_url": metadata.get("careers_url"),
+            "job_url": metadata.get("job_url"),
+            "job_path": metadata.get("job_path"),
+            "report_path": metadata.get("report_path"),
+        }
+
+    research_sources = metadata.get("research_sources")
+    if not isinstance(research_sources, dict):
+        research_sources = {
+            "jobplanet_url": metadata.get("jobplanet_url"),
+            "jobplanet_browse": JOBPLANET_COMPANIES_URL,
+            "blind_url": metadata.get("blind_url"),
+            "blind_browse": BLIND_COMPANIES_URL,
+            "extra_sources": [],
+        }
+
+    followup_front_matter_lines = [
+        "---",
+        f"company: {json.dumps(company, ensure_ascii=False)}",
+        f"created_at: {json.dumps(created_at, ensure_ascii=False)}",
+        f"mode: {json.dumps(normalized_mode, ensure_ascii=False)}",
+        f"source_brief: {json.dumps(brief_path.as_posix(), ensure_ascii=False)}",
+        f"homepage: {json.dumps(metadata.get('homepage'), ensure_ascii=False)}",
+        f"careers_url: {json.dumps(metadata.get('careers_url'), ensure_ascii=False)}",
+        f"job_url: {json.dumps(metadata.get('job_url'), ensure_ascii=False)}",
+        f"jobplanet_url: {json.dumps(metadata.get('jobplanet_url'), ensure_ascii=False)}",
+        f"blind_url: {json.dumps(metadata.get('blind_url'), ensure_ascii=False)}",
+        f"job_path: {json.dumps(metadata.get('job_path'), ensure_ascii=False)}",
+        f"report_path: {json.dumps(metadata.get('report_path'), ensure_ascii=False)}",
+    ]
+    _append_yaml_block(followup_front_matter_lines, "official_sources", official_sources)
+    _append_yaml_block(followup_front_matter_lines, "research_sources", research_sources)
+    followup_front_matter_lines.extend(["---", ""])
+
     ensure_dir(output_path.parent)
     body = "\n".join(
-        [
-            "---",
-            f"company: {json.dumps(company, ensure_ascii=False)}",
-            f"created_at: {json.dumps(created_at, ensure_ascii=False)}",
-            f"mode: {json.dumps(normalized_mode, ensure_ascii=False)}",
-            f"source_brief: {json.dumps(brief_path.as_posix(), ensure_ascii=False)}",
-            f"homepage: {json.dumps(metadata.get('homepage'), ensure_ascii=False)}",
-            f"careers_url: {json.dumps(metadata.get('careers_url'), ensure_ascii=False)}",
-            f"job_url: {json.dumps(metadata.get('job_url'), ensure_ascii=False)}",
-            f"jobplanet_url: {json.dumps(metadata.get('jobplanet_url'), ensure_ascii=False)}",
-            f"blind_url: {json.dumps(metadata.get('blind_url'), ensure_ascii=False)}",
-            f"job_path: {json.dumps(metadata.get('job_path'), ensure_ascii=False)}",
-            f"report_path: {json.dumps(metadata.get('report_path'), ensure_ascii=False)}",
-            "---",
-            "",
+        followup_front_matter_lines
+        + [
             f"# {company} {'Research Summary' if normalized_mode == 'summary' else 'Outreach Draft'}",
             "",
             "## Input Sources",
             "",
             f"- Research brief: {brief_path.as_posix()}",
-            f"- Homepage: {metadata.get('homepage') or 'TBD'}",
-            f"- Careers: {metadata.get('careers_url') or 'TBD'}",
-            f"- Target job URL: {metadata.get('job_url') or 'TBD'}",
-            f"- JobPlanet page: {metadata.get('jobplanet_url') or 'TBD'}",
-            f"- Blind page: {metadata.get('blind_url') or 'TBD'}",
-            f"- JD Markdown: {metadata.get('job_path') or 'TBD'}",
-            f"- Score Report: {metadata.get('report_path') or 'TBD'}",
+            f"- Homepage: {official_sources.get('homepage') or 'TBD'}",
+            f"- Careers: {official_sources.get('careers_url') or 'TBD'}",
+            f"- Target job URL: {official_sources.get('job_url') or 'TBD'}",
+            f"- JobPlanet page: {research_sources.get('jobplanet_url') or 'TBD'}",
+            f"- Blind page: {research_sources.get('blind_url') or 'TBD'}",
+            f"- JD Markdown: {official_sources.get('job_path') or 'TBD'}",
+            f"- Score Report: {official_sources.get('report_path') or 'TBD'}",
             "",
+            *_build_followup_source_readiness(official_sources, research_sources),
+            *_build_followup_source_candidates(official_sources, research_sources),
             "## Research Prompts To Reuse",
             "",
             *[f"- {item}" for item in research_items],
