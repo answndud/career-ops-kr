@@ -26,14 +26,14 @@
 
 1. 회사 조사가 필요하면 `career-ops-kr prepare-company-research "<company>"`를 실행합니다.
 2. 알고 있는 URL이 있으면 `--homepage`, `--careers-url`, `--job-url`, `--jobplanet-url`, `--blind-url`를 같이 넘깁니다.
-3. exact company URL을 아직 모르면 생성된 brief의 `Search Hints` 섹션에 있는 query와 search URL을 먼저 사용합니다.
+3. exact company URL을 아직 모르면 생성된 brief의 `Search Hints` 섹션을 먼저 봅니다. `homepage`나 `job_url`을 넘겼다면 official homepage 후보, careers URL 후보, domain 제한 검색 링크가 같이 생성됩니다. 이 단계의 후보 생성은 deterministic helper이고, 최종 exact URL 선택은 아직 사람이 직접 확정합니다.
 4. 저장한 JD나 리포트를 연결할 때는 `--job-path`, `--report-path`를 사용합니다.
 5. 추가 source가 있으면 `--extra-source label=https://...` 형태로 반복해서 붙입니다.
 6. 필요하면 `--prompt-path`로 checklist seed prompt를 바꿀 수 있습니다.
 7. 결과는 `research/<date>-<slug>.md` 또는 `--out` 경로에 생성됩니다.
 8. 이 명령은 네트워크를 호출하지 않고 `data/pipeline.md`, `data/applications.md`, `data/tracker-additions/`도 수정하지 않습니다.
 9. 후속 정리나 메시지 초안이 필요하면 `career-ops-kr prepare-company-followup <research-brief> --mode summary|outreach`를 실행합니다.
-10. `prepare-company-followup`도 네트워크를 호출하지 않고, intake/tracker를 수정하지 않으며 `research/*.md` 기반 후속 scaffold만 생성합니다.
+10. `prepare-company-followup`도 네트워크를 호출하지 않고, intake/tracker를 수정하지 않으며 `research/*.md` 기반 후속 scaffold만 생성합니다. follow-up 문서에는 brief에서 가져온 `Source Readiness` 요약과 `Source Candidates To Confirm` 섹션이 같이 들어가서, 공식 URL이 확정됐는지 후보만 있는지 먼저 확인할 수 있습니다.
 
 `JobPlanet`과 `Blind`는 여기서 URL과 조사 source를 정리하는 입력원입니다. crawler나 discovery 대상이 아닙니다.
 

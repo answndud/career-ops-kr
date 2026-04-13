@@ -126,6 +126,13 @@
 - 실제 저장된 mixed JD review 1차 정리
   - repo의 `jds/`, `data/applications.md`, `data/career-ops-web.db` `jobs`/`resumes`를 확인했지만 실제 저장된 JD/공고 데이터는 비어 있는 상태
   - 따라서 scorecard의 grouped signal 재설계는 진행하지 않고, 현재 explainability surface를 유지한 채 실제 JD가 쌓인 뒤 다시 판단하기로 정리
+- 회사 리서치 workflow 확장 2차 반영
+  - `src/career_ops_kr/research.py`가 `homepage`나 `job_url`이 있으면 brief의 `Search Hints`에 official homepage 후보, careers URL 후보, domain 제한 검색 링크를 같이 생성
+  - `tests/test_research.py`에 homepage 기반 careers candidate, job URL 기반 homepage/parent candidate 회귀 추가
+  - brief/follow-up front matter에 `official_sources`, `research_sources` structured metadata를 같이 기록해 후속 요약/아웃리치 재사용성을 높임
+  - exact company URL 자동 확정은 넣지 않고, candidate 생성 + 수동 확정 기준을 문서에 고정
+  - follow-up 문서가 `Source Readiness` 섹션에서 official/research source의 linked/candidate-only/browse-only 상태를 바로 보여주도록 정리
+  - follow-up 문서가 `Source Candidates To Confirm` 섹션에서 homepage/careers 후보 URL과 extra source를 다시 보여주도록 정리
 - repo-level ops check helper 1차 추가
   - `career-ops-kr ops-check`
   - `src/career_ops_kr/commands/ops.py`, `src/career_ops_kr/commands/ops_cli.py`

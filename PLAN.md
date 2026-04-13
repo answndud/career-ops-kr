@@ -394,8 +394,12 @@
 - 회사 리서치 workflow 확장
   - brief 후속 요약/아웃리치 scaffold 명령 완료
   - exact company URL 보조 탐색용 search hint 생성 완료
+  - homepage/job URL 기반 official homepage/careers 후보 URL hint 생성 완료
   - exact company URL의 자동 해석/선택은 아직 남음
+  - 현재는 후보 생성까지만 deterministic helper로 지원하고, 최종 exact URL 확정은 수동 검토로 유지
   - 회사별 source metadata 보강
+  - follow-up scaffold에서 source readiness 요약 재사용
+  - follow-up scaffold에서 candidate source 목록 재사용
 - 템플릿 다변화
   - 한국어 이력서
   - 영문 이력서

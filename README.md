@@ -420,6 +420,8 @@ career-ops-kr prepare-company-followup research/<brief>.md --mode summary
 ```
 
 결과는 `research/` 아래에 저장됩니다.
+`homepage`나 `job_url`을 같이 주면 brief의 `Search Hints`에 official homepage 후보, careers URL 후보, domain 제한 검색 링크도 함께 들어갑니다. 다만 최종 exact company URL 선택은 아직 자동화하지 않고, 사람이 후보를 보고 확정하는 방식으로 유지합니다.
+`prepare-company-followup`로 만든 summary/outreach 문서는 brief의 structured source metadata를 읽어 `Source Readiness` 요약과 `Source Candidates To Confirm` 섹션도 같이 보여줍니다.
 
 ## 8. 어떤 명령을 언제 쓰는가
 

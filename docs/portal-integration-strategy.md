@@ -373,7 +373,8 @@ v1:
 
 - crawler 구현 대상에 넣지 않는다.
 - `career-ops-kr prepare-company-research <company>`로 `research/*.md`를 생성한다.
-- exact company URL을 아직 모르면 brief의 `Search Hints` 섹션에서 JobPlanet / Blind 보조 탐색 링크를 사용한다.
+- exact company URL을 아직 모르면 brief의 `Search Hints` 섹션에서 JobPlanet / Blind 보조 탐색 링크와 homepage/job URL 기반 official URL 후보를 같이 사용한다.
+- final exact company URL 확정은 아직 자동화하지 않고, 사람이 후보를 검토해 선택한다.
 - 후속 정리나 메시지 초안이 필요하면 `career-ops-kr prepare-company-followup <research-brief> --mode summary|outreach`를 사용한다.
 - 알려진 회사 페이지 URL이 있으면 `--jobplanet-url`, `--blind-url`로 연결한다.
 - exact company URL을 아직 모르면 browse root만 남기고, 사람이 JobPlanet/Blind UI에서 수동 탐색한다.

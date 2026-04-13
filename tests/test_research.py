@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from career_ops_kr.research import create_company_research_brief, create_company_research_followup
+from career_ops_kr.utils import parse_front_matter
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -71,6 +72,56 @@ class CompanyResearchBriefTest(unittest.TestCase):
             self.assertIn(job_path.as_posix(), content)
             self.assertIn(report_path.as_posix(), content)
             self.assertIn("news: https://example.com/news", content)
+
+    def test_create_company_research_brief_adds_official_url_hints_from_homepage(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            output_path = create_company_research_brief(
+                "Toss",
+                out=temp_path / "toss.md",
+                homepage="https://toss.im",
+            )
+
+            content = output_path.read_text(encoding="utf-8")
+            self.assertIn("Official careers search query: site:toss.im \"Toss\" (career OR careers OR jobs OR recruit)", content)
+            self.assertIn("Likely careers URL candidates:", content)
+            self.assertIn("https://toss.im/career/", content)
+            self.assertIn("https://toss.im/careers/", content)
+            self.assertIn("https://toss.im/jobs/", content)
+
+    def test_create_company_research_brief_adds_homepage_and_parent_hints_from_job_url(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            output_path = create_company_research_brief(
+                "Karrot",
+                out=temp_path / "karrot.md",
+                job_url="https://about.daangn.com/jobs/backend-platform-engineer",
+            )
+
+            content = output_path.read_text(encoding="utf-8")
+            self.assertIn("Homepage candidate from job URL: https://about.daangn.com/", content)
+            self.assertIn("Official careers search query: site:about.daangn.com \"Karrot\" (career OR careers OR jobs OR recruit)", content)
+            self.assertIn("https://about.daangn.com/jobs/", content)
+
+    def test_create_company_research_brief_writes_structured_source_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            output_path = create_company_research_brief(
+                "Toss",
+                out=temp_path / "toss.md",
+                homepage="https://toss.im",
+                job_url="https://toss.im/career/jobs/123",
+                extra_sources=["news=https://example.com/news"],
+            )
+
+            metadata, _body = parse_front_matter(output_path)
+            self.assertEqual(metadata["official_sources"]["homepage"], "https://toss.im")
+            self.assertEqual(metadata["official_sources"]["job_url"], "https://toss.im/career/jobs/123")
+            self.assertIsNone(metadata["official_sources"]["homepage_candidate"])
+            self.assertIn("https://toss.im/career/", metadata["official_sources"]["careers_url_candidates"])
+            self.assertEqual(metadata["research_sources"]["jobplanet_browse"], "https://www.jobplanet.co.kr/companies")
+            self.assertEqual(metadata["research_sources"]["extra_sources"][0]["label"], "news")
+            self.assertEqual(metadata["research_sources"]["extra_sources"][0]["url"], "https://example.com/news")
 
     def test_create_company_research_brief_rejects_blank_company_name(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -182,19 +233,32 @@ class CompanyResearchBriefTest(unittest.TestCase):
             )
 
             content = followup_path.read_text(encoding="utf-8")
+            metadata, _body = parse_front_matter(followup_path)
             self.assertIn('mode: "summary"', content)
             self.assertIn(f'source_brief: "{brief_path.as_posix()}"', content)
             self.assertIn("# Toss Research Summary", content)
             self.assertIn("- Homepage: https://toss.im", content)
             self.assertIn("- JobPlanet page: https://www.jobplanet.co.kr/companies/123/info", content)
             self.assertIn("- 제품 요약", content)
+            self.assertIn("## Source Readiness", content)
+            self.assertIn("- Official homepage: linked", content)
+            self.assertIn("- Careers page: linked", content)
+            self.assertIn("- JobPlanet page: linked", content)
+            self.assertIn("## Source Candidates To Confirm", content)
+            self.assertIn("- 추가로 확인할 candidate source가 없습니다.", content)
             self.assertIn("### 회사 한 줄 요약", content)
             self.assertIn("### 다음 액션", content)
+            self.assertEqual(metadata["official_sources"]["homepage"], "https://toss.im")
+            self.assertEqual(metadata["research_sources"]["jobplanet_url"], "https://www.jobplanet.co.kr/companies/123/info")
 
     def test_create_company_research_followup_outreach_writes_outreach_sections(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
-            brief_path = create_company_research_brief("Karrot", out=temp_path / "karrot-brief.md")
+            brief_path = create_company_research_brief(
+                "Karrot",
+                out=temp_path / "karrot-brief.md",
+                job_url="https://about.daangn.com/jobs/backend-platform-engineer",
+            )
 
             followup_path = create_company_research_followup(
                 brief_path,
@@ -205,6 +269,13 @@ class CompanyResearchBriefTest(unittest.TestCase):
             content = followup_path.read_text(encoding="utf-8")
             self.assertIn('mode: "outreach"', content)
             self.assertIn("# Karrot Outreach Draft", content)
+            self.assertIn("## Source Readiness", content)
+            self.assertIn("- Careers page: candidate-only", content)
+            self.assertIn("- JobPlanet page: browse-only", content)
+            self.assertIn("## Source Candidates To Confirm", content)
+            self.assertIn("- Homepage candidate: https://about.daangn.com/", content)
+            self.assertIn("- Careers URL candidates:", content)
+            self.assertIn("https://about.daangn.com/jobs/", content)
             self.assertIn("### Recruiter Outreach", content)
             self.assertIn("### Hiring Manager Note", content)
             self.assertIn("### Referral Request", content)
